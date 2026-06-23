@@ -350,17 +350,19 @@ def build_play_output(hand: PlayedHand) -> str:
 
 
 def build_split_play_output(hand: PlayedSplitHand) -> str:
-    """Render a split hand (two sub-hands) as terminal output."""
+    """Render a split hand (the full split / re-split tree) as terminal output."""
     lines = [format_header("Played Hand (SPLIT)")]
     lines += _kv_block([
         ("Original hand", format_cards(hand.original_player_cards)),
         ("Dealer upcard", hand.dealer_cards[0]),
+        ("Split hands", str(hand.num_split_hands)),
     ])
     for i, sub in enumerate(hand.split_hands, start=1):
         actions = format_cards(sub.actions_taken) or "(none)"
         outcome = sub.final_outcome.value if sub.final_outcome else "(unresolved)"
+        origin = "re-split" if sub.from_resplit else "split"
         lines.append("")
-        lines.append(format_section(f"Split hand {i}"))
+        lines.append(format_section(f"Split hand {i} ({origin}, depth {sub.split_depth})"))
         lines += _kv_block([
             ("Cards", format_cards(sub.cards)),
             ("Actions", actions),
@@ -883,10 +885,9 @@ def build_diagnose_output(diag, profile) -> str:
     if profile.profile_description:
         lines.append(format_kv("About", profile.profile_description))
     lines.append(format_kv(
-        "Metadata note",
-        "hit-split-aces and double-after-split now affect the simulator; "
-        "resplit / max-split-hands remain partly descriptive (full re-split "
-        "play is not yet simulated).",
+        "Simulator note",
+        "double-after-split, hit-split-aces, resplit and max-split-hands are "
+        "all enforced by the simulator's full re-split tree (v1.6.0).",
     ))
 
     extra_warnings = [w for w in diag.warnings if w != explain_insurance_no()]

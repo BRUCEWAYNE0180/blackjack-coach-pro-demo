@@ -30,13 +30,13 @@ class RuleProfile:
         split_allowed: True if splitting pairs is allowed at all.
         blackjack_payout: Payout multiple for a natural blackjack (e.g. 1.5
             for 3:2). Informational.
-        resplit_allowed: Metadata - whether re-splitting is allowed. NOTE:
-            metadata only; the v1.4 engine/simulator do not yet vary play by
-            this field.
-        max_split_hands: Metadata - maximum number of hands from splitting.
-            NOTE: metadata only (not yet enforced by the simulator).
-        hit_split_aces: Metadata - whether hitting split aces is allowed.
-            NOTE: metadata only (not yet enforced by the simulator).
+        resplit_allowed: Whether re-splitting an already-split pair is allowed.
+            Enforced by the simulator's re-split tree (v1.6.0).
+        max_split_hands: Maximum number of hands a split may produce. Enforced
+            by the simulator's re-split tree (v1.6.0).
+        hit_split_aces: Whether hitting split aces is allowed. Enforced by the
+            simulator (v1.6.0): when False, each split ace gets exactly one
+            card and stops.
         profile_description: Short human-readable description.
         notes: Free-form notes (e.g. which fields are metadata only).
     """
@@ -66,9 +66,8 @@ class RuleProfile:
 # --- Built-in profiles -------------------------------------------------------
 
 _METADATA_NOTE = (
-    "resplit_allowed, max_split_hands, and hit_split_aces are professional "
-    "metadata for description only; the v1.4 engine and simulator do not yet "
-    "vary play by these fields."
+    "double_after_split, resplit_allowed, max_split_hands, and hit_split_aces "
+    "are enforced by the simulator's full split / re-split tree (v1.6.0)."
 )
 
 # Multi-deck shoe, dealer HITS soft 17, double after split + late surrender.
@@ -303,10 +302,10 @@ def profile_supports_das(profile: RuleProfile) -> bool:
 
 
 def profile_supports_resplit(profile: RuleProfile) -> bool:
-    """Whether the profile allows re-splitting (metadata)."""
+    """Whether the profile allows re-splitting (enforced by the simulator)."""
     return profile.resplit_allowed
 
 
 def profile_supports_hit_split_aces(profile: RuleProfile) -> bool:
-    """Whether the profile allows hitting split aces (metadata)."""
+    """Whether the profile allows hitting split aces (enforced by the simulator)."""
     return profile.hit_split_aces

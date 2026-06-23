@@ -59,12 +59,14 @@ tool relies on and the project's evolution.
 - `app/shoe.py` — Virtual multi-deck shoe: build, shuffle (seedable), draw,
   cards/decks remaining, penetration, and deck validation.
 - `app/simulator.py` — Local training simulator: deals hands from the shoe,
-  plays a full hand against the dealer (H17/S17), plays basic pair splits, and
-  resolves the outcome. Ties together the evaluator, strategy engine, and
-  counting (`SimulatedHand`, `deal_initial_hand`, `simulate_training_hand`,
-  `HandOutcome`, `PlayedHand`, `play_dealer_hand`, `resolve_outcome`,
-  `play_training_hand`, `SplitSubHand`, `PlayedSplitHand`, `can_split_hand`,
-  `split_initial_hand`, `play_split_subhand`).
+  plays a full hand against the dealer (H17/S17), plays a full pair-split /
+  re-split tree, and resolves the outcome. Ties together the evaluator,
+  strategy engine, and counting (`SimulatedHand`, `deal_initial_hand`,
+  `simulate_training_hand`, `HandOutcome`, `PlayedHand`, `play_dealer_hand`,
+  `resolve_outcome`, `play_training_hand`, `SplitSubHand`, `PlayedSplitHand`,
+  `can_split_hand`, `split_initial_hand`, `play_split_subhand`, and the v1.6.0
+  re-split tree `_play_split_tree` / `_play_out_position` with the
+  `RESPLIT_LIMIT_REACHED` marker).
 - `app/quiz.py` — Quiz mode and scored sessions: generate/grade basic-strategy
   questions, normalise user actions, and run multi-question strategy/count
   sessions (`QuizQuestion`, `QuizResult`, `CountQuizResult`,
@@ -582,7 +584,7 @@ are descriptive metadata for now and do not yet change engine play; this is
 documented on the fields and in profile notes. Every new profile has a
 description and tests.
 
-### v1.5.0 — Profile-Aware Split Rules (current)
+### v1.5.0 — Profile-Aware Split Rules (done)
 
 Promotes part of the v1.4.0 profile metadata into active behaviour in the
 simulator and diagnostics. No changes to basic strategy, Hi-Lo math,
@@ -606,8 +608,46 @@ Delivered:
 
 - `double_after_split` and `hit_split_aces` actively change simulator play.
 - `resplit_allowed` and `max_split_hands` gate the split-rule helpers and
-  surface honest warnings; full multi-round re-split is still simplified (a
-  hand that could re-split is played as a normal total with a clear note).
+  surface honest warnings; the **play** simulator's full re-split tree arrives
+  in v1.6.0 (below).
+
+### v1.6.0 — Full Re-Split Tree Simulator (current)
+
+Completes the split logic started in v1.5.0: the play simulator now plays a
+real split / re-split tree rather than treating re-splits as a simplified
+warning. No changes to basic strategy, Hi-Lo math, deviations, or session
+history.
+
+Delivered:
+
+- **Simulator re-split tree** (`_play_split_tree`, `_play_out_position` in
+  `app/simulator.py`): the opening pair is split, and each resulting hand may
+  itself be re-split up to `profile.max_split_hands` when basic strategy says
+  SPLIT and the rules allow it.
+- **Rule enforcement**:
+  - `resplit_allowed=false` → a pair that could re-split is played as a normal
+    total with a clear warning.
+  - `max_split_hands` → never exceeded; once reached, further pairs are played
+    as totals with a warning.
+  - `hit_split_aces=false` → each split ace gets exactly one card and stops (no
+    hitting, no re-splitting); `true` → split aces play normally and may
+    re-split.
+  - `double_after_split` → split sub-hands double only when allowed.
+- **Result model**: `SplitSubHand` records `hand_id`, `split_depth`, and
+  `from_resplit`; `PlayedSplitHand` records `num_split_hands`. A new
+  `RESPLIT_LIMIT_REACHED` marker flags a pair played as a total because the
+  rules forbade a re-split. The legacy `RESPLIT_NOT_IMPLEMENTED` marker is no
+  longer produced.
+- **CLI**: `play` shows the number of split hands and labels each sub-hand as
+  `split` or `re-split` with its depth.
+- **Tests**: a deterministic `TestFullResplitTree` suite (re-split up to the
+  max, blocked when disallowed, max respected, split-aces one-card vs normal,
+  DAS allowed/disallowed) plus a CLI re-split test.
+
+**How the profile fields are used now:** `double_after_split`, `hit_split_aces`,
+`resplit_allowed`, and `max_split_hands` all drive real play in the play
+simulator's re-split tree. Per `PROJECT_RULES.md`, all re-split logic must be
+covered by deterministic tests.
 
 ### v2.0 — Possible Web UI (if decided later)
 

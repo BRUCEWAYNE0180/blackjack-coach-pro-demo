@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.5.0 feature summary
+## v1.6.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -59,6 +59,9 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 - **Profile-aware split rules** (v1.5.0): the simulator and diagnostics now
   respect split / split-aces / double-after-split rules, with a `split-rules`
   command to inspect them.
+- **Full re-split tree simulator** (v1.6.0): the play simulator now plays a real
+  split / re-split tree up to `max_split_hands`, honouring `resplit_allowed`,
+  `hit_split_aces`, and `double_after_split`.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -256,10 +259,9 @@ independently. The dealer then plays **once** and each sub-hand is resolved
 against the dealer's final hand. The CLI prints the original hand, both split
 hands with their actions and outcomes, and the dealer's final cards.
 
-**Out of scope for v0.6:** re-splitting (if a split hand could split again it is
-played as a normal total, with a warning) and special split-Aces rules (Aces
-are split but played normally, with a warning). There is no money, bankroll,
-betting units, or payout modelling.
+**Re-splitting and split aces** are now fully simulated — see
+[Full re-split tree simulator (v1.6.0)](#full-re-split-tree-simulator-v160)
+below. There is no money, bankroll, betting units, or payout modelling.
 
 ## Quiz mode (v0.7)
 
@@ -433,9 +435,9 @@ aces, blackjack payout, notes, and description).
 
 Shorthand for the rule codes: **H17/S17** = dealer hits/stands on soft 17;
 **DAS/NDAS** = double-after-split allowed / not allowed; **LS/NS** = late
-surrender / no surrender. Some fields (`resplit_allowed`, `max_split_hands`,
-`hit_split_aces`) are professional **metadata** for description and are not yet
-used to vary engine play; this is stated wherever they appear.
+surrender / no surrender. The split-related fields (`resplit_allowed`,
+`max_split_hands`, `hit_split_aces`, `double_after_split`) now drive real play
+in the simulator — see [Full re-split tree simulator (v1.6.0)](#full-re-split-tree-simulator-v160).
 
 ## Profile-aware split rules (v1.5.0)
 
@@ -457,13 +459,61 @@ What is now profile-aware:
 - **Double after split**: split sub-hands only double when `double_after_split`
   is allowed.
 - **Re-split / max split hands**: `can_resplit` and `max_split_hands` are
-  enforced by the split-rule helpers and surfaced as honest warnings; full
-  multi-round re-split play is still simplified (a hand that could re-split is
-  played as a normal total with a clear note).
+  enforced by the split-rule helpers and surfaced as honest warnings. As of
+  v1.6.0 the **play** simulator also plays a full re-split tree (see below).
 
 `split-rules` prints whether the hand is a pair / aces, whether it can split or
 re-split, the max split hands, hit-split-aces, double-after-split, a reason, and
 any warnings.
+
+## Full re-split tree simulator (v1.6.0)
+
+The `play` simulator now plays a real **split / re-split tree** instead of
+treating re-splits as a simplified warning. When a split hand is again a pair
+and basic strategy says SPLIT, it is re-split — provided the profile allows it:
+
+- **`resplit_allowed`**: when false, a pair that could re-split is played as a
+  normal total with a clear warning (it is never re-split).
+- **`max_split_hands`**: the tree never produces more than this many hands. Once
+  the cap is reached, any further pair is played as a normal total with a
+  warning.
+- **`hit_split_aces`**: when false, each split ace receives exactly **one card**
+  and stops (no hitting, no re-splitting); when true, split aces play normally
+  and may even re-split.
+- **`double_after_split`**: split sub-hands double only when the profile allows
+  doubling after a split.
+
+The dealer still plays **once** for all sub-hands. The CLI shows the number of
+split hands and labels each sub-hand as a `split` or `re-split` with its depth:
+
+```bash
+blackjack-coach play --decks 6 --seed 428 --profile SIX_DECK_H17_DAS_LS
+```
+
+```text
+=== Played Hand (SPLIT) ===
+Original hand: 8, 8
+Dealer upcard: 4
+Split hands  : 3
+
+-- Split hand 1 (split, depth 1) --
+Cards  : 8, A
+Actions: STAND
+Outcome: DEALER_BUST
+
+-- Split hand 2 (re-split, depth 2) --
+Cards  : 8, 9
+Actions: STAND
+Outcome: DEALER_BUST
+
+-- Split hand 3 (re-split, depth 2) --
+Cards  : 8, 6
+Actions: STAND
+Outcome: DEALER_BUST
+```
+
+There is still no money, bankroll, betting units, or payout modelling — this is
+local, simulated practice only.
 
 ## Library usage
 
@@ -492,12 +542,12 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.5.0 makes part of the v1.4.0 profile metadata **active**: the simulator and
-diagnostics are now profile-aware for split, split-aces, and double-after-split
-rules (via `app/split_rules.py` and a `split-rules` command). No changes to
-basic strategy, Hi-Lo math, deviations, or session history. It is a
-professional coach for local practice, demo money, video games, recreational
-tournaments, and training.
+v1.6.0 completes the split logic: the **play** simulator now plays a full
+split / re-split tree (up to `max_split_hands`, honouring `resplit_allowed`,
+`hit_split_aces`, and `double_after_split`), building on the profile-aware split
+rules introduced in v1.5.0. No changes to basic strategy, Hi-Lo math,
+deviations, or session history. It is a professional coach for local practice,
+demo money, video games, recreational tournaments, and training.
 
 Planned next (educational/local only): a possible v2.0 web UI if decided later.
 See

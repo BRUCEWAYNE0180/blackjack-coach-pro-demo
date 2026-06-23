@@ -176,6 +176,17 @@ class TestCliPlay:
         assert "Final dealer cards" in out
         assert "True count after" in out
 
+    def test_play_shows_resplit_tree(self, capsys):
+        # Seed 428 with this profile re-splits into three hands; the CLI must
+        # show the extra hand and label it as a re-split.
+        exit_code = cli.main(["play", "--decks", "6", "--seed", "428",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Split hands  : 3" in out
+        assert "Split hand 3" in out
+        assert "re-split" in out
+
 
 
 class TestCliQuiz:
