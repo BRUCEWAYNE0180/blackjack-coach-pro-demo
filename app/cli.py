@@ -25,10 +25,12 @@ bets, uses any camera/video, or promises winnings. See docs/PROJECT_RULES.md.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from collections.abc import Sequence
 
 from . import __version__
+from . import cards as cards_mod
 from .counting import EDUCATIONAL_NOTE, CountingState, update_running_count_many
 from .decision_audit import audit_decision
 from .decision_diagnostics import explain_decision_factors
@@ -100,6 +102,48 @@ PROG = "blackjack-coach"
 
 # Short scope reminder shown at the foot of command output.
 SCOPE_FOOTER = "Educational / simulated practice only - no real bets, no winnings."
+
+# Card-rendering configuration, set from the global --no-color / --plain-cards
+# flags (and the terminal's colour support) in main(). Display only.
+_RENDER = {"color": True, "show_suit": True}
+
+
+def _configure_rendering(color: bool, show_suit: bool) -> None:
+    """Set the global card-rendering options (colour, suit symbols)."""
+    _RENDER["color"] = color
+    _RENDER["show_suit"] = show_suit
+
+
+def _stable_seed(ranks: Sequence[str]) -> int:
+    """Deterministic seed for decorative suit assignment from a rank list."""
+    seed = 0
+    for i, ch in enumerate("|".join(ranks)):
+        seed = (seed * 131 + ord(ch) + i) % (2_147_483_647)
+    return seed
+
+
+def _render_cards(tokens, *, decorative: bool = False, seed: int | None = None) -> str:
+    """Render cards for display, honouring the global colour / suit options.
+
+    ``tokens`` may be a list of :class:`app.cards.RenderedCard` (user-parsed,
+    keeping any typed suits) or a list of plain rank strings (engine/simulator
+    output). For plain ranks, decorative suits are assigned deterministically
+    when ``decorative`` is set and suit display is on; otherwise the rank is
+    shown alone.
+    """
+    items = list(tokens)
+    if items and isinstance(items[0], cards_mod.RenderedCard):
+        rendered = items
+    else:
+        ranks = [str(t) for t in items]
+        if _RENDER["show_suit"] and decorative:
+            decorative_seed = seed if seed is not None else _stable_seed(ranks)
+            rendered = cards_mod.assign_display_suits(ranks, seed=decorative_seed)
+        else:
+            rendered = [cards_mod.make_card(r) for r in ranks]
+    return cards_mod.format_cards(
+        rendered, color=_RENDER["color"], show_suit=_RENDER["show_suit"]
+    )
 
 
 def _kv_block(pairs: list[tuple[str, object]]) -> list[str]:
@@ -281,8 +325,8 @@ def build_simulate_output(hand: SimulatedHand) -> str:
     rec = hand.recommendation
     lines = [format_header("Training Simulator")]
     lines += _kv_block([
-        ("Player cards", format_cards(hand.player_cards)),
-        ("Dealer upcard", hand.dealer_upcard),
+        ("Player cards", _render_cards(list(hand.player_cards), decorative=True)),
+        ("Dealer upcard", _render_cards([hand.dealer_upcard], decorative=True)),
         ("Recommendation", rec.action.value),
         ("Why", rec.reason),
         ("Running count before", f"{hand.running_count_before:+d}"),
@@ -346,11 +390,11 @@ def build_play_output(hand: PlayedHand) -> str:
     outcome = hand.final_outcome.value if hand.final_outcome else "NOT PLAYED (split)"
     lines = [format_header("Played Hand")]
     lines += _kv_block([
-        ("Player starting cards", format_cards(hand.player_cards[:2])),
-        ("Dealer upcard", hand.dealer_cards[0]),
+        ("Player starting cards", _render_cards(list(hand.player_cards[:2]), decorative=True)),
+        ("Dealer upcard", _render_cards([hand.dealer_cards[0]], decorative=True)),
         ("Actions taken", format_cards(hand.actions_taken) or "(none)"),
-        ("Final player cards", format_cards(hand.player_cards)),
-        ("Final dealer cards", format_cards(hand.dealer_cards)),
+        ("Final player cards", _render_cards(list(hand.player_cards), decorative=True)),
+        ("Final dealer cards", _render_cards(list(hand.dealer_cards), decorative=True)),
         ("Outcome", outcome),
         ("Running count before", f"{hand.running_count_before:+d}"),
         ("Running count after", f"{hand.running_count_after:+d}"),
@@ -366,8 +410,8 @@ def build_split_play_output(hand: PlayedSplitHand) -> str:
     """Render a split hand (the full split / re-split tree) as terminal output."""
     lines = [format_header("Played Hand (SPLIT)")]
     lines += _kv_block([
-        ("Original hand", format_cards(hand.original_player_cards)),
-        ("Dealer upcard", hand.dealer_cards[0]),
+        ("Original hand", _render_cards(list(hand.original_player_cards), decorative=True)),
+        ("Dealer upcard", _render_cards([hand.dealer_cards[0]], decorative=True)),
         ("Split hands", str(hand.num_split_hands)),
     ])
     for i, sub in enumerate(hand.split_hands, start=1):
@@ -377,13 +421,13 @@ def build_split_play_output(hand: PlayedSplitHand) -> str:
         lines.append("")
         lines.append(format_section(f"Split hand {i} ({origin}, depth {sub.split_depth})"))
         lines += _kv_block([
-            ("Cards", format_cards(sub.cards)),
+            ("Cards", _render_cards(list(sub.cards), decorative=True)),
             ("Actions", actions),
             ("Outcome", outcome),
         ])
     lines.append("")
     lines += _kv_block([
-        ("Final dealer cards", format_cards(hand.dealer_cards)),
+        ("Final dealer cards", _render_cards(list(hand.dealer_cards), decorative=True)),
         ("Running count before", f"{hand.running_count_before:+d}"),
         ("Running count after", f"{hand.running_count_after:+d}"),
         ("True count after", f"{hand.true_count_after:+.2f}"),
@@ -897,12 +941,16 @@ def _run_deviations(argv: Sequence[str]) -> int:
     return 0
 
 
-def build_diagnose_output(diag, profile) -> str:
+def build_diagnose_output(diag, profile, player_display=None, dealer_display=None) -> str:
     """Render a decision diagnostic as terminal output."""
+    cards_line = (player_display if player_display is not None
+                  else format_cards(diag.player_cards))
+    dealer_line = (dealer_display if dealer_display is not None
+                   else diag.dealer_upcard)
     lines = [format_header("Decision Diagnostic")]
     lines += _kv_block([
-        ("Player hand", format_cards(diag.player_cards)),
-        ("Dealer upcard", diag.dealer_upcard),
+        ("Player hand", cards_line),
+        ("Dealer upcard", dealer_line),
         ("Hand type", diag.hand_description),
         ("Profile", diag.profile_key),
         ("Recommended action", diag.recommended_action),
@@ -979,14 +1027,20 @@ def _run_diagnose(argv: Sequence[str]) -> int:
     args = parser.parse_args(argv)
 
     try:
-        cards = _parse_cards(args.cards)
+        cards = cards_mod.parse_cards(args.cards)
+        dealer_card = cards_mod.parse_card(args.dealer)
         profile = get_profile(args.profile)
-        diag = explain_decision_factors(cards, args.dealer, profile)
+        diag = explain_decision_factors(
+            cards_mod.cards_to_ranks(cards), dealer_card.rank, profile)
     except (ValueError, KeyError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 
-    print(build_diagnose_output(diag, profile))
+    print(build_diagnose_output(
+        diag, profile,
+        player_display=_render_cards(cards),
+        dealer_display=_render_cards([dealer_card]),
+    ))
     return 0
 
 
@@ -1057,14 +1111,15 @@ def _run_profiles(argv: Sequence[str]) -> int:
     return 0
 
 
-def build_split_rules_output(decision, cards, profile) -> str:
+def build_split_rules_output(decision, cards, profile, cards_display=None) -> str:
     """Render a profile-aware split-rules decision as terminal output."""
     def yn(value: bool) -> str:
         return "yes" if value else "no"
 
+    cards_line = cards_display if cards_display is not None else format_cards(cards)
     lines = [format_header("Split Rules")]
     lines += _kv_block([
-        ("Cards", format_cards(cards)),
+        ("Cards", cards_line),
         ("Profile", profile.key),
         ("Is pair", yn(decision.is_pair)),
         ("Is aces", yn(decision.is_aces)),
@@ -1105,14 +1160,16 @@ def _run_split_rules(argv: Sequence[str]) -> int:
     args = parser.parse_args(argv)
 
     try:
-        cards = _parse_cards(args.cards)
+        cards = cards_mod.parse_cards(args.cards)
         profile = get_profile(args.profile)
-        decision = explain_split_rules(cards, profile, args.split_hands)
+        ranks = cards_mod.cards_to_ranks(cards)
+        decision = explain_split_rules(ranks, profile, args.split_hands)
     except (ValueError, KeyError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 
-    print(build_split_rules_output(decision, cards, profile))
+    print(build_split_rules_output(
+        decision, ranks, profile, cards_display=_render_cards(cards)))
     return 0
 
 
@@ -1288,12 +1345,16 @@ def _run_matrix(argv: Sequence[str]) -> int:
     return 0
 
 
-def build_audit_output(audit) -> str:
+def build_audit_output(audit, player_display=None, dealer_display=None) -> str:
     """Render a per-hand decision audit for the terminal."""
+    cards_line = (player_display if player_display is not None
+                  else format_cards(audit.player_cards))
+    dealer_line = (dealer_display if dealer_display is not None
+                   else audit.dealer_upcard)
     lines = [format_header("Decision Audit")]
     lines += _kv_block([
-        ("Cards", format_cards(audit.player_cards)),
-        ("Dealer", audit.dealer_upcard),
+        ("Cards", cards_line),
+        ("Dealer", dealer_line),
         ("Profile", audit.profile_key),
         ("Hand", audit.hand_description),
         ("Category", audit.category),
@@ -1345,14 +1406,20 @@ def _run_audit(argv: Sequence[str]) -> int:
     args = parser.parse_args(argv)
 
     try:
-        cards = _parse_cards(args.cards)
+        cards = cards_mod.parse_cards(args.cards)
+        dealer_card = cards_mod.parse_card(args.dealer)
         profile = get_profile(args.profile)
-        audit = audit_decision(cards, args.dealer, profile)
+        audit = audit_decision(cards_mod.cards_to_ranks(cards),
+                               dealer_card.rank, profile)
     except (ValueError, KeyError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 
-    print(build_audit_output(audit))
+    print(build_audit_output(
+        audit,
+        player_display=_render_cards(cards),
+        dealer_display=_render_cards([dealer_card]),
+    ))
     return 0
 
 
@@ -1426,12 +1493,16 @@ def _run_outcomes(argv: Sequence[str]) -> int:
     return 0
 
 
-def build_coach_step_output(step) -> str:
+def build_coach_step_output(step, player_display=None, dealer_display=None) -> str:
     """Render a single guided-coach recommendation for the terminal."""
+    cards_line = (player_display if player_display is not None
+                  else format_cards(step.player_cards))
+    dealer_line = (dealer_display if dealer_display is not None
+                   else step.dealer_upcard)
     lines = [format_header("Guided Coach")]
     lines += _kv_block([
-        ("Cards", format_cards(step.player_cards)),
-        ("Dealer upcard", step.dealer_upcard),
+        ("Cards", cards_line),
+        ("Dealer upcard", dealer_line),
         ("Profile", step.profile_key),
         ("Hand", step.hand_description),
         ("Recommended action", step.recommended_action.value),
@@ -1463,9 +1534,9 @@ def build_coach_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--cards", required=True,
-                        help="Player cards, comma-separated, e.g. 'A,7'.")
+                        help="Player cards, e.g. 'A,7', 'A\u2660,7\u2665', or 'AS,7H'.")
     parser.add_argument("--dealer", required=True,
-                        help="Dealer upcard, e.g. '9', '10', or 'A'.")
+                        help="Dealer upcard, e.g. '9', '10', 'A', or '9\u2666'.")
     parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
                         choices=sorted(PROFILES),
                         help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
@@ -1478,14 +1549,20 @@ def _run_coach(argv: Sequence[str]) -> int:
     args = parser.parse_args(argv)
 
     try:
-        cards = _parse_cards(args.cards)
+        cards = cards_mod.parse_cards(args.cards)
+        dealer_card = cards_mod.parse_card(args.dealer)
         profile = get_profile(args.profile)
-        step = build_coach_step(cards, args.dealer, profile)
+        step = build_coach_step(cards_mod.cards_to_ranks(cards),
+                                dealer_card.rank, profile)
     except (ValueError, KeyError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 
-    print(build_coach_step_output(step))
+    print(build_coach_step_output(
+        step,
+        player_display=_render_cards(cards),
+        dealer_display=_render_cards([dealer_card]),
+    ))
     return 0
 
 
@@ -1494,16 +1571,16 @@ def build_coach_play_output(result) -> str:
     lines = [format_header("Guided Coach - Played Hand")]
     lines += _kv_block([
         ("Profile", result.profile_key),
-        ("Starting cards", format_cards(result.initial_player_cards)),
-        ("Dealer upcard", result.dealer_upcard),
+        ("Starting cards", _render_cards(list(result.initial_player_cards), decorative=True)),
+        ("Dealer upcard", _render_cards([result.dealer_upcard], decorative=True)),
     ])
 
     for step in result.coach_steps:
         lines.append("")
         lines.append(format_section(f"Step {step.step_id}"))
         lines += _kv_block([
-            ("Player cards", format_cards(step.player_cards)),
-            ("Dealer upcard", step.dealer_upcard),
+            ("Player cards", _render_cards(list(step.player_cards), decorative=True)),
+            ("Dealer upcard", _render_cards([step.dealer_upcard], decorative=True)),
             ("Coach recommends", step.recommended_action.value),
             ("Why", step.explanation),
         ])
@@ -1511,8 +1588,8 @@ def build_coach_play_output(result) -> str:
     lines.append("")
     lines.append(format_section("Result"))
     lines += _kv_block([
-        ("Final player cards", format_cards(result.final_player_cards)),
-        ("Final dealer cards", format_cards(result.final_dealer_cards)),
+        ("Final player cards", _render_cards(list(result.final_player_cards), decorative=True)),
+        ("Final dealer cards", _render_cards(list(result.final_dealer_cards), decorative=True)),
         ("Final outcome", result.final_outcome),
         ("Result label", result.result_label),
         ("Total steps", result.total_steps),
@@ -1604,6 +1681,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
     """
     args = list(sys.argv[1:] if argv is None else argv)
+
+    # Global display flags can appear anywhere; strip them before dispatch so
+    # the subcommand parsers don't see them.
+    color_flag = True
+    show_suit_flag = True
+    cleaned: list[str] = []
+    for token in args:
+        if token == "--no-color":
+            color_flag = False
+        elif token == "--plain-cards":
+            show_suit_flag = False
+        else:
+            cleaned.append(token)
+    args = cleaned
+
+    # Colour is used only on a real terminal (and unless NO_COLOR is set), so
+    # piped / captured output stays plain text.
+    color_enabled = (
+        color_flag
+        and os.environ.get("NO_COLOR") is None
+        and sys.stdout.isatty()
+    )
+    _configure_rendering(color=color_enabled, show_suit=show_suit_flag)
+
     if args and args[0] in ("--version", "-V"):
         print(f"{PROG} {__version__}")
         return 0

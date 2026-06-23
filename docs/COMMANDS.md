@@ -333,5 +333,37 @@ the coach play a hand; `play` is the existing auto-simulation; `audit` is the
 technical breakdown; `diagnose` is the expanded explanation. None of them change
 the strategy engine.
 
+## Professional card display (v1.10.0)
+
+The card-facing commands (`coach`, `coach-play`, `play`, `simulate`, `diagnose`,
+`audit`, `split-rules`) accept and show cards with suits and colour.
+
+Card input forms (all equivalent for the engine):
+
+```bash
+blackjack-coach coach --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach --cards AS,7H --dealer 9D --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
+```
+
+- Suits: symbols `♠♥♦♣`, letters `S/H/D/C` (e.g. `AS`, `10H`, `Kd`), or names
+  (`A spades`, `Q clubs`). No suit -> rank only.
+- Hearts/diamonds render red; spades/clubs use the default colour.
+
+Global display flags (accepted by any command, anywhere on the line):
+
+```bash
+blackjack-coach coach --cards A♠,7♥ --dealer 9♦ --no-color
+blackjack-coach coach --cards A♠,7♥ --dealer 9♦ --plain-cards
+```
+
+- `--no-color`: plain text, no ANSI colour codes.
+- `--plain-cards`: ranks only, no suit symbols.
+
+Colour is used only on a real terminal; captured or piped output is plain text.
+The display layer never changes strategy, counting, outcomes, or scoring - the
+engine always receives plain ranks.
+
+
 
 

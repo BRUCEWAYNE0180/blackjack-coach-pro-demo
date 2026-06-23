@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.9.0 feature summary
+## v1.10.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -72,6 +72,9 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 - **Guided coach mode** (v1.9.0): the coach picks and explains the best play -
   ask for direct advice (`coach`) or let the coach play a full hand
   automatically, step by step (`coach-play`).
+- **Professional card display** (v1.10.0): enter and see cards with suits and
+  colour (`A♠`, `10♥`, `K♦`, `8♣`) - hearts/diamonds in red - with `--no-color`
+  and `--plain-cards` options. Visual only; the engine still uses plain ranks.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -135,6 +138,7 @@ blackjack-coach audit --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
 blackjack-coach play --decks 6 --seed 428 --profile SIX_DECK_H17_DAS_LS --save-outcome
 blackjack-coach outcomes
 blackjack-coach coach --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS
 blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS
 ```
 
@@ -687,6 +691,34 @@ existing auto-simulation; `audit` is the **technical** breakdown; and
 `diagnose` is the **expanded** explanation. The coach never modifies the
 strategy engine - it only reads it.
 
+## Professional card display (v1.10.0)
+
+Enter and see cards with figures, suits, and colour, so the coach feels like a
+complete blackjack calculator. Card input accepts several forms - all of these
+mean the same hand to the engine:
+
+```bash
+blackjack-coach coach --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach --cards AS,7H --dealer 9D --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach --cards A♠,7♥ --dealer 9♦ --no-color
+blackjack-coach coach --cards A♠,7♥ --dealer 9♦ --plain-cards
+```
+
+- Suits can be symbols (`♠♥♦♣`), letters (`S/H/D/C`, e.g. `AS`, `10H`, `Kd`), or
+  names (`A spades`, `Q clubs`). A card with no suit shows just its rank.
+- **Hearts and diamonds are shown in red**; spades and clubs use the terminal's
+  default colour so they stay readable on dark backgrounds.
+- `--no-color` prints plain text (no ANSI); `--plain-cards` shows ranks only
+  (no suit symbols). Colour is used only on a real terminal, so piped or
+  redirected output stays plain automatically.
+- Simulated hands (`play`, `coach-play`, `simulate`) get deterministic
+  decorative suits for a polished look.
+
+This is a **display / input layer only**. The strategy engine always receives
+plain ranks (`A♠,7♥` → `["A", "7"]`), so suits and colour never change
+strategy, counting, outcomes, or scoring.
+
 ## Library usage
 
 ```python
@@ -714,14 +746,14 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.9.0 adds a guided coach mode (`app/guided_coach.py`, the `coach` and
-`coach-play` commands): the coach picks and explains the best play, and can play
-a full simulated hand step by step, optionally saving the outcome. It keeps
-recommendation, explanation, executed action, and outcome separate - the coach
-decides; the user receives guidance. No changes to basic strategy, Hi-Lo math,
-deviations, the simulator, the matrix/audit tooling, or outcome history. It is a
-professional coach for local practice, demo money, video games, recreational
-tournaments, and training.
+v1.10.0 adds a professional card renderer (`app/cards.py`): cards can be entered
+and shown with suits and colour (`A♠`, `10♥`, ...), with `--no-color` and
+`--plain-cards` options, across the card-facing commands. It is a display /
+input layer only - the engine always receives plain ranks, so strategy,
+counting, outcomes, and scoring are unchanged. No changes to basic strategy,
+Hi-Lo math, deviations, the simulator, the matrix/audit tooling, outcome
+history, or guided coaching. It is a professional coach for local practice,
+demo money, video games, recreational tournaments, and training.
 
 Planned next (educational/local only): a possible v2.0 web UI if decided later.
 See
