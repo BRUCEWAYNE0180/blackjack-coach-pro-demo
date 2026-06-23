@@ -306,3 +306,106 @@ class TestCompositionEngineUnchanged:
         after = recommend(["10", "6"], "10", P6)
         assert before.action == after.action
         assert before.reason == after.reason
+
+
+
+# ---------------------------------------------------------------------------
+# v1.15.0 - Composition-aware SPLIT / re-split EV
+# ---------------------------------------------------------------------------
+
+import dataclasses  # noqa: E402
+
+from app.probability_advisor import (  # noqa: E402
+    SplitEVEstimate,
+    compare_pair_actions_ev,
+    estimate_split_ev_composition,
+)
+
+
+class TestSplitEV:
+    def test_only_applies_to_pairs(self):
+        est = estimate_split_ev_composition(["10", "6"], "6", P6)
+        assert est.estimated_ev is None
+        assert any("not a pair" in w.lower() for w in est.warnings)
+
+    def test_pair_8_8_vs_6_returns_estimate(self):
+        est = estimate_split_ev_composition(["8", "8"], "6", P6)
+        assert isinstance(est, SplitEVEstimate)
+        assert est.estimated_ev is not None
+        # Splitting 8s vs a weak 6 is clearly positive.
+        assert est.estimated_ev > 0.0
+        assert est.hands_evaluated > 0
+
+    def test_aces_respect_no_hit_split_aces(self):
+        # P6 has hit_split_aces=False: split aces get one card then stand,
+        # which this advisor evaluates exactly.
+        est = estimate_split_ev_composition(["A", "A"], "6", P6)
+        assert est.hit_split_aces is False
+        assert est.is_exact_for_supported_rules is True
+        assert est.estimated_ev is not None
+        assert any("one card" in w.lower() for w in est.warnings)
+
+    def test_aces_with_hit_split_aces_true_plays_normally(self):
+        profile = dataclasses.replace(P6, hit_split_aces=True)
+        est = estimate_split_ev_composition(["A", "A"], "6", profile)
+        assert est.hit_split_aces is True
+        # Hittable sub-hands -> not the exact one-card-aces case.
+        assert est.is_exact_for_supported_rules is False
+        assert est.estimated_ev is not None
+
+    def test_resplit_respects_max_split_hands(self):
+        low = dataclasses.replace(P6, max_split_hands=2)
+        high = dataclasses.replace(P6, max_split_hands=4)
+        est_low = estimate_split_ev_composition(["8", "8"], "6", low)
+        est_high = estimate_split_ev_composition(["8", "8"], "6", high)
+        assert est_low.split_depth_limit == 2
+        assert est_high.split_depth_limit == 4
+        # A deeper re-split cap evaluates at least as many sub-hands.
+        assert est_high.hands_evaluated >= est_low.hands_evaluated
+
+    def test_resplit_disabled_blocks_resplit(self):
+        no_resplit = dataclasses.replace(P6, resplit_allowed=False)
+        est = estimate_split_ev_composition(["8", "8"], "6", no_resplit)
+        assert est.resplit_allowed is False
+        assert any("re-split" in w.lower() for w in est.warnings)
+        assert est.estimated_ev is not None
+
+    def test_das_changes_subhand_ev(self):
+        das = dataclasses.replace(P6, double_after_split=True)
+        ndas = dataclasses.replace(P6, double_after_split=False)
+        ev_das = estimate_split_ev_composition(["8", "8"], "6", das).estimated_ev
+        ev_ndas = estimate_split_ev_composition(["8", "8"], "6", ndas).estimated_ev
+        # Allowing doubles after split can only help (>=) the split EV.
+        assert ev_das >= ev_ndas
+
+    def test_compare_pair_actions_includes_split(self):
+        ranked = compare_pair_actions_ev(["8", "8"], "6", P6)
+        actions = {e.action for e in ranked}
+        assert "SPLIT" in actions
+        assert "HIT" in actions
+        assert "STAND" in actions
+        # Sorted by EV (highest first) among scored actions.
+        evs = [e.estimated_ev for e in ranked if e.estimated_ev is not None]
+        assert evs == sorted(evs, reverse=True)
+
+
+class TestSplitEVInAdvice:
+    def test_split_estimate_present_for_pairs(self):
+        advice = build_composition_aware_advice(["8", "8"], "6", P6, decks=6)
+        assert advice.split_estimate is not None
+        assert advice.split_estimate.estimated_ev is not None
+        split_actions = [e for e in advice.action_estimates if e.action == "SPLIT"]
+        assert split_actions and split_actions[0].estimated_ev is not None
+
+    def test_split_estimate_absent_for_non_pairs(self):
+        advice = build_composition_aware_advice(["10", "6"], "10", P6, decks=6)
+        assert advice.split_estimate is None
+
+    def test_does_not_change_recommend(self):
+        before = recommend(["8", "8"], "6", P6)
+        build_composition_aware_advice(["8", "8"], "6", P6, decks=6)
+        estimate_split_ev_composition(["8", "8"], "6", P6)
+        compare_pair_actions_ev(["8", "8"], "6", P6)
+        after = recommend(["8", "8"], "6", P6)
+        assert before.action == after.action
+        assert before.reason == after.reason

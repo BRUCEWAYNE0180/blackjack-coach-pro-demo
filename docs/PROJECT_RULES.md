@@ -186,6 +186,18 @@ As of v0.9 the project enforces these gates on every change:
   warning for inconsistent / impossible compositions (never negative counts),
   and must not change `strategy_engine.recommend` or the Hi-Lo counting math. It
   must stay dependency-free and fast (no large/slow simulations).
+- **Split / re-split EV must separate exact, approximate, and simplified.** The
+  split EV layer (v1.15.0: `app/probability_advisor.py`) must clearly
+  distinguish exact computation (the finite-shoe dealer distribution, the
+  re-split tree up to `max_split_hands`, and split aces that take exactly one
+  card), approximation (hittable sub-hand one-card look-ahead and ignored
+  inter-hand depletion), and advisory output (reported via
+  `is_exact_for_supported_rules`). It must respect the profile's split rules
+  (`split_allowed`, `resplit_allowed`, `max_split_hands`, `hit_split_aces`,
+  double-after-split), must never overwrite the main strategy recommendation
+  without explicit validation, and must not change `strategy_engine.recommend`
+  or the Hi-Lo counting math. It must stay deterministic / memoised
+  (no Monte Carlo) and dependency-free.
 
 ## 8. Release Rules
 
