@@ -28,6 +28,7 @@ import argparse
 import os
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 from . import __version__
 from . import cards as cards_mod
@@ -90,6 +91,7 @@ from .quiz import (
     run_count_session,
     run_strategy_session,
 )
+from .reporting import export_report
 from .rules import (
     DEFAULT_PROFILE,
     PROFILES,
@@ -2434,6 +2436,79 @@ def _run_ev_review(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_report_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'report' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli report",
+        description=(
+            "Export a local learning report (Markdown / JSON / CSV) combining "
+            "session history, outcomes, EV snapshots, Strategy-vs-EV review, "
+            "weak spots, and practice tips (educational / local only). Never "
+            "changes the recommendation; exports no sensitive data."
+        ),
+    )
+    parser.add_argument("--format", default="markdown", dest="report_format",
+                        help="Report format: markdown (default), json, or csv.")
+    parser.add_argument("--output", default=None,
+                        help="Exact output file path (default: a timestamped "
+                             "file under ./.blackjack_coach/reports).")
+    parser.add_argument("--profile", default=None, choices=sorted(PROFILES),
+                        help="Only include outcomes / EV snapshots for this "
+                             "rule profile.")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Only use the most recent N records per area.")
+    parser.add_argument("--session-dir", default=None, dest="session_dir",
+                        help="Session history directory (default: "
+                             "./.blackjack_coach/history).")
+    parser.add_argument("--outcome-dir", default=None, dest="outcome_dir",
+                        help="Outcome history directory (default: "
+                             "./.blackjack_coach/outcomes).")
+    parser.add_argument("--ev-dir", default=None, dest="ev_dir",
+                        help="EV snapshot directory (default: "
+                             "./.blackjack_coach/ev_snapshots).")
+    parser.add_argument("--print", action="store_true", dest="print_content",
+                        help="Also print the report content to the terminal.")
+    return parser
+
+
+def _run_report(argv: Sequence[str]) -> int:
+    """Handle the 'report' exportable-learning-report subcommand."""
+    parser = build_report_parser()
+    args = parser.parse_args(argv)
+
+    if args.limit is not None and args.limit < 0:
+        print("Error: --limit must be >= 0.", file=sys.stderr)
+        return 2
+
+    try:
+        exported = export_report(
+            format=args.report_format,
+            output_path=args.output,
+            profile_key=args.profile,
+            session_dir=args.session_dir,
+            outcome_dir=args.outcome_dir,
+            ev_dir=args.ev_dir,
+            limit=args.limit,
+        )
+    except (ValueError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(format_header("Learning Report"))
+    print(format_kv("Format", exported.format))
+    print(format_kv("Saved", exported.output_path))
+
+    if args.print_content:
+        print("")
+        try:
+            content = Path(exported.output_path).read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print(content)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -2458,6 +2533,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli outcomes --limit 10                (win/loss history)
         python -m app.cli learn --profile SIX_DECK_H17_DAS_LS (adaptive learning)
         python -m app.cli ev-review --limit 20               (Strategy-vs-EV review)
+        python -m app.cli report --format markdown --print   (exportable report)
         python -m app.cli coach --cards A,7 --dealer 9       (direct advice)
         python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
         python -m app.cli odds --cards 10,6 --dealer 10      (probability advisor)
@@ -2518,6 +2594,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_learn(args[1:])
     if args and args[0] == "ev-review":
         return _run_ev_review(args[1:])
+    if args and args[0] == "report":
+        return _run_report(args[1:])
     if args and args[0] == "coach":
         return _run_coach(args[1:])
     if args and args[0] == "coach-play":

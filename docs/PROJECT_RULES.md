@@ -235,6 +235,17 @@ As of v0.9 the project enforces these gates on every change:
   Hi-Lo counting math, the probability / EV advisor, adaptive learning, guided
   coaching, outcome history, session history, or the EV-snapshot history, and it
   must stay dependency-free with no network, cloud, database, or sensitive data.
+- **Exportable reports are local and must not include sensitive data.** The
+  learning reports (v1.19.0: `app/reporting.py`, the `report` command) are local
+  and read-only, and must keep training, outcomes, EV advisory, and practice
+  recommendations in clearly separated sections. They must never include money,
+  bankroll, real bets, accounts, tokens, screenshots, or any sensitive/personal
+  data, and no private filesystem paths beyond the report's own output location.
+  Reports must never change `strategy_engine.recommend`, the Hi-Lo counting
+  math, or any of the upstream summaries they combine, and must stay
+  dependency-free with no network, cloud, or database. Report files live under
+  the git-ignored `.blackjack_coach/reports` tree (unless the user passes an
+  explicit `--output` path) and are never committed.
 
 ## 8. Release Rules
 

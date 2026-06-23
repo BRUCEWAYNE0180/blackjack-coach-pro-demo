@@ -83,6 +83,17 @@ from .quiz import (
     run_count_session,
     run_strategy_session,
 )
+from .reporting import (
+    ExportedReport,
+    ReportSummary,
+    build_report_summary,
+    default_reports_dir,
+    export_report,
+    render_report_csv,
+    render_report_json,
+    render_report_markdown,
+    save_report,
+)
 from .rules import (
     DEFAULT_PROFILE,
     DOUBLE_DECK_H17_DAS_NS,
@@ -160,7 +171,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.18.0"
+__version__ = "1.19.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -182,6 +193,8 @@ __all__ = [
     "EVGapCategory",
     "StrategyEVDisagreement",
     "DisagreementExplanationSummary",
+    "ExportedReport",
+    "ReportSummary",
     "FOUR_DECK_H17_DAS_LS",
     "HandEvaluation",
     "HandOutcome",
@@ -216,6 +229,13 @@ __all__ = [
     "explain_strategy_vs_ev",
     "explain_ev_snapshot_record",
     "summarize_disagreement_explanations",
+    "build_report_summary",
+    "default_reports_dir",
+    "export_report",
+    "render_report_csv",
+    "render_report_json",
+    "render_report_markdown",
+    "save_report",
     "can_double_after_split",
     "can_hit_split_aces",
     "can_resplit",
