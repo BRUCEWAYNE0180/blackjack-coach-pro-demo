@@ -128,6 +128,13 @@ from .repeat_pack import (
     render_repeat_pack,
     render_repeat_pack_markdown,
 )
+from .repeat_pack_history import (
+    build_repeat_pack_completion_record,
+    list_repeat_pack_completion_records,
+    render_repeat_pack_progress_summary,
+    save_repeat_pack_completion_record,
+    summarize_repeat_pack_history,
+)
 from .reporting import export_report
 from .review_scheduler import (
     build_drill_streak_summary,
@@ -3043,6 +3050,24 @@ def build_repeat_pack_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", default=None,
                         help="Exact output file path for --export (default: a "
                              "timestamped file under ./.blackjack_coach/reports).")
+    parser.add_argument("--complete", action="store_true",
+                        help="Save a local completion record for the generated "
+                             "repeat pack (marks it practised).")
+    parser.add_argument("--completed-spots", default=None, dest="completed_spots",
+                        help="Comma-separated spot ids that were completed.")
+    parser.add_argument("--corrected-spots", default=None, dest="corrected_spots",
+                        help="Comma-separated spot ids that were corrected.")
+    parser.add_argument("--still-missed-spots", default=None,
+                        dest="still_missed_spots",
+                        help="Comma-separated spot ids still missed.")
+    parser.add_argument("--skipped-spots", default=None, dest="skipped_spots",
+                        help="Comma-separated spot ids that were skipped.")
+    parser.add_argument("--repeat-dir", default=None, dest="repeat_dir",
+                        help="Repeat-pack completion directory (default: "
+                             "./.blackjack_coach/repeat_packs).")
+    parser.add_argument("--progress", action="store_true",
+                        help="Show the repeat-pack completion progress summary "
+                             "instead of generating a pack.")
     return parser
 
 
@@ -3050,6 +3075,14 @@ def _run_repeat_pack(argv: Sequence[str]) -> int:
     """Handle the 'repeat-pack' missed-spot repeat subcommand."""
     parser = build_repeat_pack_parser()
     args = parser.parse_args(argv)
+
+    # Progress mode: show the completion-history summary.
+    if args.progress:
+        records = list_repeat_pack_completion_records(
+            history_dir=args.repeat_dir, profile_key=args.profile)
+        summary = summarize_repeat_pack_history(records)
+        print(render_repeat_pack_progress_summary(summary))
+        return 0
 
     if args.count <= 0:
         print("Error: --count must be >= 1.", file=sys.stderr)
@@ -3081,6 +3114,27 @@ def _run_repeat_pack(argv: Sequence[str]) -> int:
             return 2
         print("")
         print(format_kv("Saved repeat pack", export.output_path))
+
+    if args.complete:
+        record = build_repeat_pack_completion_record(
+            pack,
+            completed_spot_ids=args.completed_spots,
+            corrected_spot_ids=args.corrected_spots,
+            still_missed_spot_ids=args.still_missed_spots,
+            skipped_spot_ids=args.skipped_spots,
+        )
+        try:
+            path = save_repeat_pack_completion_record(record, args.repeat_dir)
+        except OSError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print("")
+        print(format_kv("Saved repeat completion", str(path)))
+        print(format_kv(
+            "Completion",
+            f"{record.completed_items}/{record.total_items} items, "
+            f"{record.completion_rate * 100:.0f}% complete, "
+            f"{record.repeat_accuracy * 100:.0f}% corrected"))
     return 0
 
 

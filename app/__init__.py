@@ -151,6 +151,20 @@ from .repeat_pack import (
     render_repeat_pack,
     render_repeat_pack_markdown,
 )
+from .repeat_pack_history import (
+    RepeatPackCompletionRecord,
+    RepeatPackProgressSummary,
+    RepeatSpotProgress,
+    build_repeat_pack_completion_record,
+    build_repeat_spot_progress,
+    default_repeat_pack_history_dir,
+    ensure_repeat_pack_history_dir,
+    list_repeat_pack_completion_records,
+    load_repeat_pack_completion_record,
+    render_repeat_pack_progress_summary,
+    save_repeat_pack_completion_record,
+    summarize_repeat_pack_history,
+)
 from .reporting import (
     ExportedReport,
     ReportSummary,
@@ -252,7 +266,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.26.0"
+__version__ = "1.27.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -296,6 +310,9 @@ __all__ = [
     "RepeatPack",
     "RepeatPackExport",
     "RepeatPackItem",
+    "RepeatPackCompletionRecord",
+    "RepeatPackProgressSummary",
+    "RepeatSpotProgress",
     "FOUR_DECK_H17_DAS_LS",
     "HandEvaluation",
     "HandOutcome",
@@ -384,6 +401,15 @@ __all__ = [
     "export_repeat_pack",
     "render_repeat_pack",
     "render_repeat_pack_markdown",
+    "build_repeat_pack_completion_record",
+    "build_repeat_spot_progress",
+    "default_repeat_pack_history_dir",
+    "ensure_repeat_pack_history_dir",
+    "list_repeat_pack_completion_records",
+    "load_repeat_pack_completion_record",
+    "render_repeat_pack_progress_summary",
+    "save_repeat_pack_completion_record",
+    "summarize_repeat_pack_history",
     "can_double_after_split",
     "can_hit_split_aces",
     "can_resplit",

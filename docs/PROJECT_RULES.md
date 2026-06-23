@@ -342,6 +342,21 @@ As of v0.9 the project enforces these gates on every change:
   dependency-free with no network, cloud, or database. Exported repeat packs
   live under the git-ignored `.blackjack_coach/reports` tree (unless the user
   passes an explicit `--output` path) and are never committed.
+- **Repeat-pack completion history is local and only records practice.** The
+  repeat-pack completion history (v1.27.0: `app/repeat_pack_history.py`, the
+  `repeat-pack --complete` / `--progress` flags) is local and read-only. It must
+  never change the main strategy recommendation, the correct answers, or the
+  engine math, and must never change `strategy_engine.recommend`, the Hi-Lo
+  counting math, adaptive learning, guided coaching, outcome / session history,
+  the EV-snapshot history, the Strategy-vs-EV engine, the reporting module, the
+  dashboard, the drill generator, the drill history, the review scheduler, the
+  practice-pack generator, the practice-pack completion history, or the
+  repeat-pack generator. It stores no money, bankroll, real bets, accounts,
+  tokens, screenshots, or sensitive/personal data, records practice without
+  promising results, and stays dependency-free with no network, cloud, or
+  database. Completion files live under the git-ignored
+  `.blackjack_coach/repeat_packs` tree (unless the user passes a `--repeat-dir`
+  path) and are never committed.
 
 ## 8. Release Rules
 
