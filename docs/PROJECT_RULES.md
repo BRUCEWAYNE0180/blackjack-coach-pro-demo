@@ -106,6 +106,11 @@ As of v0.9 the project enforces these gates on every change:
   `PROFILES`. If a profile field is metadata that does not yet alter engine
   logic (e.g. `resplit_allowed`, `max_split_hands`, `hit_split_aces`), that
   must be documented in the field/profile notes.
+- **Metadata promoted to logic needs tests and docs.** When a profile field
+  moves from descriptive metadata to active behaviour (as `hit_split_aces` and
+  `double_after_split` did for the simulator in v1.5.0), it must have explicit
+  tests and updated docs that state the new behaviour, and any part that is
+  still simplified (e.g. full re-split) must be called out honestly.
 
 ## 8. Release Rules
 

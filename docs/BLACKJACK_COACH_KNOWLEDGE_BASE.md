@@ -49,7 +49,11 @@ tool relies on and the project's evolution.
   without modifying it).
 - `app/decision_diagnostics.py` — Decision intelligence: `DecisionDiagnostic`
   and `explain_decision_factors`, which break a recommended play into plain
-  factors (hand shape, dealer strength, available options, rule context).
+  factors (hand shape, dealer strength, available options, rule context, and
+  profile-aware split rules).
+- `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
+  `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
+  `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
 - `app/counting.py` — Hi-Lo counting trainer: tag values, running count, true
   count, and `CountingState` (educational / simulated practice only).
 - `app/shoe.py` — Virtual multi-deck shoe: build, shuffle (seedable), draw,
@@ -70,7 +74,7 @@ tool relies on and the project's evolution.
 - `app/cli.py` — Terminal trainer (`python -m app.cli` or the installed
   `blackjack-coach` command, plus `count`, `simulate`, `play`, `quiz`,
   `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`,
-  `deviation-quiz`, `diagnose`, and `profiles` subcommands).
+  `deviation-quiz`, `diagnose`, `profiles`, and `split-rules` subcommands).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -548,7 +552,7 @@ deviation set is intentionally small (not the full Illustrious 18), and
 recommendations note their dependence on the rule profile, deck estimation,
 true-count rounding, and table context.
 
-### v1.4.0 — Expanded Rule Profiles (current)
+### v1.4.0 — Expanded Rule Profiles (done)
 
 Expands the rule profiles so the coach understands and explains more blackjack
 configurations. No changes to the basic-strategy engine, Hi-Lo math, simulator,
@@ -577,6 +581,33 @@ double-after-split allowed / not; LS/NS = late surrender / none.
 are descriptive metadata for now and do not yet change engine play; this is
 documented on the fields and in profile notes. Every new profile has a
 description and tests.
+
+### v1.5.0 — Profile-Aware Split Rules (current)
+
+Promotes part of the v1.4.0 profile metadata into active behaviour in the
+simulator and diagnostics. No changes to basic strategy, Hi-Lo math,
+deviations, or session history.
+
+Delivered:
+
+- **`app/split_rules.py`**: `SplitRuleDecision` plus `is_pair_hand`,
+  `is_ace_pair`, `can_split_initial_hand`, `can_resplit`, `can_hit_split_aces`,
+  `can_double_after_split`, and `explain_split_rules`.
+- **Simulator**: split aces honour `hit_split_aces` (one card each and locked
+  when false; normal play when true); split sub-hands double only when
+  `double_after_split` is allowed; re-split is gated by `resplit_allowed` /
+  `max_split_hands` with honest warnings.
+- **Diagnostics**: `diagnose` adds profile-aware split-rule factors (pair,
+  split allowed, resplit, max split hands, hit split aces, DAS/NDAS), with
+  explicit split-aces context for A,A and split context for 8,8.
+- **CLI**: a `split-rules` command (`--cards`, `--profile`, `--split-hands`).
+
+**How the profile fields are used now:**
+
+- `double_after_split` and `hit_split_aces` actively change simulator play.
+- `resplit_allowed` and `max_split_hands` gate the split-rule helpers and
+  surface honest warnings; full multi-round re-split is still simplified (a
+  hand that could re-split is played as a normal total with a clear note).
 
 ### v2.0 — Possible Web UI (if decided later)
 

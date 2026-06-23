@@ -576,3 +576,37 @@ class TestCliNewProfilesAccepted:
         out = capsys.readouterr().out
         assert exit_code == 0
         assert "=== Deviation Study ===" in out
+
+
+
+class TestCliSplitRules:
+    def test_split_rules_works(self, capsys):
+        exit_code = cli.main(["split-rules", "--cards", "8,8",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Split Rules ===" in out
+        assert "Can split" in out
+        assert "Double after split" in out
+
+    def test_split_rules_aces(self, capsys):
+        exit_code = cli.main(["split-rules", "--cards", "A,A",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Is aces           : yes" in out
+        assert "Hit split aces" in out
+
+    def test_split_rules_non_pair(self, capsys):
+        exit_code = cli.main(["split-rules", "--cards", "10,9"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Is pair           : no" in out
+
+    def test_diagnose_aces_split_context(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "A,A", "--dealer", "6",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Split rules:" in out
+        assert "Split aces:" in out

@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.4.0 feature summary
+## v1.5.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -56,6 +56,9 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 - **Expanded rule profiles** (v1.4.0): single/double/four/six/eight-deck
   profiles with H17/S17, DAS/NDAS, LS/NS, plus a `profiles` command to list and
   inspect them.
+- **Profile-aware split rules** (v1.5.0): the simulator and diagnostics now
+  respect split / split-aces / double-after-split rules, with a `split-rules`
+  command to inspect them.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -434,6 +437,34 @@ surrender / no surrender. Some fields (`resplit_allowed`, `max_split_hands`,
 `hit_split_aces`) are professional **metadata** for description and are not yet
 used to vary engine play; this is stated wherever they appear.
 
+## Profile-aware split rules (v1.5.0)
+
+Some of the v1.4.0 profile metadata now drives real play. The simulator and
+`diagnose` respect the profile's split rules, and a `split-rules` command shows
+the available options for a hand:
+
+```bash
+blackjack-coach split-rules --cards A,A --profile SIX_DECK_H17_DAS_LS
+blackjack-coach diagnose --cards A,A --dealer 6 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach play --decks 6 --seed 5 --profile SIX_DECK_H17_DAS_LS
+```
+
+What is now profile-aware:
+
+- **Split aces**: when `hit_split_aces` is false (the common rule), each split
+  ace receives exactly **one card** and is locked; when true, the hands are
+  played normally.
+- **Double after split**: split sub-hands only double when `double_after_split`
+  is allowed.
+- **Re-split / max split hands**: `can_resplit` and `max_split_hands` are
+  enforced by the split-rule helpers and surfaced as honest warnings; full
+  multi-round re-split play is still simplified (a hand that could re-split is
+  played as a normal total with a clear note).
+
+`split-rules` prints whether the hand is a pair / aces, whether it can split or
+re-split, the max split hands, hit-split-aces, double-after-split, a reason, and
+any warnings.
+
 ## Library usage
 
 ```python
@@ -461,11 +492,12 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.4.0 expands the **rule profiles** (single/double/four/six/eight deck, with
-H17/S17, DAS/NDAS, LS/NS) and adds a `profiles` command to list and inspect
-them. No changes to the strategy engine, Hi-Lo math, simulator, split, or
-scoring. It is a professional coach for local practice, demo money, video
-games, recreational tournaments, and training.
+v1.5.0 makes part of the v1.4.0 profile metadata **active**: the simulator and
+diagnostics are now profile-aware for split, split-aces, and double-after-split
+rules (via `app/split_rules.py` and a `split-rules` command). No changes to
+basic strategy, Hi-Lo math, deviations, or session history. It is a
+professional coach for local practice, demo money, video games, recreational
+tournaments, and training.
 
 Planned next (educational/local only): a possible v2.0 web UI if decided later.
 See

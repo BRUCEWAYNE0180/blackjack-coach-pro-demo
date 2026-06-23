@@ -78,6 +78,7 @@ from .simulator import (
     play_training_hand,
     simulate_training_hand,
 )
+from .split_rules import explain_split_rules
 from .strategy_engine import Recommendation, recommend
 
 # Name of the installed console command (see [project.scripts] in
@@ -883,8 +884,9 @@ def build_diagnose_output(diag, profile) -> str:
         lines.append(format_kv("About", profile.profile_description))
     lines.append(format_kv(
         "Metadata note",
-        "resplit / max split hands / hit-split-aces are descriptive metadata "
-        "and do not yet change engine play.",
+        "hit-split-aces and double-after-split now affect the simulator; "
+        "resplit / max-split-hands remain partly descriptive (full re-split "
+        "play is not yet simulated).",
     ))
 
     extra_warnings = [w for w in diag.warnings if w != explain_insurance_no()]
@@ -1002,6 +1004,65 @@ def _run_profiles(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_split_rules_output(decision, cards, profile) -> str:
+    """Render a profile-aware split-rules decision as terminal output."""
+    def yn(value: bool) -> str:
+        return "yes" if value else "no"
+
+    lines = [format_header("Split Rules")]
+    lines += _kv_block([
+        ("Cards", format_cards(cards)),
+        ("Profile", profile.key),
+        ("Is pair", yn(decision.is_pair)),
+        ("Is aces", yn(decision.is_aces)),
+        ("Can split", yn(decision.can_split)),
+        ("Can resplit", yn(decision.resplit_allowed)),
+        ("Max split hands", decision.max_split_hands),
+        ("Hit split aces", yn(decision.hit_split_aces)),
+        ("Double after split", yn(decision.double_after_split)),
+    ])
+    lines.append("")
+    lines.append(format_kv("Reason", decision.reason))
+    if decision.warnings:
+        lines.append("")
+        lines.append(format_section("Warnings"))
+        lines.append(format_list(decision.warnings))
+    return "\n".join(lines)
+
+
+def build_split_rules_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'split-rules' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli split-rules",
+        description="Explain profile-aware split rules for a hand.",
+    )
+    parser.add_argument("--cards", required=True,
+                        help="Two cards, comma-separated, e.g. 'A,A' or '8,8'.")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
+                        choices=sorted(PROFILES),
+                        help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
+    parser.add_argument("--split-hands", type=int, default=1, dest="split_hands",
+                        help="Current number of hands (1 = initial split).")
+    return parser
+
+
+def _run_split_rules(argv: Sequence[str]) -> int:
+    """Handle the 'split-rules' subcommand."""
+    parser = build_split_rules_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        cards = _parse_cards(args.cards)
+        profile = get_profile(args.profile)
+        decision = explain_split_rules(cards, profile, args.split_hands)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_split_rules_output(decision, cards, profile))
+    return 0
+
+
 # Representative hard-total hands for building deviation quiz questions.
 _DEVIATION_TOTAL_TO_CARDS = {
     16: ["10", "6"],
@@ -1115,6 +1176,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli deviation-quiz --seed 42 --answer S
         python -m app.cli diagnose --cards A,7 --dealer 9   (decision factors)
         python -m app.cli profiles --list                   (rule profiles)
+        python -m app.cli split-rules --cards A,A            (split options)
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] in ("--version", "-V"):
@@ -1136,6 +1198,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_diagnose(args[1:])
     if args and args[0] == "profiles":
         return _run_profiles(args[1:])
+    if args and args[0] == "split-rules":
+        return _run_split_rules(args[1:])
     if args and args[0] == "quiz":
         return _run_quiz(args[1:])
     if args and args[0] == "count-quiz":

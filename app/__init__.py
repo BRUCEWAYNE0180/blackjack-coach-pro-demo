@@ -114,6 +114,16 @@ from .simulator import (
     simulate_training_hand,
     split_initial_hand,
 )
+from .split_rules import (
+    SplitRuleDecision,
+    can_double_after_split,
+    can_hit_split_aces,
+    can_resplit,
+    can_split_initial_hand,
+    explain_split_rules,
+    is_ace_pair,
+    is_pair_hand,
+)
 from .strategy_engine import (
     Action,
     Recommendation,
@@ -121,7 +131,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -157,11 +167,16 @@ __all__ = [
     "SIX_DECK_S17_DAS_LS",
     "SessionRecord",
     "SimulatedHand",
+    "SplitRuleDecision",
     "SplitSubHand",
     "build_session_record",
     "build_shoe",
     "build_strategy_questions",
+    "can_double_after_split",
+    "can_hit_split_aces",
+    "can_resplit",
     "can_split_hand",
+    "can_split_initial_hand",
     "card_value",
     "cards_remaining",
     "compare_true_count",
@@ -176,6 +191,7 @@ __all__ = [
     "explain_action",
     "explain_decision_factors",
     "explain_insurance_no",
+    "explain_split_rules",
     "explain_state",
     "find_matching_deviation",
     "format_cards",
@@ -191,7 +207,9 @@ __all__ = [
     "get_rule_profile",
     "grade_strategy_answer",
     "hilo_value",
+    "is_ace_pair",
     "is_counting_allowed_context",
+    "is_pair_hand",
     "list_rule_profiles",
     "list_session_records",
     "load_session_record",

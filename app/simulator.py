@@ -341,6 +341,7 @@ def play_split_subhand(
     dealer_upcard: str,
     profile: RuleProfile = DEFAULT_PROFILE,
     running_count: int = 0,
+    allow_hit: bool = True,
 ) -> tuple[SplitSubHand, int]:
     """Play one split sub-hand to completion.
 
@@ -351,6 +352,10 @@ def play_split_subhand(
     a ``RESPLIT_NOT_IMPLEMENTED`` marker is recorded and the hand is played as a
     normal total instead.
 
+    When ``allow_hit`` is False (split aces without hit-split-aces), the
+    sub-hand keeps its two cards as a completed one-card hand: no hitting and
+    no doubling.
+
     The running count is updated for each newly drawn card (all visible).
 
     Returns:
@@ -359,6 +364,19 @@ def play_split_subhand(
         dealer's hand).
     """
     cards = list(subhand_cards)
+
+    if not allow_hit:
+        # Split aces (no hit-split-aces): exactly one card, then locked.
+        busted = evaluate_hand(cards).is_bust
+        sub_hand = SplitSubHand(
+            cards=tuple(cards),
+            actions_taken=["ONE_CARD"],
+            final_outcome=HandOutcome.PLAYER_BUST if busted else None,
+            recommendations=[],
+            is_complete=True,
+        )
+        return sub_hand, running_count
+
     actions: list[str] = []
     recommendations: list[Recommendation] = []
     busted = False
@@ -573,25 +591,46 @@ def _play_split_hands(
     """Play out a split into two sub-hands, then the dealer, then resolve."""
     warnings: list[str] = [EDUCATIONAL_NOTE]
 
-    if evaluate_hand(player_cards).pair_value == 11:  # split Aces
-        warnings.append(
-            "Split Aces: special rules (one card per Ace, no re-split) are not "
-            "specially modelled in v0.6; both hands are played normally."
-        )
+    is_aces = evaluate_hand(player_cards).pair_value == 11
+    allow_hit = True
+    if is_aces:
+        if profile.hit_split_aces:
+            allow_hit = True
+            warnings.append(
+                "Split Aces: this rule set allows hitting split aces; both "
+                "hands are played normally."
+            )
+        else:
+            allow_hit = False
+            warnings.append(
+                "Split Aces: each hand receives exactly one card and cannot be "
+                "hit again in this rule set."
+            )
 
     hand_one, hand_two = split_initial_hand(shoe, player_cards)
     # The two newly dealt cards are visible and are counted now.
     running = update_running_count_many(running, [hand_one[1], hand_two[1]])
 
-    sub1, running = play_split_subhand(shoe, hand_one, dealer_upcard, profile, running)
-    sub2, running = play_split_subhand(shoe, hand_two, dealer_upcard, profile, running)
+    sub1, running = play_split_subhand(
+        shoe, hand_one, dealer_upcard, profile, running, allow_hit=allow_hit
+    )
+    sub2, running = play_split_subhand(
+        shoe, hand_two, dealer_upcard, profile, running, allow_hit=allow_hit
+    )
     subs = [sub1, sub2]
 
     if any(RESPLIT_NOT_IMPLEMENTED in s.actions_taken for s in subs):
-        warnings.append(
-            "A split hand could itself be re-split; re-splitting is out of "
-            "scope for v0.6, so it was played as a normal total instead."
-        )
+        if profile.resplit_allowed:
+            warnings.append(
+                "A split hand could be re-split; this rule set allows it, but "
+                "full re-split play is out of scope, so it was played as a "
+                "normal total instead."
+            )
+        else:
+            warnings.append(
+                "A split hand could re-split, but re-splitting is not allowed "
+                "in this rule set, so it was played as a normal total."
+            )
 
     # The dealer plays once for both sub-hands, only if at least one is live.
     dealer_cards: list[str] = [dealer_upcard, dealer_hole]

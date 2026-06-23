@@ -7,6 +7,42 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.5.0] - 2026-06-23
+
+Profile-aware split rules. Promotes part of the v1.4.0 profile metadata from
+description into active simulator/diagnostic behaviour. No changes to basic
+strategy, Hi-Lo math, deviations, or session history.
+
+### Added
+
+- `app/split_rules.py` with `SplitRuleDecision` and helpers: `is_pair_hand`,
+  `is_ace_pair`, `can_split_initial_hand`, `can_resplit`, `can_hit_split_aces`,
+  `can_double_after_split`, and `explain_split_rules`.
+- `split-rules` command (`--cards`, `--profile`, `--split-hands`).
+
+### Changed
+
+- The simulator now honours split-aces (`hit_split_aces`): when false, each
+  split ace gets exactly one card and is locked; when true, hands play
+  normally. Split sub-hands double only when `double_after_split` is allowed.
+  Re-split is gated by `resplit_allowed` / `max_split_hands` with honest
+  warnings (full multi-round re-split still simplified).
+- `diagnose` now includes profile-aware split-rule factors (and an accurate
+  metadata note).
+- Bumped the package and `app.__version__` to **1.5.0**.
+
+### Quality
+
+- Added `tests/test_split_rules.py`; extended simulator, diagnostics, and CLI
+  tests. Full suite passing; ruff clean; CI on Python 3.9-3.12.
+
+### Safety
+
+- Behaviour change is local/simulated coaching only; basic strategy, the engine
+  recommendation, deviations, and session history are unchanged. `max_split_
+  hands` and full re-split remain partly metadata, documented where surfaced.
+  Responsible scope is preserved in the Safety / Educational Scope section.
+
 ## [1.4.0] - 2026-06-23
 
 Expanded rule profiles. Adds a range of professional rule profiles and helpers
