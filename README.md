@@ -7,7 +7,7 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
 > any camera/video at a real table, and makes **no** promise of winnings.
 > See [`docs/PROJECT_RULES.md`](docs/PROJECT_RULES.md).
 
-## What it does (v0.4)
+## What it does (v0.5)
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -18,6 +18,8 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
   **local / simulated practice only**.
 - Includes a **local shoe simulator** that deals hands from a virtual shoe so
   you can practise basic strategy and counting together, fully offline.
+- **Plays a full hand against the dealer** (H17/S17 dealer logic + outcome
+  resolution) in a simplified single-hand educational model.
 - Ships a simple **command-line trainer**.
 
 ## Requirements
@@ -123,6 +125,41 @@ Pass `--seed` for a reproducible shuffle and `--decks` to size the shoe
 (`--decks` must be a positive integer). This is **local / simulated practice
 only** — never for real tables, betting, camera/video, or screen scraping.
 
+## Full-hand play (v0.5)
+
+Play a complete hand against the dealer from a local virtual shoe. The player
+follows basic strategy (simplified single-hand model): `SURRENDER` ends the
+hand, `DOUBLE` takes exactly one card then stands, `HIT` draws until strategy
+says stand or the hand busts, and `STAND` ends the turn. The dealer then
+reveals its hole card and plays per the profile's soft-17 rule (H17/S17).
+The running count only includes visible cards; the hole card counts once
+revealed.
+
+```bash
+python -m app.cli play --decks 6 --seed 42
+```
+
+Example output:
+
+```text
+Played training hand (local / simulated practice only)
+Player starting cards: 3, 5
+Dealer upcard:         J
+Actions taken:         HIT, HIT, STAND
+Final player cards:    3, 5, 4, 6
+Final dealer cards:    J, 7
+Outcome:               PLAYER_WIN
+Running count before:  +0
+Running count after:   +3
+True count after:      +0.51
+Note:                  ... educational practice ...
+```
+
+Possible outcomes: `PLAYER_WIN`, `DEALER_WIN`, `PUSH`, `PLAYER_BUST`,
+`DEALER_BUST`, `SURRENDER`. **Pair-splitting is out of scope for v0.5**: when
+basic strategy says SPLIT, the hand is recorded and ends without being played
+out. No money is ever involved.
+
 ## Library usage
 
 ```python
@@ -145,9 +182,10 @@ ruff check app tests   # lint (if ruff is installed)
 
 ## Scope and roadmap
 
-v0.4 adds a **local shoe simulator** (virtual shoe + training hands) on top of
-the v0.3 Hi-Lo counting trainer and the v0.2 basic-strategy coach. **Out of
-scope** for now: betting spread, Kelly bet sizing, the Illustrious 18,
-insurance index plays, and a web app. See
+v0.5 adds **full-hand play** against the dealer (H17/S17 dealer logic + outcome
+resolution) on top of the v0.4 local shoe simulator, the v0.3 Hi-Lo trainer,
+and the v0.2 basic-strategy coach. **Out of scope** for now: pair-splitting in
+the simulator, betting spread, Kelly bet sizing, the Illustrious 18, insurance
+index plays, and a web app. See
 [`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
 for the full v0.1-v0.6 roadmap.

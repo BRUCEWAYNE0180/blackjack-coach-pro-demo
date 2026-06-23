@@ -128,3 +128,33 @@ class TestCliSimulate:
         err = capsys.readouterr().err
         assert exit_code == 2
         assert "Error" in err
+
+
+class TestCliPlay:
+    def test_play_basic(self, capsys):
+        exit_code = cli.main(["play", "--decks", "6", "--seed", "42"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Player starting cards:" in out
+        assert "Dealer upcard:" in out
+        assert "Actions taken:" in out
+        assert "Final player cards:" in out
+        assert "Final dealer cards:" in out
+        assert "Outcome:" in out
+        assert "Running count before:" in out
+        assert "Running count after:" in out
+        assert "True count after:" in out
+        assert "simulated" in out.lower()
+
+    def test_play_seed_is_reproducible(self, capsys):
+        cli.main(["play", "--decks", "6", "--seed", "42"])
+        first = capsys.readouterr().out
+        cli.main(["play", "--decks", "6", "--seed", "42"])
+        second = capsys.readouterr().out
+        assert first == second
+
+    def test_play_invalid_decks_errors(self, capsys):
+        exit_code = cli.main(["play", "--decks", "0"])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err

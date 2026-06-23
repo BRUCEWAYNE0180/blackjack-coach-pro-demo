@@ -5,10 +5,12 @@ A small terminal entry point. Forms supported:
     python -m app.cli --cards A,7 --dealer 9 --profile MULTI_DECK_H17_DAS_LS
     python -m app.cli count --cards 2,5,K,A,9 --decks-remaining 5
     python -m app.cli simulate --decks 6 --seed 42
+    python -m app.cli play --decks 6 --seed 42
 
 The first prints a basic-strategy recommendation; the second runs the Hi-Lo
-counting trainer; the third deals a hand from a local virtual shoe (all
-educational / simulated practice only).
+counting trainer; the third deals an opening hand from a local virtual shoe;
+the fourth plays a full hand out against the dealer (all educational /
+simulated practice only).
 
 Educational/practice tool only: it never connects to a casino, places real
 bets, uses any camera/video, or promises winnings. See docs/PROJECT_RULES.md.
@@ -23,7 +25,12 @@ from collections.abc import Sequence
 from .counting import CountingState
 from .explanations import explain_insurance_no
 from .rules import DEFAULT_PROFILE, PROFILES, get_profile
-from .simulator import SimulatedHand, simulate_training_hand
+from .simulator import (
+    PlayedHand,
+    SimulatedHand,
+    play_training_hand,
+    simulate_training_hand,
+)
 from .strategy_engine import Recommendation, recommend
 
 
@@ -249,19 +256,88 @@ def _run_simulate(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_play_output(hand: PlayedHand) -> str:
+    """Render a fully played-out hand as human-readable terminal output."""
+    outcome = hand.final_outcome.value if hand.final_outcome else "NOT PLAYED (split)"
+    starting = ", ".join(hand.player_cards[:2])
+    lines = [
+        "Played training hand (local / simulated practice only)",
+        f"Player starting cards: {starting}",
+        f"Dealer upcard:         {hand.dealer_cards[0]}",
+        f"Actions taken:         {', '.join(hand.actions_taken) or '(none)'}",
+        f"Final player cards:    {', '.join(hand.player_cards)}",
+        f"Final dealer cards:    {', '.join(hand.dealer_cards)}",
+        f"Outcome:               {outcome}",
+        f"Running count before:  {hand.running_count_before:+d}",
+        f"Running count after:   {hand.running_count_after:+d}",
+        f"True count after:      {hand.true_count_after:+.2f}",
+        f"Note:                  {hand.note}",
+    ]
+    return "\n".join(lines)
+
+
+def build_play_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'play' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli play",
+        description=(
+            "Play a full blackjack hand against the dealer (educational / "
+            "simulated only). Not for real tables: no betting, no camera/video."
+        ),
+    )
+    parser.add_argument(
+        "--decks",
+        type=int,
+        default=6,
+        help="Number of decks in the virtual shoe (default: 6).",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Optional seed for a reproducible shuffle.",
+    )
+    parser.add_argument(
+        "--profile",
+        default=DEFAULT_PROFILE.key,
+        choices=sorted(PROFILES),
+        help=f"Rule profile (default: {DEFAULT_PROFILE.key}).",
+    )
+    return parser
+
+
+def _run_play(argv: Sequence[str]) -> int:
+    """Handle the 'play' full-hand simulator subcommand."""
+    parser = build_play_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        profile = get_profile(args.profile)
+        hand = play_training_hand(decks=args.decks, seed=args.seed, profile=profile)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_play_output(hand))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
-    Supports three forms:
+    Supports four forms:
         python -m app.cli --cards A,7 --dealer 9              (basic strategy)
         python -m app.cli count --cards 2,5,K --decks-remaining 5  (Hi-Lo)
-        python -m app.cli simulate --decks 6 --seed 42       (local simulator)
+        python -m app.cli simulate --decks 6 --seed 42       (opening hand)
+        python -m app.cli play --decks 6 --seed 42           (full hand)
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] == "count":
         return _run_count(args[1:])
     if args and args[0] == "simulate":
         return _run_simulate(args[1:])
+    if args and args[0] == "play":
+        return _run_play(args[1:])
     return _run_strategy(args)
 
 

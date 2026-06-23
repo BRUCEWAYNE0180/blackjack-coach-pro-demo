@@ -40,8 +40,13 @@ from .shoe import (
     validate_decks,
 )
 from .simulator import (
+    HandOutcome,
+    PlayedHand,
     SimulatedHand,
     deal_initial_hand,
+    play_dealer_hand,
+    play_training_hand,
+    resolve_outcome,
     simulate_training_hand,
 )
 from .strategy_engine import (
@@ -51,7 +56,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -59,9 +64,11 @@ __all__ = [
     "CountingState",
     "DEFAULT_PROFILE",
     "HandEvaluation",
+    "HandOutcome",
     "MULTI_DECK_H17_DAS_LS",
     "MULTI_DECK_S17_DAS_LS",
     "PROFILES",
+    "PlayedHand",
     "Recommendation",
     "RuleProfile",
     "SimulatedHand",
@@ -81,7 +88,10 @@ __all__ = [
     "is_counting_allowed_context",
     "normalize_rank",
     "penetration",
+    "play_dealer_hand",
+    "play_training_hand",
     "recommend",
+    "resolve_outcome",
     "should_take_insurance",
     "shuffle_shoe",
     "simulate_training_hand",
