@@ -15,6 +15,16 @@ from .counting import (
     update_running_count,
     update_running_count_many,
 )
+from .decision_diagnostics import DecisionDiagnostic, explain_decision_factors
+from .deviations import (
+    DEFAULT_DEVIATION_RULES,
+    DeviationRecommendation,
+    DeviationRule,
+    compare_true_count,
+    find_matching_deviation,
+    normalize_true_count,
+    recommend_with_deviation,
+)
 from .explanations import (
     ACTION_NOTES,
     explain_action,
@@ -94,7 +104,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -102,6 +112,10 @@ __all__ = [
     "CountQuizResult",
     "CountingState",
     "DEFAULT_PROFILE",
+    "DecisionDiagnostic",
+    "DeviationRecommendation",
+    "DeviationRule",
+    "DEFAULT_DEVIATION_RULES",
     "HandEvaluation",
     "HandOutcome",
     "HistorySummary",
@@ -124,6 +138,7 @@ __all__ = [
     "can_split_hand",
     "card_value",
     "cards_remaining",
+    "compare_true_count",
     "counting_summary",
     "deal_initial_hand",
     "decks_remaining",
@@ -132,8 +147,10 @@ __all__ = [
     "ensure_history_dir",
     "evaluate_hand",
     "explain_action",
+    "explain_decision_factors",
     "explain_insurance_no",
     "explain_state",
+    "find_matching_deviation",
     "format_cards",
     "format_header",
     "format_kv",
@@ -150,12 +167,14 @@ __all__ = [
     "list_session_records",
     "load_session_record",
     "normalize_rank",
+    "normalize_true_count",
     "normalize_user_action",
     "penetration",
     "play_dealer_hand",
     "play_split_subhand",
     "play_training_hand",
     "recommend",
+    "recommend_with_deviation",
     "resolve_outcome",
     "run_count_session",
     "run_strategy_session",

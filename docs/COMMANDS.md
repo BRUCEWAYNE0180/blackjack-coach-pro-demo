@@ -1,8 +1,9 @@
 # Commands Reference
 
-A quick reference for setting up the project and using every trainer command.
-All commands are local and educational only — no real casino, betting,
-camera/video, scraping, or promise of winnings.
+A quick reference for setting up the project and using every coaching command.
+Blackjack Coach Pro Demo is a professional coach for local practice, demo
+money, video games, recreational tournaments, and training. (Responsible
+scope: not a real-money gambling product; see `PROJECT_RULES.md`.)
 
 The trainer is available two ways once installed: as the `blackjack-coach`
 console command, or as `python -m app.cli ...`. Both accept the same
@@ -148,3 +149,38 @@ Summarises saved sessions: total sessions, average/best/worst accuracy, and the
 most common weak spots. `--limit N` summarises only the most recent N sessions;
 `--dir` reads from a specific folder. The history is a **summary only** — no
 money, accounts, or personal data — and is never committed to git.
+
+## Deviation study mode (v1.3.0)
+
+### deviations
+
+```bash
+blackjack-coach deviations --cards 10,6 --dealer 10 --true-count 1
+blackjack-coach deviations --list
+```
+
+Shows the basic action, whether a studied true-count deviation applies, and the
+resulting study recommendation. `--list` lists the available study rules (id,
+title, threshold, `basic -> deviation`). Study-only and local; not live casino
+advice.
+
+### deviation-quiz
+
+```bash
+blackjack-coach deviation-quiz --seed 42 --answer S
+```
+
+Poses a deviation study question and grades your answer (`H/S/D/P/R` or full
+names). Omit `--answer` to be prompted interactively. Study-only; the insurance
+deviation never changes the engine's insurance recommendation.
+
+### diagnose
+
+```bash
+blackjack-coach diagnose --cards A,7 --dealer 9
+```
+
+Explains the factors behind the recommended play: hand shape (hard/soft/pair),
+dealer upcard strength, which options (double/surrender/split) are available or
+fall back, and the H17/S17 rule context. Reads the stable strategy engine and
+never modifies it.

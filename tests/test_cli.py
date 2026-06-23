@@ -416,3 +416,111 @@ class TestCliSessionHistory:
         out = capsys.readouterr().out
         assert exit_code == 0
         assert "Total sessions  : 2" in out
+
+
+
+class TestCliDeviations:
+    def test_deviations_list(self, capsys):
+        exit_code = cli.main(["deviations", "--list"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Deviation Study Rules ===" in out
+        assert "hard_16_vs_10" in out
+        assert "HIT -> STAND" in out
+        assert "insurance" in out
+
+    def test_deviations_applies(self, capsys):
+        # 10,6 = hard 16 vs 10 at TC 1 -> deviation STAND.
+        exit_code = cli.main([
+            "deviations", "--cards", "10,6", "--dealer", "10", "--true-count", "1",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Deviation Study ===" in out
+        assert "Study recommendation: STAND" in out
+        assert "Deviation           : STAND" in out
+
+    def test_deviations_does_not_apply(self, capsys):
+        # At TC -1 no deviation applies -> basic strategy stands as the play.
+        exit_code = cli.main([
+            "deviations", "--cards", "10,6", "--dealer", "10", "--true-count", "-1",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "none - play basic strategy" in out
+
+    def test_deviations_requires_cards_or_list(self, capsys):
+        exit_code = cli.main(["deviations"])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err
+
+
+class TestCliDeviationQuiz:
+    def test_deviation_quiz_with_answer(self, capsys):
+        exit_code = cli.main(["deviation-quiz", "--seed", "42", "--answer", "S"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Deviation Quiz ===" in out
+        assert "Player hand" in out
+        assert "True count" in out
+        assert "Correct action" in out
+        assert ("[ CORRECT ]" in out) or ("[ INCORRECT ]" in out)
+
+    def test_deviation_quiz_reproducible(self, capsys):
+        cli.main(["deviation-quiz", "--seed", "7", "--answer", "S"])
+        first = capsys.readouterr().out
+        cli.main(["deviation-quiz", "--seed", "7", "--answer", "S"])
+        second = capsys.readouterr().out
+        assert first == second
+
+    def test_deviation_quiz_invalid_answer_errors(self, capsys):
+        exit_code = cli.main(["deviation-quiz", "--seed", "42", "--answer", "Z"])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err
+
+    def test_deviation_quiz_interactive(self, capsys, monkeypatch):
+        monkeypatch.setattr("builtins.input", lambda *_: "S")
+        exit_code = cli.main(["deviation-quiz", "--seed", "42"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Deviation Quiz" in out
+
+
+
+class TestCliDiagnose:
+    def test_diagnose_works(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "A,7", "--dealer", "9"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Decision Diagnostic ===" in out
+
+    def test_diagnose_shows_action_and_factors(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "A,7", "--dealer", "9"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Recommended action:" in out
+        assert "Decision factors" in out
+        # The soft-hand factor is surfaced.
+        assert "soft" in out.lower()
+
+    def test_diagnose_hard_total(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "10,6", "--dealer", "10"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Hard 16" in out
+        assert "hard" in out.lower()
+
+    def test_diagnose_pair(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "8,8", "--dealer", "10"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Recommended action: SPLIT" in out
+        assert "split" in out.lower()
+
+    def test_diagnose_invalid_card_errors(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "Z,7", "--dealer", "9"])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err

@@ -7,6 +7,47 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.3.0] - 2026-06-23
+
+Professional rules & decision intelligence. Reframes the coach around decision
+intelligence and adds a true-count deviation study mode plus a decision
+diagnostics command. No changes to the basic-strategy engine, Hi-Lo math,
+simulator, split handling, or scoring.
+
+### Added
+
+- `app/deviations.py` with `DeviationRule`, `DeviationRecommendation`, a small
+  explicit `DEFAULT_DEVIATION_RULES` study set, `normalize_true_count`,
+  `compare_true_count`, `find_matching_deviation`, and
+  `recommend_with_deviation` (wraps the engine without modifying it).
+- `app/decision_diagnostics.py` with `DecisionDiagnostic` and
+  `explain_decision_factors`, which breaks a recommended play into plain factors
+  (hand shape, dealer strength, available options, and H17/S17 rule context).
+- CLI commands: `deviations` (`--cards/--dealer/--true-count`, `--list`),
+  `deviation-quiz` (`--seed`, `--answer`, interactive), and `diagnose`
+  (`--cards`, `--dealer`).
+
+### Changed
+
+- Reframed the product (README and docs) as a professional blackjack coach for
+  local practice, demo money, video games, recreational tournaments, and
+  training, focused on decision intelligence and rules.
+- Bumped the package and `app.__version__` to **1.3.0**.
+
+### Quality
+
+- Added `tests/test_deviations.py` and `tests/test_decision_diagnostics.py`,
+  plus CLI tests for the new commands. Full suite passing; ruff clean; CI on
+  Python 3.9-3.12.
+
+### Safety
+
+- Deviations and diagnostics are **study/coaching aids** that read the stable
+  engine and never modify it. The insurance deviation is study-only and does
+  not change the engine's insurance recommendation (always NO). Responsible
+  scope (no real-money gambling product, no casino connectivity, camera/video,
+  or scraping) is preserved in the Safety / Educational Scope section.
+
 ## [1.2.0] - 2026-06-23
 
 Local session history. Adds opt-in, local-only progress tracking. No changes

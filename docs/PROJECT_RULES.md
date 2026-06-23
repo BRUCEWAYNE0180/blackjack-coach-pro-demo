@@ -2,11 +2,15 @@
 
 ## 1. Purpose
 
-Blackjack Coach Pro Demo is an **educational and practice** tool. Its goal is
-to help a user learn and drill blackjack **basic strategy** (and, in later
-versions, the math behind it) in a safe, offline, simulated environment.
+Blackjack Coach Pro Demo is a **professional blackjack coach** for **local
+practice, demo money, video games, recreational tournaments, and training**.
+Its focus is **decision intelligence**: it recommends the correct play, explains
+the rule factors behind it, drills it with quizzes and scored sessions, and
+offers true-count deviation study and decision diagnostics.
 
-It is a study aid, not a gambling product.
+It is a coaching and practice tool, not a real-money gambling product. The
+hard constraints below define the responsible scope; within that scope, the
+product should behave like a sharp, helpful coach.
 
 ## 2. Hard Constraints (Non-Negotiable)
 
@@ -93,6 +97,10 @@ As of v0.9 the project enforces these gates on every change:
   contain secrets, real money, bets, bankroll, accounts, personal data,
   screenshots, or casino data. It is a local summary only (no database, no
   network), and the `.blackjack_coach/` folder must remain git-ignored.
+- **Deviations are study-only.** True-count deviation features are a local
+  study aid. They must not enable real betting, bankroll, bet spread, Kelly,
+  live casino assistance, or camera/video, and must not modify the basic
+  strategy engine or change its insurance recommendation (always NO).
 
 ## 8. Release Rules
 

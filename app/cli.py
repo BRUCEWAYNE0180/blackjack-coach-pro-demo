@@ -30,6 +30,12 @@ from collections.abc import Sequence
 
 from . import __version__
 from .counting import EDUCATIONAL_NOTE, CountingState, update_running_count_many
+from .decision_diagnostics import explain_decision_factors
+from .deviations import (
+    DEFAULT_DEVIATION_RULES,
+    normalize_true_count,
+    recommend_with_deviation,
+)
 from .explanations import explain_insurance_no
 from .formatting import (
     format_cards,
@@ -39,6 +45,7 @@ from .formatting import (
     format_percentage,
     format_result_status,
     format_section,
+    format_warning,
 )
 from .quiz import (
     ACTION_PROMPT,
@@ -47,6 +54,7 @@ from .quiz import (
     build_strategy_questions,
     generate_strategy_question,
     grade_strategy_answer,
+    normalize_user_action,
     run_count_session,
     run_strategy_session,
 )
@@ -749,6 +757,262 @@ def _run_history(argv: Sequence[str]) -> int:
     return 0
 
 
+def _format_upcard(value: int) -> str:
+    """Render a dealer upcard value (11 = Ace) for display."""
+    return "A" if value == 11 else str(value)
+
+
+def build_deviation_output(rec, cards, dealer_upcard: str) -> str:
+    """Render a deviation study recommendation as terminal output."""
+    lines = [format_header("Deviation Study")]
+    deviation_line = (
+        rec.recommended_action if rec.applies else "(none - play basic strategy)"
+    )
+    lines += _kv_block([
+        ("Player hand", format_cards(cards)),
+        ("Dealer upcard", dealer_upcard),
+        ("True count", normalize_true_count(rec.true_count)),
+        ("Basic action", rec.basic_action),
+        ("Deviation", deviation_line),
+        ("Study recommendation", rec.recommended_action),
+    ])
+    lines.append("")
+    lines.append(format_kv("Why", rec.explanation))
+    lines.append(format_warning(rec.warning))
+    return "\n".join(lines)
+
+
+def build_deviation_list_output() -> str:
+    """Render the available study deviation rules."""
+    lines = [format_header("Deviation Study Rules")]
+    for rule in DEFAULT_DEVIATION_RULES:
+        if rule.hand_type == "insurance":
+            target = "insurance"
+        else:
+            target = f"{rule.hand_type} {rule.player_total} vs {_format_upcard(rule.dealer_upcard)}"
+        lines.append("")
+        lines.append(format_section(rule.rule_id))
+        threshold = normalize_true_count(rule.true_count_threshold)
+        lines += _kv_block([
+            ("Title", rule.title),
+            ("Applies to", target),
+            ("Threshold", f"TC {rule.comparison} {threshold}"),
+            ("Change", f"{rule.basic_action} -> {rule.deviation_action}"),
+        ])
+    lines.append("")
+    lines.append(format_warning(
+        "Study-only set (not the full Illustrious 18); no betting, bankroll, "
+        "bet spread, Kelly, or live casino assistance."
+    ))
+    return "\n".join(lines)
+
+
+def build_deviations_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'deviations' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli deviations",
+        description=(
+            "Study true-count strategy deviations (educational / local only). "
+            "Not live casino advice; no betting, bankroll, or bet spread."
+        ),
+    )
+    parser.add_argument("--list", action="store_true",
+                        help="List the available study deviation rules.")
+    parser.add_argument("--cards", default=None,
+                        help="Player cards, comma-separated, e.g. '10,6'.")
+    parser.add_argument("--dealer", default=None,
+                        help="Dealer upcard, e.g. '10' or 'A'.")
+    parser.add_argument("--true-count", type=float, default=0.0, dest="true_count",
+                        help="Current true count (default: 0).")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
+                        choices=sorted(PROFILES),
+                        help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
+    return parser
+
+
+def _run_deviations(argv: Sequence[str]) -> int:
+    """Handle the 'deviations' study subcommand."""
+    parser = build_deviations_parser()
+    args = parser.parse_args(argv)
+
+    if args.list:
+        print(build_deviation_list_output())
+        return 0
+
+    if not args.cards or not args.dealer:
+        print("Error: provide --cards and --dealer (or use --list).",
+              file=sys.stderr)
+        return 2
+
+    try:
+        cards = _parse_cards(args.cards)
+        profile = get_profile(args.profile)
+        rec = recommend_with_deviation(cards, args.dealer, args.true_count, profile)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_deviation_output(rec, cards, args.dealer))
+    return 0
+
+
+def build_diagnose_output(diag) -> str:
+    """Render a decision diagnostic as terminal output."""
+    lines = [format_header("Decision Diagnostic")]
+    lines += _kv_block([
+        ("Player hand", format_cards(diag.player_cards)),
+        ("Dealer upcard", diag.dealer_upcard),
+        ("Hand type", diag.hand_description),
+        ("Profile", diag.profile_key),
+        ("Recommended action", diag.recommended_action),
+    ])
+    lines.append("")
+    lines.append(format_section("Decision factors"))
+    lines.append(format_list(diag.rule_factors))
+
+    extra_warnings = [w for w in diag.warnings if w != explain_insurance_no()]
+    if extra_warnings:
+        lines.append("")
+        lines.append(format_section("Warnings"))
+        lines.append(format_list(extra_warnings))
+
+    lines.append("")
+    lines.append(format_kv("Why", diag.basic_reason))
+    lines.append(format_kv("Confidence", diag.confidence_note))
+    return "\n".join(lines)
+
+
+def build_diagnose_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'diagnose' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli diagnose",
+        description=(
+            "Explain the factors behind a basic-strategy decision (decision "
+            "intelligence for local practice, demo money, and tournaments)."
+        ),
+    )
+    parser.add_argument("--cards", required=True,
+                        help="Player cards, comma-separated, e.g. 'A,7'.")
+    parser.add_argument("--dealer", required=True,
+                        help="Dealer upcard, e.g. '9', '10', or 'A'.")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
+                        choices=sorted(PROFILES),
+                        help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
+    return parser
+
+
+def _run_diagnose(argv: Sequence[str]) -> int:
+    """Handle the 'diagnose' decision-diagnostics subcommand."""
+    parser = build_diagnose_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        cards = _parse_cards(args.cards)
+        profile = get_profile(args.profile)
+        diag = explain_decision_factors(cards, args.dealer, profile)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_diagnose_output(diag))
+    return 0
+
+
+# Representative hard-total hands for building deviation quiz questions.
+_DEVIATION_TOTAL_TO_CARDS = {
+    16: ["10", "6"],
+    15: ["10", "5"],
+    12: ["7", "5"],
+    11: ["6", "5"],
+    10: ["6", "4"],
+}
+
+
+def _generate_deviation_question(seed: int | None):
+    """Build a reproducible deviation quiz scenario from the study rules.
+
+    Returns a tuple ``(cards, dealer_upcard, true_count, recommendation)``.
+    """
+    import random
+
+    rng = random.Random(seed)
+    playing_rules = [
+        r for r in DEFAULT_DEVIATION_RULES
+        if r.hand_type == "hard" and r.player_total in _DEVIATION_TOTAL_TO_CARDS
+    ]
+    rule = rng.choice(playing_rules)
+    cards = list(_DEVIATION_TOTAL_TO_CARDS[rule.player_total])
+    dealer_upcard = _format_upcard(rule.dealer_upcard)
+    # Pick a true count near the threshold so answers vary across seeds.
+    true_count = normalize_true_count(rule.true_count_threshold) + rng.choice(
+        [-2, -1, 0, 1, 2]
+    )
+    rec = recommend_with_deviation(cards, dealer_upcard, true_count)
+    return cards, dealer_upcard, true_count, rec
+
+
+def build_deviation_quiz_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'deviation-quiz' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli deviation-quiz",
+        description=(
+            "Deviation study quiz (educational / local only). Not live casino "
+            "advice; no betting, bankroll, or bet spread."
+        ),
+    )
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Optional seed for a reproducible question.")
+    parser.add_argument("--answer", default=None,
+                        help="Your action: H/S/D/P/R (or full name). If "
+                             "omitted, you are prompted interactively.")
+    return parser
+
+
+def _run_deviation_quiz(argv: Sequence[str]) -> int:
+    """Handle the 'deviation-quiz' study subcommand."""
+    parser = build_deviation_quiz_parser()
+    args = parser.parse_args(argv)
+
+    cards, dealer_upcard, true_count, rec = _generate_deviation_question(args.seed)
+
+    answer = args.answer
+    if answer is None:
+        print(format_header("Deviation Quiz"))
+        for line in _kv_block([
+            ("Player hand", format_cards(cards)),
+            ("Dealer upcard", dealer_upcard),
+            ("True count", true_count),
+        ]):
+            print(line)
+        try:
+            answer = input(ACTION_PROMPT)
+        except EOFError:
+            print("Error: no answer provided.", file=sys.stderr)
+            return 2
+
+    try:
+        user_action = normalize_user_action(answer)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    is_correct = user_action == rec.recommended_action
+    lines = [format_header("Deviation Quiz")]
+    lines += _kv_block([
+        ("Player hand", format_cards(cards)),
+        ("Dealer upcard", dealer_upcard),
+        ("True count", true_count),
+        ("Your answer", user_action),
+        ("Correct action", rec.recommended_action),
+        ("Result", format_result_status(is_correct)),
+    ])
+    lines.append("")
+    lines.append(format_kv("Why", rec.explanation))
+    lines.append(format_warning(rec.warning))
+    print("\n".join(lines))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -763,6 +1027,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli quiz-session --questions 10 --seed 42 --answers ...
         python -m app.cli count-session --batches "2,5,K|A,9" --answers "1,0"
         python -m app.cli history                            (saved sessions)
+        python -m app.cli deviations --cards 10,6 --dealer 10 --true-count 1
+        python -m app.cli deviation-quiz --seed 42 --answer S
+        python -m app.cli diagnose --cards A,7 --dealer 9   (decision factors)
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] in ("--version", "-V"):
@@ -776,6 +1043,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_play(args[1:])
     if args and args[0] == "history":
         return _run_history(args[1:])
+    if args and args[0] == "deviations":
+        return _run_deviations(args[1:])
+    if args and args[0] == "deviation-quiz":
+        return _run_deviation_quiz(args[1:])
+    if args and args[0] == "diagnose":
+        return _run_diagnose(args[1:])
     if args and args[0] == "quiz":
         return _run_quiz(args[1:])
     if args and args[0] == "count-quiz":

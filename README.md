@@ -2,23 +2,28 @@
 
 [![CI](https://github.com/BRUCEWAYNE0180/blackjack-coach-pro-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/BRUCEWAYNE0180/blackjack-coach-pro-demo/actions/workflows/ci.yml)
 
-An **educational / practice** tool for learning blackjack **basic strategy**,
-Hi-Lo counting, and hand simulation — entirely offline, with a friendly CLI.
+A **professional blackjack coach** for **local practice, demo money, video
+games, recreational tournaments, and training** — basic strategy, Hi-Lo
+counting, a hand simulator, scored drills, true-count deviation study, and
+decision diagnostics, all from a friendly offline CLI.
 
-> This project is a study aid, not a gambling product. It does **not** connect
-> to casinos, does **not** place or automate real-money bets, does **not** use
-> any camera/video at a real table, and makes **no** promise of winnings.
-> See [`docs/PROJECT_RULES.md`](docs/PROJECT_RULES.md).
+The focus is **decision intelligence**: it tells you the right play *and why*,
+breaks down the rule factors behind it, and helps you drill until it sticks.
+
+> Responsible scope: this is a coaching and practice tool, not a real-money
+> gambling product. See the [Safety / Educational Scope](#safety--educational-scope)
+> section and [`docs/PROJECT_RULES.md`](docs/PROJECT_RULES.md).
 
 **30-second tour:** install with `pip install -e ".[dev]"`, run the tests with
-`python -m pytest`, then try `blackjack-coach --cards A,7 --dealer 9`. It tells
-you the basic-strategy play and *why*. Everything is local and educational.
+`python -m pytest`, then try `blackjack-coach diagnose --cards A,7 --dealer 9`.
+It gives the recommended play, the decision factors behind it, and the rule
+context.
 
 Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.2.0 feature summary
+## v1.3.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -42,6 +47,12 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   rows, visible pass/fail badges, and percentage summaries.
 - **Local session history** (v1.2.0): optionally save scored sessions to local
   JSON files and review your progress with `blackjack-coach history`.
+- **Deviation study mode** (v1.3.0): study a small set of well-known Hi-Lo
+  true-count deviations (`deviations`, `deviation-quiz`) without touching the
+  basic-strategy engine.
+- **Decision diagnostics** (v1.3.0): `diagnose` explains the factors behind a
+  recommended play — hand shape, dealer strength, available options, and the
+  rule-profile context.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -93,11 +104,13 @@ Once installed (see Quick start), the same trainer is available as the
 
 ```bash
 blackjack-coach --version
+blackjack-coach diagnose --cards A,7 --dealer 9
 blackjack-coach --cards A,7 --dealer 9
 blackjack-coach count --cards 2,5,K,A,9 --decks-remaining 5
 blackjack-coach play --decks 6 --seed 42
 blackjack-coach quiz --seed 42 --answer H
 blackjack-coach quiz-session --questions 10 --seed 42 --answers H,S,D,H,R,S,H,D,P,S
+blackjack-coach deviations --cards 10,6 --dealer 10 --true-count 1
 ```
 
 Without installing, run it as a module from the repository root:
@@ -357,6 +370,44 @@ summary** (mode, totals, accuracy, weak spots) — never money, bankroll, bets,
 accounts, or personal data — and the `.blackjack_coach/` folder is git-ignored
 so nothing is committed.
 
+## Deviation study mode (v1.3.0)
+
+Study a small, explicit set of well-known Hi-Lo **true-count deviations**. This
+is layered on top of the basic-strategy engine — it never modifies it. It is a
+local **study aid**, not live casino assistance, and involves no betting,
+bankroll, or bet spread.
+
+```bash
+blackjack-coach deviations --cards 10,6 --dealer 10 --true-count 1
+blackjack-coach deviations --list
+blackjack-coach deviation-quiz --seed 42 --answer S
+```
+
+`deviations` shows the basic action, whether a studied deviation applies at the
+given true count, and the resulting study recommendation with an explanation.
+`deviations --list` lists the available rules (id, title, threshold, and the
+`basic -> deviation` change). `deviation-quiz` poses a study question and grades
+your answer (omit `--answer` to be prompted).
+
+The set is intentionally small (not the full Illustrious 18) and the insurance
+deviation is **study-only** — it does not change the engine's insurance stance
+(always NO). Every recommendation notes that results depend on the rule
+profile, deck estimation, true-count rounding, and table context.
+
+## Decision diagnostics (v1.3.0)
+
+`diagnose` explains the reasoning behind a recommended play, so you learn the
+*why*, not just the *what*:
+
+```bash
+blackjack-coach diagnose --cards A,7 --dealer 9
+```
+
+It prints the recommended action plus the **decision factors**: the hand shape
+(hard / soft / pair), the dealer upcard's strength, which options
+(double / surrender / split) are available or fall back, and the rule-profile
+(H17/S17) context. It reads the stable strategy engine and never modifies it.
+
 ## Library usage
 
 ```python
@@ -384,13 +435,14 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.2.0 adds **local session history** (opt-in JSON summaries + a `history`
-command) on top of v1.1.0's terminal polish, with no changes to strategy,
-counting, simulation, split, or scoring logic. It remains an educational,
-local, well-tested trainer with modern packaging and CI.
+v1.3.0 adds **decision intelligence**: a deviation study mode (true-count
+playing deviations) and a `diagnose` command that explains the factors behind
+each recommended play. No changes to the strategy engine, Hi-Lo math,
+simulator, split, or scoring. It is a professional coach for local practice,
+demo money, video games, recreational tournaments, and training.
 
-Planned next (educational/local only): v1.3 advanced count deviations
-(educational only), and a possible v2.0 web UI if decided later. See
+Planned next (educational/local only): a possible v2.0 web UI if decided later.
+See
 [`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
 for the full roadmap.
 
