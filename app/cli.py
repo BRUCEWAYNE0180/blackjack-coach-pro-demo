@@ -1789,6 +1789,50 @@ def _odds_compact_lines(advice) -> list[str]:
         ("Note", note),
     ]
     lines += _kv_block(rows)
+
+    # v1.15.0: compact Split EV summary for pairs, and whether the advisory
+    # best-EV action agrees with the coach's recommendation (no override).
+    split_estimate = getattr(advice, "split_estimate", None)
+    if split_estimate is not None and split_estimate.estimated_ev is not None:
+        agrees = (advice.best_estimated_action == advice.recommended_action)
+        lines += _kv_block([
+            ("Split EV", f"{split_estimate.estimated_ev:+.3f}"),
+            ("EV vs recommendation",
+             "agrees" if agrees else "differs (recommendation stands)"),
+        ])
+    return lines
+
+
+def _split_ev_lines(split_estimate, advice) -> list[str]:
+    """Render the Split / re-split EV advisory block for a pair."""
+    def yn(value: bool) -> str:
+        return "yes" if value else "no"
+
+    lines = ["", format_section("Split EV estimate")]
+    ev_text = ("n/a" if split_estimate.estimated_ev is None
+               else f"{split_estimate.estimated_ev:+.3f}")
+    rows = [
+        ("Split allowed", yn(True)),
+        ("Resplit allowed", yn(split_estimate.resplit_allowed)),
+        ("Max split hands", split_estimate.max_split_hands),
+        ("Hit split aces", yn(split_estimate.hit_split_aces)),
+        ("DAS", yn(split_estimate.double_after_split)),
+        ("Estimated split EV", ev_text),
+        ("Sub-hands evaluated", split_estimate.hands_evaluated),
+        ("Exact for these rules", yn(split_estimate.is_exact_for_supported_rules)),
+    ]
+    lines += _kv_block(rows)
+
+    # Compact comparison vs the other legal actions (if EV available).
+    others = [
+        f"{e.action} {e.estimated_ev:+.3f}"
+        for e in advice.action_estimates
+        if e.estimated_ev is not None and e.action != "SPLIT"
+    ]
+    if others:
+        lines.append(format_kv("Compare", "  ".join(others)))
+    if split_estimate.warnings:
+        lines.append(format_list(split_estimate.warnings))
     return lines
 
 
@@ -1865,6 +1909,10 @@ def build_odds_output(advice, player_display=None, dealer_display=None,
             f"bust {_pct(est.bust_probability)}",
             width=10,
         ))
+
+    split_estimate = getattr(advice, "split_estimate", None)
+    if split_estimate is not None:
+        lines += _split_ev_lines(split_estimate, advice)
 
     lines.append("")
     last_rows = [("Best estimated action", advice.best_estimated_action or "(n/a)")]

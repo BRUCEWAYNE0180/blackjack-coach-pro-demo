@@ -889,7 +889,7 @@ It is local, transparent, and reversible (read-only over the git-ignored
 dependencies; no money, bankroll, accounts, tokens, screenshots, or sensitive
 data) and does not change `strategy_engine.recommend` or the counting math.
 
-### v1.14.0 — Composition-aware Probability & EV Advisor (current)
+### v1.14.0 — Composition-aware Probability & EV Advisor (done)
 
 Upgrades the probability / EV advisor so it can use the **composition of the
 remaining shoe / seen cards**. The user supplies their cards, the dealer
@@ -919,13 +919,48 @@ Delivered:
 - **Tests**: extended `tests/test_probability_advisor.py` and CLI tests.
 
 **Honest about exactness:** the dealer distribution is exact finite-shoe; the
-player HIT/DOUBLE EV is an approximate one-card look-ahead; SPLIT EV is
-simplified. A **full exact split tree remains future work**. Per
-`PROJECT_RULES.md`, composition-aware probabilities clearly separate exact /
-finite-shoe, approximation, and advisory, and must not override the main
-strategy without explicit validation. It does not change
-`strategy_engine.recommend` or the Hi-Lo counting math, adds no external
+player HIT/DOUBLE EV is an approximate one-card look-ahead; SPLIT EV was
+simplified here (improved in v1.15.0). Per `PROJECT_RULES.md`, composition-aware
+probabilities clearly separate exact / finite-shoe, approximation, and advisory,
+and must not override the main strategy without explicit validation. It does not
+change `strategy_engine.recommend` or the Hi-Lo counting math, adds no external
 dependencies, and runs no large/slow simulations.
+
+### v1.15.0 — Composition-aware Split / Re-split EV Advisor (current)
+
+Builds directly on v1.14.0. The composition layer and exact finite-shoe dealer
+distribution were already in place, but SPLIT EV was a simplified placeholder.
+v1.15.0 makes the advisor properly evaluate **splitting and re-splitting** pairs
+(A,A / 8,8 / 10,10 / 2,2, ...) using the remaining shoe composition and the
+profile's split rules, so the coach is far more professional when analysing
+pairs.
+
+Delivered:
+
+- **`app/probability_advisor.py`**: `SplitEVEstimate`, `SplitBranchEstimate`;
+  `estimate_split_ev_composition` (pairs only; respects `split_allowed`,
+  `resplit_allowed`, `max_split_hands`, `hit_split_aces`, DAS; builds the
+  re-split tree to the cap and falls back to a normal hand once the cap is hit;
+  split aces get one card and stop unless `hit_split_aces`),
+  `estimate_subhand_ev_after_split` (per-sub-hand optimal EV, memoised on
+  rank/depth/hand-count), and `compare_pair_actions_ev` (SPLIT vs
+  HIT/STAND/DOUBLE/SURRENDER, sorted by EV). `build_composition_aware_advice`
+  attaches a `split_estimate` for pairs and feeds the real split EV into
+  `best_estimated_action`.
+- **CLI**: `odds` shows a "Split EV estimate" block for pairs; `coach
+  --show-odds` shows a compact Split EV line and whether the advisory best-EV
+  action agrees with the coach's recommendation.
+- **Tests**: extended `tests/test_probability_advisor.py` and CLI tests.
+
+**Limits / honesty:** the dealer distribution and the re-split tree (up to
+`max_split_hands`) are enumerated deterministically, and split aces that cannot
+be hit are evaluated **exactly** (`is_exact_for_supported_rules=True`). Hittable
+sub-hands reuse the one-card-then-stand look-ahead and inter-hand card depletion
+is ignored, so those cases remain **approximate**. Per `PROJECT_RULES.md`,
+split/re-split EV separates exact, approximate, and simplified, and never
+overrides the main strategy without explicit validation. No change to
+`strategy_engine.recommend` or the Hi-Lo math; no external dependencies; no
+Monte Carlo / slow simulations.
 
 ### v2.0 — Possible Web UI (if decided later)
 

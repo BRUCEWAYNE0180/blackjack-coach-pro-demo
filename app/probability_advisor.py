@@ -407,8 +407,9 @@ COMPOSITION_RANKS: tuple[str, ...] = (
 COMPOSITION_APPROXIMATION_NOTE = (
     "Composition-aware: the dealer final-total distribution is computed exactly "
     "for the finite shoe of remaining cards (ten-values aggregated). Player "
-    "HIT/DOUBLE EV uses a one-card look-ahead and is approximate; SPLIT EV is "
-    "simplified. Advisory only - it does not override the strategy recommendation."
+    "HIT/DOUBLE EV uses a one-card look-ahead and is approximate; SPLIT/re-split "
+    "EV (for pairs) is computed from the finite-shoe re-split tree and shown "
+    "separately. Advisory only - it does not override the strategy recommendation."
 )
 _COMPOSITION_ADVISORY_WARNING = (
     "Composition-aware EV is advisory and does not override the strategy "
@@ -453,6 +454,7 @@ class CompositionAwareProbabilityAdvice:
     composition_note: str
     approximation_note: str
     warnings: list[str] = field(default_factory=list)
+    split_estimate: SplitEVEstimate | None = None
 
 
 def build_initial_rank_counts(decks: int = 6) -> dict[str, int]:
@@ -846,14 +848,37 @@ def build_composition_aware_advice(
         for a in legal_actions_for_hand(player_cards, profile)
     ]
 
+    # v1.15.0: for pairs, replace the simplified SPLIT placeholder with a real
+    # composition-aware split / re-split EV estimate.
+    split_estimate = None
+    pair_hand = evaluate_hand(player_cards)
+    if pair_hand.is_pair and profile.split_allowed:
+        split_estimate = estimate_split_ev_composition(
+            player_cards, dealer_upcard, profile, composition, decks=decks)
+        if split_estimate.estimated_ev is not None:
+            action_estimates = [
+                ActionEVEstimate(
+                    action=Action.SPLIT.value,
+                    estimated_ev=split_estimate.estimated_ev,
+                    win_probability=0.0, loss_probability=0.0,
+                    push_probability=0.0, bust_probability=0.0,
+                    note="Composition-aware split / re-split EV (see split "
+                         "estimate).",
+                )
+                if e.action == Action.SPLIT.value else e
+                for e in action_estimates
+            ]
+
     scored = [e for e in action_estimates if e.estimated_ev is not None]
     best_estimated_action = (
         max(scored, key=lambda e: e.estimated_ev).action if scored else None
     )
 
     warnings = [_COMPOSITION_ADVISORY_WARNING, *comp_warnings]
-    if any(e.action == Action.SPLIT.value and e.estimated_ev is None
-           for e in action_estimates):
+    if split_estimate is not None:
+        warnings.extend(split_estimate.warnings)
+    elif any(e.action == Action.SPLIT.value and e.estimated_ev is None
+             for e in action_estimates):
         warnings.append(_SPLIT_SIMPLIFIED_WARNING)
     if best_estimated_action and best_estimated_action != recommended_action:
         warnings.append(
@@ -879,4 +904,301 @@ def build_composition_aware_advice(
         composition_note=composition.note,
         approximation_note=COMPOSITION_APPROXIMATION_NOTE,
         warnings=warnings,
+        split_estimate=split_estimate,
+    )
+
+
+
+# ---------------------------------------------------------------------------
+# v1.15.0 - Composition-aware SPLIT / re-split EV
+#
+# In v1.14.0 SPLIT EV was left simplified. This section computes a far stronger
+# advisory EV for splitting and re-splitting pairs, using the remaining shoe
+# composition and the profile's split rules (split_allowed, resplit_allowed,
+# max_split_hands, hit_split_aces, double_after_split).
+#
+# What is exact vs approximate (see docs/PROJECT_RULES.md):
+#   * The dealer final-total distribution is exact finite-shoe (from v1.14.0).
+#   * The split structure and the re-split tree (up to max_split_hands) are
+#     enumerated deterministically over the aggregated ranks.
+#   * Split aces that cannot be hit get exactly one card then stand - that part
+#     is enumerated exactly.
+#   * Hittable sub-hands reuse the one-card-then-stand look-ahead, which is an
+#     APPROXIMATION, and inter-hand card depletion between the two split hands
+#     is ignored. So it is advisory only and never overrides the strategy.
+# ---------------------------------------------------------------------------
+
+SPLIT_APPROXIMATION_NOTE = (
+    "Split/re-split EV uses the exact finite-shoe dealer distribution and "
+    "enumerates the re-split tree up to max_split_hands. Split aces that cannot "
+    "be hit are evaluated exactly (one card then stand); hittable sub-hands use "
+    "a one-card-then-stand look-ahead and inter-hand depletion is ignored, so "
+    "those parts stay approximate. Advisory only - it never overrides the "
+    "strategy recommendation."
+)
+
+
+@dataclass(frozen=True)
+class SplitBranchEstimate:
+    """EV of one post-split sub-hand played optimally (advisory)."""
+
+    hand_cards: tuple[str, ...]
+    split_depth: int
+    from_resplit: bool
+    estimated_ev: float
+    recommended_action: str
+    branch_note: str = ""
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class SplitEVEstimate:
+    """Composition-aware EV of splitting (and re-splitting) a pair."""
+
+    pair_cards: tuple[str, ...]
+    dealer_upcard: str
+    profile_key: str
+    decks: int
+    max_split_hands: int
+    resplit_allowed: bool
+    hit_split_aces: bool
+    double_after_split: bool
+    estimated_ev: float | None
+    hands_evaluated: int
+    split_depth_limit: int
+    is_exact_for_supported_rules: bool
+    approximation_note: str
+    warnings: list[str] = field(default_factory=list)
+
+
+def _pair_rank_key(player_cards: list[str] | tuple[str, ...]) -> str | None:
+    """Return the aggregated rank of a pair, or ``None`` if not a pair."""
+    ev = evaluate_hand(player_cards)
+    if not ev.is_pair:
+        return None
+    if ev.pair_value == 11:
+        return "A"
+    if ev.pair_value == 10:
+        return "10"
+    return str(ev.pair_value)
+
+
+def estimate_subhand_ev_after_split(
+    hand_cards: list[str] | tuple[str, ...],
+    dealer_upcard: RenderedCard | str,
+    profile: RuleProfile,
+    shoe_composition: ShoeComposition,
+    split_depth: int,
+    current_split_hands_count: int,
+    *,
+    _raw_dist: dict[str, float] | None = None,
+    _expected: "callable | None" = None,
+) -> SplitBranchEstimate:
+    """Estimate the EV of one post-split sub-hand played optimally.
+
+    ``hand_cards`` are the cards already in the sub-hand (typically the split
+    rank plus its first drawn card). ``current_split_hands_count`` is how many
+    hands the split currently spans; re-splitting is allowed only while it is
+    below ``profile.max_split_hands`` and ``resplit_allowed`` is set.
+    """
+    raw_dist = _raw_dist if _raw_dist is not None else _dealer_distribution_composition(
+        dealer_upcard, profile.dealer_hits_soft_17, shoe_composition.rank_counts)
+    counts = shoe_composition.rank_counts
+    total_cards = shoe_composition.total_cards
+
+    ev_hand = evaluate_hand(hand_cards)
+    total, is_soft = ev_hand.total, ev_hand.is_soft
+    is_pair = ev_hand.is_pair
+    is_aces = is_pair and ev_hand.pair_value == 11
+    aces_locked = is_aces and not profile.hit_split_aces
+
+    candidates: dict[str, float] = {}
+    stand_ev, _, _, _ = _stand_outcome(total, raw_dist)
+    candidates[Action.STAND.value] = stand_ev
+
+    if not aces_locked:
+        hit_ev, _, _, _, _ = _one_card_then_stand_composition(
+            total, is_soft, raw_dist, counts, total_cards)
+        candidates[Action.HIT.value] = hit_ev
+        if profile.double_after_split:
+            candidates[Action.DOUBLE.value] = 2.0 * hit_ev
+
+    # Re-split option: a fresh pair, allowed by the profile, under the cap.
+    can_resplit_here = (
+        is_pair
+        and profile.split_allowed
+        and profile.resplit_allowed
+        and current_split_hands_count < profile.max_split_hands
+        and _expected is not None
+    )
+    if can_resplit_here:
+        pair_key = "A" if is_aces else (
+            "10" if ev_hand.pair_value == 10 else str(ev_hand.pair_value))
+        candidates[Action.SPLIT.value] = 2.0 * _expected(
+            pair_key, current_split_hands_count + 1, split_depth + 1)
+
+    best_action = max(candidates, key=lambda a: candidates[a])
+    return SplitBranchEstimate(
+        hand_cards=tuple(str(c) for c in hand_cards),
+        split_depth=split_depth,
+        from_resplit=split_depth > 0,
+        estimated_ev=candidates[best_action],
+        recommended_action=best_action,
+        branch_note=(
+            "Split aces: one card then stand."
+            if aces_locked else "Best of stand/hit/double/re-split (advisory)."
+        ),
+    )
+
+
+def estimate_split_ev_composition(
+    player_cards: list[str] | tuple[str, ...],
+    dealer_upcard: RenderedCard | str,
+    profile: RuleProfile = DEFAULT_PROFILE,
+    shoe_composition: ShoeComposition | None = None,
+    decks: int = 6,
+) -> SplitEVEstimate:
+    """Composition-aware EV of splitting (and re-splitting) a pair.
+
+    Only applies to pairs. Returns a :class:`SplitEVEstimate`; when the hand is
+    not a pair or splitting is not allowed, ``estimated_ev`` is ``None`` with a
+    clear warning. Advisory only - it never overrides the recommendation.
+    """
+    if shoe_composition is None:
+        shoe_composition = build_shoe_composition(
+            decks=decks, known_cards=[*player_cards, dealer_upcard])
+    else:
+        decks = shoe_composition.decks
+
+    pair_key = _pair_rank_key(player_cards)
+    base = dict(
+        pair_cards=tuple(str(c) for c in player_cards),
+        dealer_upcard=str(
+            dealer_upcard.rank if isinstance(dealer_upcard, RenderedCard)
+            else dealer_upcard),
+        profile_key=profile.key,
+        decks=decks,
+        max_split_hands=profile.max_split_hands,
+        resplit_allowed=profile.resplit_allowed,
+        hit_split_aces=profile.hit_split_aces,
+        double_after_split=profile.double_after_split,
+        split_depth_limit=profile.max_split_hands,
+        approximation_note=SPLIT_APPROXIMATION_NOTE,
+    )
+
+    if pair_key is None:
+        return SplitEVEstimate(
+            **base, estimated_ev=None, hands_evaluated=0,
+            is_exact_for_supported_rules=False,
+            warnings=["Not a pair; split EV does not apply."],
+        )
+    if not profile.split_allowed:
+        return SplitEVEstimate(
+            **base, estimated_ev=None, hands_evaluated=0,
+            is_exact_for_supported_rules=False,
+            warnings=["This rule set does not allow splitting."],
+        )
+
+    raw_dist = _dealer_distribution_composition(
+        dealer_upcard, profile.dealer_hits_soft_17, shoe_composition.rank_counts)
+    counts = shoe_composition.rank_counts
+    total_cards = shoe_composition.total_cards
+    is_aces = pair_key == "A"
+    aces_locked = is_aces and not profile.hit_split_aces
+
+    leaves = [0]
+    memo: dict[tuple[str, int], float] = {}
+
+    def expected(rank_key: str, current_hands: int, depth: int = 0) -> float:
+        """Expected EV of one new split hand starting with ``rank_key``."""
+        cache_key = (rank_key, current_hands)
+        cached = memo.get(cache_key)
+        if cached is not None:
+            return cached
+        ev_sum = 0.0
+        if total_cards <= 0:
+            memo[cache_key] = 0.0
+            return 0.0
+        for second in COMPOSITION_RANKS:
+            count = counts.get(second, 0)
+            if count <= 0:
+                continue
+            prob = count / total_cards
+            branch = estimate_subhand_ev_after_split(
+                [rank_key, second], dealer_upcard, profile, shoe_composition,
+                split_depth=depth, current_split_hands_count=current_hands,
+                _raw_dist=raw_dist, _expected=expected,
+            )
+            if branch.recommended_action != Action.SPLIT.value:
+                leaves[0] += 1
+            ev_sum += prob * branch.estimated_ev
+        memo[cache_key] = ev_sum
+        return ev_sum
+
+    per_hand_ev = expected(pair_key, current_hands=2, depth=0)
+    total_ev = 2.0 * per_hand_ev
+
+    warnings: list[str] = []
+    if is_aces and not profile.hit_split_aces:
+        warnings.append(
+            "Split aces receive one card each and stand (no hitting); EV is "
+            "evaluated exactly for that rule.")
+    if not profile.resplit_allowed:
+        warnings.append("Re-splitting is disabled by this profile.")
+    if profile.double_after_split:
+        warnings.append("Double-after-split (DAS) is allowed and included in EV.")
+    else:
+        warnings.append("No double-after-split (DAS); sub-hands cannot double.")
+
+    return SplitEVEstimate(
+        **base,
+        estimated_ev=total_ev,
+        hands_evaluated=leaves[0],
+        # Exact only when the sole modelled action is one-card-then-stand aces.
+        is_exact_for_supported_rules=aces_locked,
+        warnings=warnings,
+    )
+
+
+def compare_pair_actions_ev(
+    player_cards: list[str] | tuple[str, ...],
+    dealer_upcard: RenderedCard | str,
+    profile: RuleProfile = DEFAULT_PROFILE,
+    shoe_composition: ShoeComposition | None = None,
+    decks: int = 6,
+) -> list[ActionEVEstimate]:
+    """Compare the EV of SPLIT, HIT, STAND, DOUBLE, SURRENDER for a pair.
+
+    Returns the legal actions sorted by estimated EV (highest first). SPLIT uses
+    :func:`estimate_split_ev_composition`; the rest use
+    :func:`estimate_action_ev_composition`. Advisory only.
+    """
+    if shoe_composition is None:
+        shoe_composition = build_shoe_composition(
+            decks=decks, known_cards=[*player_cards, dealer_upcard])
+
+    legal = {a.value for a in legal_actions_for_hand(player_cards, profile)}
+    estimates: list[ActionEVEstimate] = []
+    for action_value in (Action.HIT.value, Action.STAND.value,
+                         Action.DOUBLE.value, Action.SURRENDER.value):
+        if action_value in legal:
+            estimates.append(estimate_action_ev_composition(
+                player_cards, dealer_upcard, action_value, profile,
+                shoe_composition))
+
+    if Action.SPLIT.value in legal:
+        split = estimate_split_ev_composition(
+            player_cards, dealer_upcard, profile, shoe_composition, decks=decks)
+        estimates.append(ActionEVEstimate(
+            action=Action.SPLIT.value,
+            estimated_ev=split.estimated_ev,
+            win_probability=0.0, loss_probability=0.0,
+            push_probability=0.0, bust_probability=0.0,
+            note="Composition-aware split / re-split EV.",
+        ))
+
+    return sorted(
+        estimates,
+        key=lambda e: (e.estimated_ev is not None, e.estimated_ev or 0.0),
+        reverse=True,
     )

@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.14.0 feature summary
+## v1.15.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -158,6 +158,7 @@ blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_D
 blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS
 blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
 blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --seen-cards 2♣,5♦,K♠,A♥ --composition
+blackjack-coach odds --cards 8♠,8♥ --dealer 6♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
 ```
 
 Without installing, run it as a module from the repository root:
@@ -831,10 +832,52 @@ Flags:
 
 This layer **separates exact, approximate, and advisory** clearly: the dealer
 distribution is exact finite-shoe, player HIT/DOUBLE EV is an approximate
-one-card look-ahead, and SPLIT EV is simplified (a full exact split tree
-remains future work). Impossible compositions (e.g. five aces in one deck) are
-flagged with a clear warning. As always, it is **advisory only** and never
-changes `strategy_engine.recommend()` or the Hi-Lo counting math.
+one-card look-ahead, and SPLIT/re-split EV is now modelled separately (see
+below). Impossible compositions (e.g. five aces in one deck) are flagged with a
+clear warning. As always, it is **advisory only** and never changes
+`strategy_engine.recommend()` or the Hi-Lo counting math.
+
+## Split / re-split EV advisor (v1.15.0)
+
+For pairs, the advisor now computes a proper composition-aware EV for
+**splitting and re-splitting** instead of the old simplified placeholder. It
+respects the profile's split rules - `split_allowed`, `resplit_allowed`,
+`max_split_hands`, `hit_split_aces`, and double-after-split (DAS) - and
+enumerates the re-split tree against the exact finite-shoe dealer distribution.
+
+```bash
+blackjack-coach odds --cards 8♠,8♥ --dealer 6♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach odds --cards A♠,A♥ --dealer 6♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach coach --cards 8♠,8♥ --dealer 6♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware
+```
+
+```text
+-- Split EV estimate --
+Split allowed        : yes
+Resplit allowed      : yes
+Max split hands      : 4
+Hit split aces       : no
+DAS                  : yes
+Estimated split EV   : +0.373
+Sub-hands evaluated  : 28
+Exact for these rules: no
+Compare         : HIT -0.438  STAND -0.125  DOUBLE -0.876  SURRENDER -0.500
+```
+
+When the hand is a pair, `odds` adds a **Split EV estimate** block (split rules,
+estimated split EV, sub-hands evaluated, and a compact comparison vs
+HIT/STAND/DOUBLE/SURRENDER), and `coach --show-odds` adds a compact Split EV
+line plus whether the advisory best-EV action **agrees** with the coach's
+recommendation.
+
+**Honest about exactness:** the dealer distribution and the re-split tree
+(up to `max_split_hands`) are enumerated deterministically, and split aces that
+cannot be hit (one card then stand) are evaluated **exactly**. Hittable
+sub-hands reuse the one-card-then-stand look-ahead and inter-hand card depletion
+is ignored, so those parts stay **approximate** (reported via
+`is_exact_for_supported_rules`). It is **advisory only** - it never overrides
+the coach's final recommendation, `strategy_engine.recommend()`, or the Hi-Lo
+math.
 
 ## Adaptive local learning (v1.13.0)
 

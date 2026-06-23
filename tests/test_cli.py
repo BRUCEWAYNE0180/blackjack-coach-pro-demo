@@ -1073,6 +1073,67 @@ class TestCliCompositionAware:
         assert "Count-aware advisory" in out
 
 
+class TestCliSplitEV:
+    """v1.15.0 composition-aware split / re-split EV advisor."""
+
+    def test_odds_pair_8_8_shows_split_ev(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "8\u2660,8\u2665",
+                              "--dealer", "6\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--composition-aware"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "-- Split EV estimate --" in out
+        assert "Estimated split EV" in out
+        assert "Max split hands" in out
+        assert "DAS" in out
+
+    def test_odds_pair_aces_shows_split_context(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "A\u2660,A\u2665",
+                              "--dealer", "6\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--composition-aware"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "-- Split EV estimate --" in out
+        assert "Hit split aces       : no" in out
+        # Split aces (one card then stand) are evaluated exactly.
+        assert "Exact for these rules: yes" in out
+
+    def test_odds_pair_tens_works(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "10\u2660,10\u2665",
+                              "--dealer", "6\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--composition-aware"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "-- Split EV estimate --" in out
+        # Standing on 20 beats splitting tens; the advisory should not pick SPLIT.
+        assert "Best estimated action: STAND" in out
+
+    def test_odds_non_pair_has_no_split_ev(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "6\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--composition-aware"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Split EV estimate" not in out
+
+    def test_coach_pair_show_odds_composition_aware(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "8\u2660,8\u2665",
+                              "--dealer", "6\u2666", "--show-odds",
+                              "--composition-aware",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Odds (approximate)" in out
+        assert "Split EV" in out
+        assert "EV vs recommendation" in out
+        # The coach's final recommendation is still shown (no override).
+        assert "Recommended action" in out
+
+
 
 class TestCliLearn:
     """Adaptive local-learning 'learn' command and coach --use-history."""

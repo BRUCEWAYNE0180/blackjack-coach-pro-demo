@@ -7,6 +7,60 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.15.0] - 2026-06-23
+
+Composition-aware SPLIT / re-split EV. In v1.14.0 the shoe composition and the
+finite-shoe dealer distribution became exact, but SPLIT EV was left simplified.
+v1.15.0 replaces that placeholder with a real composition-aware EV for splitting
+and re-splitting pairs (A,A / 8,8 / 10,10 / 2,2, ...), respecting the profile's
+split rules. It stays advisory only and never changes the recommendation or the
+Hi-Lo math.
+
+### Added
+
+- `app/probability_advisor.py`: dataclasses `SplitEVEstimate` and
+  `SplitBranchEstimate`; `estimate_split_ev_composition` (pairs only; respects
+  `split_allowed`, `resplit_allowed`, `max_split_hands`, `hit_split_aces`, and
+  DAS; enumerates the re-split tree against the exact finite-shoe dealer
+  distribution), `estimate_subhand_ev_after_split` (per-sub-hand optimal EV with
+  memoised re-splits), and `compare_pair_actions_ev` (SPLIT vs HIT/STAND/DOUBLE/
+  SURRENDER, sorted by EV).
+- `odds` now shows a "Split EV estimate" block for pairs (split rules, estimated
+  split EV, sub-hands evaluated, exactness flag, and a compact comparison vs the
+  other legal actions).
+- `coach --show-odds` shows a compact Split EV line for pairs and whether the
+  advisory best-EV action agrees with the coach's recommendation.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.15.0**.
+- `build_composition_aware_advice` now attaches a `split_estimate` for pairs and
+  feeds the real split EV into `best_estimated_action` (still advisory). The
+  composition approximation note no longer calls SPLIT "simplified".
+
+### Quality
+
+- Extended `tests/test_probability_advisor.py` (split EV applies only to pairs;
+  8,8 vs 6 returns an estimate; A,A respects `hit_split_aces=False` exactly and
+  plays normally when `hit_split_aces=True`; re-split respects `max_split_hands`;
+  `resplit_allowed=False` blocks re-splits; DAS changes sub-hand EV;
+  `compare_pair_actions_ev` includes SPLIT and is sorted; split estimate present
+  for pairs and absent for non-pairs; `recommend()` unchanged) plus CLI tests for
+  `odds` on 8,8 / A,A / 10,10 and `coach --show-odds` on a pair. Full suite
+  passing; ruff clean.
+
+### Safety
+
+- Split/re-split EV cleanly separates exact (finite-shoe dealer; re-split tree;
+  one-card split-aces), approximate (hittable sub-hand one-card look-ahead;
+  inter-hand depletion ignored), and advisory output, reported via
+  `is_exact_for_supported_rules`. It never overrides the coach's final
+  recommendation or `strategy_engine.recommend`, makes no change to the Hi-Lo
+  counting math, adaptive learning, guided coaching, outcome history, or session
+  history, adds no external dependencies, and runs no Monte Carlo / slow
+  simulations (deterministic + memoised). No money, bankroll, accounts, tokens,
+  screenshots, or sensitive data.
+
 ## [1.14.0] - 2026-06-23
 
 Composition-aware probability & EV. The advisor can now use the actual

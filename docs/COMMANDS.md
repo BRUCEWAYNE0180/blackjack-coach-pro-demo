@@ -456,9 +456,42 @@ compact block shows the composition-aware status, cards remaining, bust if hit,
 dealer bust, and the best estimated action.
 
 This layer cleanly **separates exact, approximate, and advisory**: exact
-finite-shoe dealer distribution, approximate player HIT/DOUBLE EV, and a
-simplified SPLIT EV (a full exact split tree is future work). It is advisory
-only and never overrides `strategy_engine.recommend()` or the Hi-Lo math.
+finite-shoe dealer distribution, approximate player HIT/DOUBLE EV, and (for
+pairs) a composition-aware SPLIT/re-split EV (see below). It is advisory only
+and never overrides `strategy_engine.recommend()` or the Hi-Lo math.
+
+## Split / re-split EV advisor (v1.15.0)
+
+### odds (pairs)
+
+```bash
+blackjack-coach odds --cards 8♠,8♥ --dealer 6♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach odds --cards A♠,A♥ --dealer 6♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach odds --cards 10♠,10♥ --dealer 6♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach odds --cards 8♠,8♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --seen-cards 2♣,5♦,K♠,A♥ --composition
+```
+
+When the hand is a pair, `odds` (in composition-aware mode) adds a **Split EV
+estimate** block: split allowed, resplit allowed, max split hands, hit split
+aces, DAS, the estimated split EV, the number of sub-hands evaluated, whether it
+is exact for the active rules, and a compact comparison vs
+HIT/STAND/DOUBLE/SURRENDER. The re-split tree is enumerated up to
+`max_split_hands`, and split aces that cannot be hit are evaluated exactly.
+
+### coach --show-odds (pairs)
+
+```bash
+blackjack-coach coach --cards 8♠,8♥ --dealer 6♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware
+```
+
+For pairs, the compact odds block adds a Split EV line and shows whether the
+advisory best-EV action **agrees** with the coach's recommendation. The coach's
+final recommendation is never overridden automatically.
+
+Honest about exactness: the dealer distribution and the re-split tree are
+enumerated deterministically and split aces (one card then stand) are exact;
+hittable sub-hands use a one-card look-ahead and inter-hand depletion is ignored,
+so those parts stay approximate (reported via `is_exact_for_supported_rules`).
 
 ## Adaptive local learning (v1.13.0)
 
