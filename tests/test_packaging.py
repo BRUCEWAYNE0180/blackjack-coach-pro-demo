@@ -1,16 +1,16 @@
-"""Tests for packaging / professional-hardening invariants (v0.9)."""
+"""Tests for packaging / release invariants."""
 
 import app
 from app import cli
 
 
 class TestVersion:
-    def test_version_is_0_9_0(self):
-        assert app.__version__ == "0.9.0"
+    def test_version_is_1_0_0(self):
+        assert app.__version__ == "1.0.0"
 
 
 class TestCliBackwardCompatibility:
-    """The v0.9 packaging work must not change existing CLI behaviour."""
+    """Release polish must not change existing CLI behaviour."""
 
     def test_strategy_default_command(self, capsys):
         assert cli.main(["--cards", "A,7", "--dealer", "9"]) == 0

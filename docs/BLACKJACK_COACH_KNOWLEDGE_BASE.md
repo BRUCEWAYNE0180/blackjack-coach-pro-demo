@@ -389,7 +389,7 @@ Delivered (educational practice only):
 - Never for real tables: no casino connectivity, no real-money betting, no
   camera/video, no screen scraping, and no promise of winnings.
 
-### v0.9 — Professional Hardening (current)
+### v0.9 — Professional Hardening (done)
 
 Delivered (no new gameplay scope; tooling and quality only):
 
@@ -421,17 +421,54 @@ Delivered (no new gameplay scope; tooling and quality only):
 - Still local/simulated only: no casino connectivity, no real-money betting or
   bankroll, no camera/video, no screen scraping, and no promise of winnings.
 
-### v1.0 — Visual / UI Layer
+### v1.0.0 — Stable Release (current)
 
-- Interactive strategy charts and quiz/flashcard UX.
-- Progress tracking and accuracy stats per hand category.
-- Groundwork for a web app front end.
+The first **stable** release. It is release polish only: no new blackjack
+gameplay is added. v1.0.0 consolidates v0.1-v0.9 into a documented, packaged,
+educational/local trainer.
 
-### v1.1 — Web App & Polish
+Delivered:
 
-- Browser-based practice app over the existing engine and simulator.
-- Profile selection, drill history, and shareable practice sessions.
-- Accessibility, responsiveness, and documentation hardening.
+- Version bumped to **1.0.0** in `app.__version__` and `pyproject.toml`, with a
+  matching version test.
+- **`CHANGELOG.md`** (a single stable 1.0.0 entry: Added / Changed / Quality /
+  Safety), **`LICENSE`** (MIT), **`docs/RELEASE_NOTES_v1.0.0.md`**, and
+  **`docs/COMMANDS.md`** (full command reference).
+- **README** polished for a ~30-second understanding (what it is, install,
+  tests, CLI, educational scope), with a v1.0.0 feature summary and a
+  "Not financial / gambling advice" section.
+- **`PROJECT_RULES.md`** gains **Release Rules** (tests pass, CI green, no
+  secrets/sensitive data, no out-of-scope changes, mandatory release notes).
+
+v1.0.0 is explicitly an **educational / local / simulated** release: no casino
+connectivity, no real-money betting or bankroll, no camera/video, no screen
+scraping, no betting spread, no Kelly, no Illustrious 18, no insurance index,
+no web app, and no promise of winnings.
+
+## Future Roadmap (post-1.0.0)
+
+All future work stays educational and local unless explicitly decided
+otherwise.
+
+### v1.1 — Visual / Terminal Polish
+
+- Nicer terminal output (tables/colour), clearer prompts, and quiz UX polish.
+
+### v1.2 — Saved Local Session History
+
+- Optionally persist practice-session results **locally** (opt-in), for
+  progress tracking. No accounts, no cloud, no sensitive data.
+
+### v1.3 — Advanced Deviations (educational only)
+
+- Teach well-known count-based deviations (e.g. the Illustrious 18) as a
+  **learning topic**, practiced only against the local simulator. Still no real
+  betting, bankroll, or bet sizing.
+
+### v2.0 — Possible Web UI (if decided later)
+
+- A browser front end over the existing engine and simulator, only if and when
+  decided. Subject to the same educational, no-real-money constraints.
 
 ## Out-of-Scope (All Versions)
 

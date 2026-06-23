@@ -2,14 +2,23 @@
 
 [![CI](https://github.com/BRUCEWAYNE0180/blackjack-coach-pro-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/BRUCEWAYNE0180/blackjack-coach-pro-demo/actions/workflows/ci.yml)
 
-An **educational / practice** tool for learning blackjack **basic strategy**.
+An **educational / practice** tool for learning blackjack **basic strategy**,
+Hi-Lo counting, and hand simulation — entirely offline, with a friendly CLI.
 
 > This project is a study aid, not a gambling product. It does **not** connect
 > to casinos, does **not** place or automate real-money bets, does **not** use
 > any camera/video at a real table, and makes **no** promise of winnings.
 > See [`docs/PROJECT_RULES.md`](docs/PROJECT_RULES.md).
 
-## What it does (v0.9)
+**30-second tour:** install with `pip install -e ".[dev]"`, run the tests with
+`python -m pytest`, then try `blackjack-coach --cards A,7 --dealer 9`. It tells
+you the basic-strategy play and *why*. Everything is local and educational.
+
+Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
+[Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
+[Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
+
+## v1.0.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -319,12 +328,13 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v0.9 focuses on **professional hardening**: modern packaging
-(`pyproject.toml`), a `blackjack-coach` console command, GitHub Actions CI
-across Python 3.9-3.12, and documented quality gates. No new gameplay scope is
-added. **Out of scope** for now: saving results/files, databases, login,
-betting spread, Kelly bet sizing, the Illustrious 18, insurance index plays,
-and a web/UI layer. See
+v1.0.0 is the first **stable** release: an educational, local, well-tested
+trainer with modern packaging and CI. It adds no new gameplay over v0.9 — it is
+release polish (docs, changelog, license, metadata, quality).
+
+Planned next (educational/local only): v1.1 terminal/visual polish, v1.2 saved
+local session history, v1.3 advanced count deviations (educational only), and a
+possible v2.0 web UI if decided later. See
 [`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
 for the full roadmap.
 
@@ -336,8 +346,17 @@ not:
 - connect to any real casino or online gambling platform;
 - place, manage, or automate real-money bets, or model a bankroll;
 - use a camera, video feed, or screen scraping to read a real table;
-- promise winnings or present any "guaranteed" system.
+- promise winnings or present any "guaranteed" system;
+- include a betting spread, Kelly bet sizing, the Illustrious 18, or insurance
+  index plays.
 
 Card counting and the simulator exist purely for **local, simulated**
-education. Please gamble responsibly and follow the laws and venue rules that
-apply to you.
+education.
+
+## Not financial / gambling advice
+
+Nothing here is financial advice or gambling advice. Blackjack always carries a
+house edge; good basic strategy reduces losses but **cannot** guarantee wins.
+Gambling involves real financial risk and can be addictive. You are responsible
+for following the laws and venue rules that apply to you. If gambling is
+causing harm, seek support from a local problem-gambling helpline.
