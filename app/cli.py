@@ -9,8 +9,8 @@ A small terminal entry point. Forms supported:
 
 The first prints a basic-strategy recommendation; the second runs the Hi-Lo
 counting trainer; the third deals an opening hand from a local virtual shoe;
-the fourth plays a full hand out against the dealer (all educational /
-simulated practice only).
+the fourth plays a full hand out against the dealer, including basic pair
+splits (all educational / simulated practice only).
 
 Educational/practice tool only: it never connects to a casino, places real
 bets, uses any camera/video, or promises winnings. See docs/PROJECT_RULES.md.
@@ -27,6 +27,7 @@ from .explanations import explain_insurance_no
 from .rules import DEFAULT_PROFILE, PROFILES, get_profile
 from .simulator import (
     PlayedHand,
+    PlayedSplitHand,
     SimulatedHand,
     play_training_hand,
     simulate_training_hand,
@@ -257,7 +258,7 @@ def _run_simulate(argv: Sequence[str]) -> int:
 
 
 def build_play_output(hand: PlayedHand) -> str:
-    """Render a fully played-out hand as human-readable terminal output."""
+    """Render a fully played-out (non-split) hand as terminal output."""
     outcome = hand.final_outcome.value if hand.final_outcome else "NOT PLAYED (split)"
     starting = ", ".join(hand.player_cards[:2])
     lines = [
@@ -273,6 +274,33 @@ def build_play_output(hand: PlayedHand) -> str:
         f"True count after:      {hand.true_count_after:+.2f}",
         f"Note:                  {hand.note}",
     ]
+    return "\n".join(lines)
+
+
+def build_split_play_output(hand: PlayedSplitHand) -> str:
+    """Render a split hand (two sub-hands) as terminal output."""
+    lines = [
+        "Played training hand - SPLIT (local / simulated practice only)",
+        f"Original hand:         {', '.join(hand.original_player_cards)}",
+        f"Dealer upcard:         {hand.dealer_cards[0]}",
+    ]
+    for i, sub in enumerate(hand.split_hands, start=1):
+        actions = ", ".join(sub.actions_taken) or "(none)"
+        outcome = sub.final_outcome.value if sub.final_outcome else "(unresolved)"
+        lines.append(f"Split hand {i}:          {', '.join(sub.cards)}")
+        lines.append(f"  Actions:             {actions}")
+        lines.append(f"  Outcome:             {outcome}")
+    lines.extend([
+        f"Final dealer cards:    {', '.join(hand.dealer_cards)}",
+        f"Running count before:  {hand.running_count_before:+d}",
+        f"Running count after:   {hand.running_count_after:+d}",
+        f"True count after:      {hand.true_count_after:+.2f}",
+        f"Note:                  {hand.note}",
+    ])
+    if hand.warnings:
+        lines.append("Warnings:")
+        for w in hand.warnings:
+            lines.append(f"  - {w}")
     return "\n".join(lines)
 
 
@@ -318,7 +346,10 @@ def _run_play(argv: Sequence[str]) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 
-    print(build_play_output(hand))
+    if isinstance(hand, PlayedSplitHand):
+        print(build_split_play_output(hand))
+    else:
+        print(build_play_output(hand))
     return 0
 
 

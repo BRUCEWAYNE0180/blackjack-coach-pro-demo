@@ -14,7 +14,7 @@ See docs/PROJECT_RULES.md.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 
 from .counting import (
@@ -30,7 +30,13 @@ from .strategy_engine import Action, Recommendation, recommend
 
 # Marker recorded when basic strategy says SPLIT: pair-splitting is intentionally
 # out of scope for v0.5, so the hand ends without being played for money.
+# (As of v0.6 the simulator plays basic splits; this is kept for the rare
+# fallback where a split is indicated but cannot be performed.)
 SPLIT_NOT_IMPLEMENTED = "SPLIT_NOT_IMPLEMENTED"
+
+# Marker recorded when a split hand would itself be re-split. Re-splitting is
+# out of scope for v0.6, so the hand is instead played as a normal total.
+RESPLIT_NOT_IMPLEMENTED = "RESPLIT_NOT_IMPLEMENTED"
 
 
 @dataclass(frozen=True)
@@ -179,6 +185,57 @@ class PlayedHand:
     warnings: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class SplitSubHand:
+    """One of the hands produced by splitting a pair.
+
+    Attributes:
+        cards: The sub-hand's cards (the kept card plus any drawn cards).
+        actions_taken: Ordered actions played on this sub-hand.
+        final_outcome: The :class:`HandOutcome` once resolved against the
+            dealer (``PLAYER_BUST`` is known during play; the rest are filled in
+            after the dealer plays). ``None`` until resolved.
+        recommendations: Basic-strategy recommendations consulted, in order.
+        is_complete: True once the sub-hand has finished being played.
+    """
+
+    cards: tuple[str, ...]
+    actions_taken: list[str]
+    final_outcome: "HandOutcome | None"
+    recommendations: list[Recommendation]
+    is_complete: bool = False
+
+
+@dataclass(frozen=True)
+class PlayedSplitHand:
+    """A fully played-out hand that began with a pair split.
+
+    Attributes:
+        original_player_cards: The original pair before splitting.
+        dealer_cards: The dealer's final cards (played once for all sub-hands).
+        split_hands: The played :class:`SplitSubHand` objects (two for v0.6).
+        actions_by_hand: Actions taken per sub-hand, in order.
+        outcomes_by_hand: The resolved :class:`HandOutcome` per sub-hand.
+        running_count_before: Running count before the hand.
+        running_count_after: Running count after all visible cards were counted.
+        true_count_after: True count derived from ``running_count_after``.
+        recommendations_by_hand: Recommendations consulted per sub-hand.
+        note: Short educational interpretation of the count / result.
+        warnings: Advisory messages (educational reminder, re-split note, etc.).
+    """
+
+    original_player_cards: tuple[str, ...]
+    dealer_cards: tuple[str, ...]
+    split_hands: list[SplitSubHand]
+    actions_by_hand: list[list[str]]
+    outcomes_by_hand: list["HandOutcome | None"]
+    running_count_before: int
+    running_count_after: int
+    true_count_after: float
+    recommendations_by_hand: list[list[Recommendation]]
+    note: str = ""
+    warnings: list[str] = field(default_factory=list)
+
 
 def play_dealer_hand(
     shoe: list[str],
@@ -246,22 +303,142 @@ def resolve_outcome(
     return HandOutcome.PUSH
 
 
+def can_split_hand(player_cards: list[str] | tuple[str, ...]) -> bool:
+    """Return True if the two-card hand is a pair eligible to split."""
+    if len(player_cards) != 2:
+        return False
+    return evaluate_hand(player_cards).is_pair
+
+
+def split_initial_hand(
+    shoe: list[str],
+    player_cards: list[str] | tuple[str, ...],
+) -> tuple[list[str], list[str]]:
+    """Split a pair into two hands, dealing one new card to each.
+
+    The two newly dealt cards are visible and should be counted by the caller.
+
+    Returns:
+        A tuple ``(hand_one, hand_two)`` where each hand is the kept card plus
+        its freshly dealt card.
+
+    Raises:
+        ValueError: If the hand is not a splittable pair or the shoe is short.
+    """
+    if not can_split_hand(player_cards):
+        raise ValueError("Hand is not a splittable pair.")
+    if len(shoe) < 2:
+        raise ValueError("Shoe has too few cards to split.")
+    first, second = player_cards
+    hand_one = [first, draw_card(shoe)]
+    hand_two = [second, draw_card(shoe)]
+    return hand_one, hand_two
+
+
+def play_split_subhand(
+    shoe: list[str],
+    subhand_cards: list[str] | tuple[str, ...],
+    dealer_upcard: str,
+    profile: RuleProfile = DEFAULT_PROFILE,
+    running_count: int = 0,
+) -> tuple[SplitSubHand, int]:
+    """Play one split sub-hand to completion.
+
+    Player model (simplified): no surrender after a split; DOUBLE is allowed
+    only when the profile permits double-after-split and takes exactly one card
+    then stands; HIT draws until strategy says stand or the hand busts; STAND
+    ends the turn. Re-splitting is out of scope, so if strategy would re-split,
+    a ``RESPLIT_NOT_IMPLEMENTED`` marker is recorded and the hand is played as a
+    normal total instead.
+
+    The running count is updated for each newly drawn card (all visible).
+
+    Returns:
+        A tuple ``(sub_hand, running_count)``. ``sub_hand.final_outcome`` is
+        ``PLAYER_BUST`` if the hand busted, otherwise ``None`` (pending the
+        dealer's hand).
+    """
+    cards = list(subhand_cards)
+    actions: list[str] = []
+    recommendations: list[Recommendation] = []
+    busted = False
+
+    can_double = profile.double_after_split
+    rec = recommend(
+        cards, dealer_upcard, profile,
+        can_double=can_double, can_surrender=False, can_split=True,
+    )
+    recommendations.append(rec)
+    action = rec.action
+
+    if action == Action.SPLIT:  # re-split is out of scope: play as a total
+        actions.append(RESPLIT_NOT_IMPLEMENTED)
+        rec = recommend(
+            cards, dealer_upcard, profile,
+            can_double=can_double, can_surrender=False, can_split=False,
+        )
+        recommendations.append(rec)
+        action = rec.action
+
+    if action == Action.DOUBLE:
+        actions.append(Action.DOUBLE.value)
+        card = draw_card(shoe)
+        cards.append(card)
+        running_count = update_running_count(running_count, card)
+        busted = evaluate_hand(cards).is_bust
+    elif action == Action.STAND:
+        actions.append(Action.STAND.value)
+    else:  # HIT (SURRENDER cannot occur: can_surrender=False)
+        while True:
+            actions.append(Action.HIT.value)
+            card = draw_card(shoe)
+            cards.append(card)
+            running_count = update_running_count(running_count, card)
+            if evaluate_hand(cards).is_bust:
+                busted = True
+                break
+            rec = recommend(
+                cards, dealer_upcard, profile,
+                can_double=False, can_surrender=False, can_split=False,
+            )
+            recommendations.append(rec)
+            if rec.action != Action.HIT:
+                actions.append(Action.STAND.value)
+                break
+
+    sub_hand = SplitSubHand(
+        cards=tuple(cards),
+        actions_taken=actions,
+        final_outcome=HandOutcome.PLAYER_BUST if busted else None,
+        recommendations=recommendations,
+        is_complete=True,
+    )
+    return sub_hand, running_count
+
+
+
+
 
 def play_training_hand(
     decks: int = 6,
     seed: int | None = None,
     profile: RuleProfile = DEFAULT_PROFILE,
-) -> PlayedHand:
+) -> "PlayedHand | PlayedSplitHand":
     """Play one full training hand from a fresh local shoe.
 
     The player follows basic strategy (a simplified single-hand model):
     SURRENDER ends the hand; DOUBLE takes exactly one card then stands; HIT
     draws until strategy says STAND or the hand busts; STAND ends the turn.
-    SPLIT is intentionally out of scope for v0.5 (recorded, not played).
 
-    The dealer then reveals its hole card and plays per the profile, unless the
-    player surrendered, busted, or a split was indicated. The running count is
-    updated only with visible cards; the dealer hole card counts once revealed.
+    If the opening recommendation is SPLIT on a real pair, the hand is split
+    and both sub-hands are played (see :func:`play_split_subhand`); a
+    :class:`PlayedSplitHand` is returned in that case. Re-splitting and special
+    split-Aces handling are out of scope for v0.6.
+
+    The dealer then reveals its hole card and plays once, unless the player
+    surrendered, busted, or (for splits) every sub-hand busted. The running
+    count is updated only with visible cards; the dealer hole card counts once
+    revealed.
 
     Raises:
         ValueError: If ``decks`` is not a positive integer.
@@ -294,16 +471,24 @@ def play_training_hand(
     recommendations.append(rec)
     action = rec.action
 
+    # If strategy says SPLIT on a real pair, play it out as a split hand.
+    if action == Action.SPLIT and can_split_hand(player_cards):
+        return _play_split_hands(
+            shoe, player_cards, dealer_upcard, dealer_hole,
+            running_before, running, profile,
+        )
 
     if action == Action.SURRENDER:
         actions.append(Action.SURRENDER.value)
         surrendered = True
     elif action == Action.SPLIT:
+        # Fallback only: strategy indicated SPLIT but the hand is not a
+        # splittable pair (should not normally happen).
         actions.append(SPLIT_NOT_IMPLEMENTED)
         split_out = True
         warnings.append(
-            "Basic strategy indicated SPLIT; pair-splitting is out of scope "
-            "for v0.5, so the hand was not played out."
+            "Basic strategy indicated SPLIT, but the hand could not be split, "
+            "so it was not played out."
         )
     elif action == Action.DOUBLE:
         actions.append(Action.DOUBLE.value)
@@ -370,6 +555,76 @@ def play_training_hand(
         running_count_after=running,
         true_count_after=tc_after,
         recommendations=recommendations,
+        note=note,
+        warnings=warnings,
+    )
+
+
+
+def _play_split_hands(
+    shoe: list[str],
+    player_cards: list[str],
+    dealer_upcard: str,
+    dealer_hole: str,
+    running_before: int,
+    running: int,
+    profile: RuleProfile,
+) -> PlayedSplitHand:
+    """Play out a split into two sub-hands, then the dealer, then resolve."""
+    warnings: list[str] = [EDUCATIONAL_NOTE]
+
+    if evaluate_hand(player_cards).pair_value == 11:  # split Aces
+        warnings.append(
+            "Split Aces: special rules (one card per Ace, no re-split) are not "
+            "specially modelled in v0.6; both hands are played normally."
+        )
+
+    hand_one, hand_two = split_initial_hand(shoe, player_cards)
+    # The two newly dealt cards are visible and are counted now.
+    running = update_running_count_many(running, [hand_one[1], hand_two[1]])
+
+    sub1, running = play_split_subhand(shoe, hand_one, dealer_upcard, profile, running)
+    sub2, running = play_split_subhand(shoe, hand_two, dealer_upcard, profile, running)
+    subs = [sub1, sub2]
+
+    if any(RESPLIT_NOT_IMPLEMENTED in s.actions_taken for s in subs):
+        warnings.append(
+            "A split hand could itself be re-split; re-splitting is out of "
+            "scope for v0.6, so it was played as a normal total instead."
+        )
+
+    # The dealer plays once for both sub-hands, only if at least one is live.
+    dealer_cards: list[str] = [dealer_upcard, dealer_hole]
+    all_busted = all(s.final_outcome == HandOutcome.PLAYER_BUST for s in subs)
+    if not all_busted:
+        running = update_running_count(running, dealer_hole)  # hole revealed
+        dealer_cards = play_dealer_hand(shoe, dealer_cards, profile)
+        running = update_running_count_many(running, dealer_cards[2:])
+
+    outcomes: list[HandOutcome | None] = []
+    resolved_subs: list[SplitSubHand] = []
+    for sub in subs:
+        if sub.final_outcome == HandOutcome.PLAYER_BUST:
+            outcome: HandOutcome = HandOutcome.PLAYER_BUST
+        else:
+            outcome = resolve_outcome(sub.cards, dealer_cards)
+        outcomes.append(outcome)
+        resolved_subs.append(replace(sub, final_outcome=outcome))
+
+    remaining = decks_remaining(shoe)
+    tc_after = running / remaining if remaining > 0 else 0.0
+    note = counting_summary(running, remaining) if remaining > 0 else EDUCATIONAL_NOTE
+
+    return PlayedSplitHand(
+        original_player_cards=tuple(player_cards),
+        dealer_cards=tuple(dealer_cards),
+        split_hands=resolved_subs,
+        actions_by_hand=[s.actions_taken for s in resolved_subs],
+        outcomes_by_hand=outcomes,
+        running_count_before=running_before,
+        running_count_after=running,
+        true_count_after=tc_after,
+        recommendations_by_hand=[s.recommendations for s in resolved_subs],
         note=note,
         warnings=warnings,
     )

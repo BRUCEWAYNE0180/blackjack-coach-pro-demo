@@ -158,3 +158,15 @@ class TestCliPlay:
         err = capsys.readouterr().err
         assert exit_code == 2
         assert "Error" in err
+
+    def test_play_split_does_not_fail(self, capsys):
+        # Seed 5 deals a splittable pair (8,8); the CLI must render it cleanly.
+        exit_code = cli.main(["play", "--decks", "6", "--seed", "5"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "SPLIT" in out
+        assert "Original hand:" in out
+        assert "Split hand 1:" in out
+        assert "Split hand 2:" in out
+        assert "Final dealer cards:" in out
+        assert "True count after:" in out

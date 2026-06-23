@@ -8,12 +8,17 @@ from app.shoe import build_shoe, shuffle_shoe
 from app.simulator import (
     HandOutcome,
     PlayedHand,
+    PlayedSplitHand,
     SimulatedHand,
+    SplitSubHand,
+    can_split_hand,
     deal_initial_hand,
     play_dealer_hand,
+    play_split_subhand,
     play_training_hand,
     resolve_outcome,
     simulate_training_hand,
+    split_initial_hand,
 )
 from app.strategy_engine import Action, Recommendation
 
@@ -170,3 +175,114 @@ class TestPlayTrainingHand:
     def test_invalid_decks_raises(self):
         with pytest.raises(ValueError):
             play_training_hand(decks=0)
+
+
+
+# A seed known to deal a splittable pair (8,8) on the opening hand.
+SPLIT_SEED = 5
+
+
+class TestCanSplitHand:
+    def test_pair_of_eights(self):
+        assert can_split_hand(["8", "8"]) is True
+
+    def test_ten_valued_pair(self):
+        # K,Q are both value 10, so the evaluator treats them as a pair.
+        assert can_split_hand(["K", "Q"]) is True
+
+    def test_non_pair(self):
+        assert can_split_hand(["10", "9"]) is False
+
+    def test_three_cards_not_splittable(self):
+        assert can_split_hand(["8", "8", "8"]) is False
+
+
+class TestSplitInitialHand:
+    def test_creates_two_hands(self):
+        shoe = ["2", "3"]  # drawn from the end: hand_two gets "3", hand_one "2"
+        h1, h2 = split_initial_hand(shoe, ["8", "8"])
+        assert h1[0] == "8" and h2[0] == "8"
+        assert len(h1) == 2 and len(h2) == 2
+
+    def test_reduces_shoe(self):
+        shoe = shuffle_shoe(build_shoe(6), seed=1)
+        before = len(shoe)
+        split_initial_hand(shoe, ["8", "8"])
+        assert len(shoe) == before - 2
+
+    def test_rejects_non_pair(self):
+        with pytest.raises(ValueError):
+            split_initial_hand(build_shoe(1), ["10", "9"])
+
+
+class TestPlaySplitSubhand:
+    def test_returns_complete_state(self):
+        shoe = shuffle_shoe(build_shoe(6), seed=3)
+        sub, rc = play_split_subhand(shoe, ["8", "5"], "6", H17, running_count=0)
+        assert isinstance(sub, SplitSubHand)
+        assert sub.is_complete is True
+        assert sub.cards[0] == "8"
+        assert sub.actions_taken  # at least one action recorded
+        assert sub.recommendations
+        assert isinstance(rc, int)
+
+    def test_no_surrender_after_split(self):
+        # Surrender is disabled after a split; the action list never contains it.
+        shoe = shuffle_shoe(build_shoe(6), seed=11)
+        sub, _ = play_split_subhand(shoe, ["8", "8"], "A", H17, running_count=0)
+        assert Action.SURRENDER.value not in sub.actions_taken
+
+
+
+class TestPlayTrainingHandSplit:
+    def test_split_seed_returns_played_split_hand(self):
+        hand = play_training_hand(decks=6, seed=SPLIT_SEED)
+        assert isinstance(hand, PlayedSplitHand)
+        assert hand.original_player_cards == ("8", "8")
+
+    def test_two_split_hands_and_outcomes(self):
+        hand = play_training_hand(decks=6, seed=SPLIT_SEED)
+        assert len(hand.split_hands) == 2
+        assert len(hand.outcomes_by_hand) == 2
+        assert len(hand.actions_by_hand) == 2
+        assert len(hand.recommendations_by_hand) == 2
+
+    def test_outcomes_are_resolved(self):
+        hand = play_training_hand(decks=6, seed=SPLIT_SEED)
+        for outcome in hand.outcomes_by_hand:
+            assert isinstance(outcome, HandOutcome)
+
+    def test_dealer_plays_once_after_split(self):
+        # A single shared dealer hand backs both sub-hand resolutions.
+        hand = play_training_hand(decks=6, seed=SPLIT_SEED)
+        assert len(hand.dealer_cards) >= 2
+        # The dealer either stood pat (2 cards) or drew to a valid finish.
+        from app.hand_evaluator import evaluate_hand
+
+        dealer = evaluate_hand(hand.dealer_cards)
+        assert dealer.total >= 17 or dealer.is_bust
+
+    def test_deterministic(self):
+        a = play_training_hand(decks=6, seed=SPLIT_SEED)
+        b = play_training_hand(decks=6, seed=SPLIT_SEED)
+        assert a.dealer_cards == b.dealer_cards
+        assert a.outcomes_by_hand == b.outcomes_by_hand
+        assert a.running_count_after == b.running_count_after
+
+    def test_split_aces_warns_but_resolves(self):
+        # Seed 164 deals a pair of Aces; v0.6 warns and plays both hands.
+        hand = play_training_hand(decks=6, seed=164)
+        assert hand.original_player_cards == ("A", "A")
+        assert any("Split Aces" in w for w in hand.warnings)
+        assert len(hand.outcomes_by_hand) == 2
+
+    def test_resplit_is_played_as_total_with_warning(self):
+        # Seed 428 produces a sub-hand that would re-split; it is played as a
+        # normal total and a warning is recorded.
+        from app.simulator import RESPLIT_NOT_IMPLEMENTED
+
+        hand = play_training_hand(decks=6, seed=428)
+        assert any(
+            RESPLIT_NOT_IMPLEMENTED in actions for actions in hand.actions_by_hand
+        )
+        assert any("re-split" in w for w in hand.warnings)

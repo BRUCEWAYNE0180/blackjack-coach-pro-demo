@@ -42,12 +42,17 @@ from .shoe import (
 from .simulator import (
     HandOutcome,
     PlayedHand,
+    PlayedSplitHand,
     SimulatedHand,
+    SplitSubHand,
+    can_split_hand,
     deal_initial_hand,
     play_dealer_hand,
+    play_split_subhand,
     play_training_hand,
     resolve_outcome,
     simulate_training_hand,
+    split_initial_hand,
 )
 from .strategy_engine import (
     Action,
@@ -56,7 +61,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -69,10 +74,13 @@ __all__ = [
     "MULTI_DECK_S17_DAS_LS",
     "PROFILES",
     "PlayedHand",
+    "PlayedSplitHand",
     "Recommendation",
     "RuleProfile",
     "SimulatedHand",
+    "SplitSubHand",
     "build_shoe",
+    "can_split_hand",
     "card_value",
     "cards_remaining",
     "counting_summary",
@@ -89,12 +97,14 @@ __all__ = [
     "normalize_rank",
     "penetration",
     "play_dealer_hand",
+    "play_split_subhand",
     "play_training_hand",
     "recommend",
     "resolve_outcome",
     "should_take_insurance",
     "shuffle_shoe",
     "simulate_training_hand",
+    "split_initial_hand",
     "true_count",
     "update_running_count",
     "update_running_count_many",
