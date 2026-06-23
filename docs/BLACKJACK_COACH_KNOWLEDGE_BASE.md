@@ -113,6 +113,11 @@ tool relies on and the project's evolution.
   `render_drill_plan`, and `render_drill_result`. Builds focused drills from
   history (or a fallback educational set); the correct play comes from the
   strategy engine, so it never duplicates rules or changes the recommendation.
+- `app/drill_history.py` — Local drill-session history & spaced review:
+  `DrillSessionRecord`, `DrillSpotHistory`, `DrillReviewSummary`, plus
+  `build_drill_session_record`, save/load/list, `build_spot_history` (per-spot
+  mastery), and `summarize_drill_history`. Saves graded drills locally and
+  suggests review; never changes the correct answers or the recommendation.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -140,9 +145,9 @@ tool relies on and the project's evolution.
   `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`,
   `deviation-quiz`, `diagnose`, `profiles`, `split-rules`, `matrix`,
   `audit`, `outcomes`, `coach`, `coach-play`, `odds`, `learn`, `ev-review`,
-  `report`, and `dashboard` subcommands, plus `drill`; `odds`/`coach
-  --show-odds` accept `--explain-ev` and `ev-review` accepts `--explain` /
-  `--large-gaps-only`).
+  `report`, and `dashboard` subcommands, plus `drill` (with `--save` /
+  `--review`); `odds`/`coach --show-odds` accept `--explain-ev` and `ev-review`
+  accepts `--explain` / `--large-gaps-only`).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -1202,7 +1207,7 @@ separate sections, stores / exports no sensitive data, and never changes
 outcome / session history, the EV-snapshot history, the Strategy-vs-EV engine,
 or the reporting module. No external dependencies; no network / cloud / database.
 
-### v1.21.0 — Weak-Spot Drill Generator (current)
+### v1.21.0 — Weak-Spot Drill Generator (done)
 
 Builds on adaptive learning (v1.13.0), the EV-snapshot history (v1.17.0), the
 reports (v1.19.0), and the dashboard (v1.20.0). Those features could say *what*
@@ -1236,6 +1241,43 @@ learning, guided coaching, outcome / session history, the EV-snapshot history,
 the Strategy-vs-EV engine, the reporting module, or the dashboard. Per
 `PROJECT_RULES.md` it stores no sensitive data, suggests practice without
 promising results, and uses no external dependencies, network, cloud, or
+database.
+
+### v1.22.0 — Drill Session History & Spaced Review (current)
+
+Builds on the v1.21.0 drill generator. The generator could create and grade
+drills but did not remember them; v1.22.0 saves graded drill sessions locally
+and computes per-spot mastery to suggest what to review next - a light, local
+spaced-repetition layer. It never re-derives the correct play (that comes from
+the strategy engine via the drill results) and never changes play.
+
+Delivered:
+
+- **`app/drill_history.py`**: `DrillSessionRecord` (session id, profile, focus,
+  totals, accuracy, per-spot results, weak / mastered / next-review spots),
+  `DrillSpotHistory` (per-spot attempts / correct / accuracy / mastery level /
+  next-review hint), and `DrillReviewSummary` (totals, overall accuracy,
+  mastered / weak / due-review spots, data-quality note, practice
+  recommendations). Functions: `default_drill_history_dir`,
+  `ensure_drill_history_dir`, `build_drill_session_record`,
+  `save_drill_session_record`, `load_drill_session_record`,
+  `list_drill_session_records` (limit / profile filters), `build_spot_history`
+  (mastery NEW / WEAK / LEARNING / MASTERED), and `summarize_drill_history`.
+- **CLI**: `drill` gains `--save`, `--drill-dir`, `--review`, and `--due-only`.
+  `drill --answer ... --save` saves the graded result; `drill --review` shows
+  the mastery / spaced-review summary. The `dashboard` output also points to
+  `drill --review`.
+- **Tests**: new `tests/test_drill_history.py` and `TestCliDrillHistory` in
+  `tests/test_cli.py`.
+
+**Limits / honesty:** the drill history is local practice training. It never
+re-derives or changes the correct answers, and never changes
+`strategy_engine.recommend`, the Hi-Lo math, adaptive learning, guided coaching,
+outcome / session history, the EV-snapshot history, the Strategy-vs-EV engine,
+reporting, the dashboard, or the drill generator. Per `PROJECT_RULES.md` it
+stores no sensitive data, suggests review without promising results, keeps files
+under the git-ignored `.blackjack_coach/drill_sessions` tree (unless a
+`--drill-dir` is given), and uses no external dependencies, network, cloud, or
 database.
 
 ### v2.0 — Possible Web UI (if decided later)

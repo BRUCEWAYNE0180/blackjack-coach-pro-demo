@@ -539,6 +539,7 @@ def render_dashboard_text(dashboard: DashboardSummary) -> str:
     lines += _text_list(d.next_practice_plan)
     lines.append("")
     lines.append("Run `blackjack-coach drill --focus weak` to practice these spots.")
+    lines.append("Run `blackjack-coach drill --review` to see drill mastery.")
 
     lines.append("")
     lines.append(f"Data quality: {d.data_quality_note}")
@@ -635,6 +636,7 @@ def render_dashboard_markdown(dashboard: DashboardSummary) -> str:
     lines += [
         "",
         "_Run `blackjack-coach drill --focus weak` to practice these spots._",
+        "_Run `blackjack-coach drill --review` to see drill mastery._",
     ]
     lines += ["", "## Data quality", "", f"- {d.data_quality_note}"]
     if d.warnings:

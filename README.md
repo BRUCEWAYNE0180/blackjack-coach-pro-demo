@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.21.0 feature summary
+## v1.22.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -122,6 +122,11 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   when there is no history) into focused practice drills you can answer and get
   graded on. The correct play always comes from the strategy engine - drills
   never change the recommendation and store no sensitive data.
+- **Drill session history & spaced review** (v1.22.0): save graded drills with
+  `drill --answer ... --save`, then `drill --review` shows per-spot **mastery**
+  (NEW / WEAK / LEARNING / MASTERED) and what is **due for review** next - a
+  light, local spaced-repetition layer. Local and read-only; it never changes
+  the correct answers or the recommendation.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -275,6 +280,32 @@ deterministic; `--plan-only` just prints the plan; and `--answer H/S/D/P/R`
 `--session-dir`, `--outcome-dir`, and `--ev-dir` scope where drills come from.
 With no saved history it uses the educational set and says so clearly.
 
+## Drill Session History & Spaced Review (v1.22.0)
+
+Save your graded drills and let the coach track **mastery** per spot. Add
+`--save` to a graded drill, then `drill --review` shows how each spot is
+progressing (NEW / WEAK / LEARNING / MASTERED) and which spots are **due for
+review** next - a light, local spaced-repetition layer built on the v1.21.0
+drill generator. The correct answers always come from the strategy engine; this
+never changes them.
+
+```bash
+blackjack-coach drill --seed 42 --spot 1 --answer HIT --save
+blackjack-coach drill --review
+blackjack-coach drill --review --due-only
+blackjack-coach drill --profile SIX_DECK_H17_DAS_LS --review
+```
+
+`--save` requires `--answer` (it saves that graded result); `--drill-dir <path>`
+chooses where sessions are stored (default `./.blackjack_coach/drill_sessions`).
+`drill --review` summarises total sessions, attempts, overall accuracy, weak /
+mastered spots, the due-for-review list, and practice recommendations;
+`--due-only` shows just the spots that still need work. With no saved sessions
+it says so clearly. Mastery levels: **NEW** (< 2 attempts), **WEAK** (< 60%),
+**LEARNING** (60-85%), **MASTERED** (>= 85% over >= 3 attempts). Drill sessions
+are a local summary only - no money, accounts, or sensitive data - and are never
+committed.
+
 ## Terminal visual polish (v1.1.0)
 
 v1.1.0 makes the CLI clearer and more pleasant to practise with. Output now has
@@ -367,6 +398,9 @@ blackjack-coach dashboard --export
 blackjack-coach drill
 blackjack-coach drill --focus pairs --count 10
 blackjack-coach drill --seed 42 --spot 1 --answer HIT
+blackjack-coach drill --seed 42 --spot 1 --answer HIT --save
+blackjack-coach drill --review
+blackjack-coach drill --review --due-only
 ```
 
 Without installing, run it as a module from the repository root:
