@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.7.0 feature summary
+## v1.8.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -66,6 +66,9 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   basic-strategy decision matrix for any profile and audit its coverage
   (`matrix`), and audit how any single hand's recommendation is reached
   (`audit`) - direct table play or a legal fallback.
+- **Outcome / win-loss history** (v1.8.0): optionally save played-hand results
+  (wins, losses, pushes, surrenders, busts, and split / re-split outcomes) to a
+  local JSON folder and review them with `outcomes`.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -126,6 +129,8 @@ blackjack-coach quiz-session --questions 10 --seed 42 --answers H,S,D,H,R,S,H,D,
 blackjack-coach deviations --cards 10,6 --dealer 10 --true-count 1
 blackjack-coach matrix --profile SIX_DECK_H17_DAS_LS --section hard
 blackjack-coach audit --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach play --decks 6 --seed 428 --profile SIX_DECK_H17_DAS_LS --save-outcome
+blackjack-coach outcomes
 ```
 
 Without installing, run it as a module from the repository root:
@@ -590,6 +595,49 @@ Where `diagnose` explains a decision in plain language (and now shows a compact
 audit summary too), `audit` reports the underlying mechanics. Both read the
 stable strategy engine and never modify it.
 
+## Outcome / win-loss history (v1.8.0)
+
+Optionally record the result of each played practice hand to a local JSON
+folder, then review your outcomes over time. This complements the decision
+tooling: it tracks **wins, losses, pushes, surrenders, player/dealer busts**,
+and **split / re-split results** (counted per sub-hand). It is a summary only —
+no money, bankroll, bets, or accounts.
+
+```bash
+blackjack-coach play --decks 6 --seed 428 --profile SIX_DECK_H17_DAS_LS --save-outcome
+blackjack-coach outcomes
+blackjack-coach outcomes --limit 10
+blackjack-coach outcomes --profile SIX_DECK_H17_DAS_LS
+```
+
+`play --save-outcome` writes one JSON record and prints its path (use
+`--outcome-dir` to choose where; the default is `./.blackjack_coach/outcomes`).
+`outcomes` summarises the saved records:
+
+```text
+=== Outcome History ===
+Total records      : 2
+Wins               : 4
+Losses             : 0
+Pushes             : 0
+Surrenders         : 0
+Player busts       : 0
+Dealer busts       : 1
+Split records      : 1
+Average split hands: 3.00
+Most common profile: SIX_DECK_H17_DAS_LS
+
+-- Most common outcomes --
+  - SPLIT (x1)
+  - PLAYER_WIN (x1)
+```
+
+`--limit N` summarises only the most recent N outcomes and `--profile <KEY>`
+filters by rule profile. Records store only practice data (profile, seed,
+cards, actions, result counts) — never money, bankroll, bets, accounts, tokens,
+or personal data — and the `.blackjack_coach/` folder is git-ignored, so nothing
+is committed. No database, no network, no cloud.
+
 ## Library usage
 
 ```python
@@ -617,14 +665,15 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.7.0 adds a complete strategy-matrix audit and a per-hand decision audit
-(`app/strategy_matrix.py`, `app/decision_audit.py`, and the `matrix` / `audit`
-commands), so the coach can prove full decision coverage across hard totals,
-soft totals, pairs, dealer upcards, and profiles, and explain whether each play
-is a direct chart action or a legal fallback. No changes to basic strategy,
-Hi-Lo math, deviations, the simulator, or session history. It is a professional
-coach for local practice, demo money, video games, recreational tournaments,
-and training.
+v1.8.0 adds a local outcome / win-loss history (`app/outcome_history.py`, the
+`play --save-outcome` flag, and the `outcomes` command): played-hand results
+(wins, losses, pushes, surrenders, busts, and split / re-split outcomes) can be
+saved locally and summarised, so the coach can start learning from practice
+results. It is a summary only - no money, bankroll, bets, accounts, database,
+or network. No changes to basic strategy, Hi-Lo math, deviations, the
+simulator, the matrix/audit tooling, or scored session history. It is a
+professional coach for local practice, demo money, video games, recreational
+tournaments, and training.
 
 Planned next (educational/local only): a possible v2.0 web UI if decided later.
 See

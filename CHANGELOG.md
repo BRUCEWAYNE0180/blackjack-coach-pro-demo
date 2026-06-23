@@ -7,6 +7,46 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.8.0] - 2026-06-23
+
+Local outcome (win/loss) history. The coach can now record the results of
+played practice hands - wins, losses, pushes, surrenders, busts, and split /
+re-split results - to a local JSON folder and summarise them, complementing the
+v1.7.0 decision tooling. Basic strategy is unchanged:
+`strategy_engine.recommend` is never touched.
+
+### Added
+
+- `app/outcome_history.py`: `OutcomeRecord`, `OutcomeSummary`, and the helpers
+  `default_outcome_history_dir`, `ensure_outcome_history_dir`,
+  `build_outcome_record` (supports both `PlayedHand` and `PlayedSplitHand`,
+  counting per-sub-hand results), `save_outcome_record`, `load_outcome_record`,
+  `list_outcome_records` (with `limit` and `profile_key` filters), and
+  `summarize_outcomes`.
+- CLI `play` flags `--save-outcome` and `--outcome-dir`: play a hand, record the
+  result locally, and print the saved path.
+- CLI `outcomes` command (`--limit`, `--profile`, `--dir`): summarise the local
+  win/loss history (totals, busts, split records, average split hands, most
+  common profile and outcomes).
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.8.0**.
+
+### Quality
+
+- New deterministic suite `tests/test_outcome_history.py` plus CLI tests for
+  `play --save-outcome` and `outcomes`. Full suite passing; ruff clean; CI on
+  Python 3.9-3.12.
+
+### Safety
+
+- Summary only: outcome history stores no money, bankroll, real bets, accounts,
+  tokens, screenshots, or sensitive data - no database, no network, no cloud.
+  The `.blackjack_coach/` tree (including `outcomes/`) stays git-ignored. No
+  change to basic strategy, the engine recommendation, deviations, the
+  simulator, the matrix/audit tooling, or scored session history.
+
 ## [1.7.0] - 2026-06-23
 
 Complete strategy-matrix audit and per-hand decision audit. Makes the coach

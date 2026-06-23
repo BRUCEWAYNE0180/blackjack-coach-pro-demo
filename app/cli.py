@@ -48,6 +48,12 @@ from .formatting import (
     format_section,
     format_warning,
 )
+from .outcome_history import (
+    build_outcome_record,
+    list_outcome_records,
+    save_outcome_record,
+    summarize_outcomes,
+)
 from .quiz import (
     ACTION_PROMPT,
     QuizResult,
@@ -418,6 +424,19 @@ def build_play_parser() -> argparse.ArgumentParser:
         choices=sorted(PROFILES),
         help=f"Rule profile (default: {DEFAULT_PROFILE.key}).",
     )
+    parser.add_argument(
+        "--save-outcome",
+        action="store_true",
+        dest="save_outcome",
+        help="Save this hand's result to the local outcome history.",
+    )
+    parser.add_argument(
+        "--outcome-dir",
+        default=None,
+        dest="outcome_dir",
+        help="Directory for the saved outcome (default: "
+             "./.blackjack_coach/outcomes).",
+    )
     return parser
 
 
@@ -437,6 +456,12 @@ def _run_play(argv: Sequence[str]) -> int:
         print(build_split_play_output(hand))
     else:
         print(build_play_output(hand))
+
+    if args.save_outcome:
+        record = build_outcome_record(hand, profile.key, seed=args.seed)
+        path = save_outcome_record(record, args.outcome_dir)
+        print("")
+        print(format_kv("Saved outcome", str(path)))
     return 0
 
 
@@ -1328,6 +1353,76 @@ def _run_audit(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_outcomes_output(summary, shown: int, total: int) -> str:
+    """Render an outcome-history summary as terminal output."""
+    lines = [format_header("Outcome History")]
+    lines += _kv_block([
+        ("Total records", summary.total_records),
+        ("Wins", summary.wins),
+        ("Losses", summary.losses),
+        ("Pushes", summary.pushes),
+        ("Surrenders", summary.surrenders),
+        ("Player busts", summary.player_busts),
+        ("Dealer busts", summary.dealer_busts),
+        ("Split records", summary.split_records),
+        ("Average split hands", f"{summary.average_split_hands:.2f}"),
+        ("Most common profile", summary.most_common_profile),
+    ])
+    lines.append("")
+    lines.append(format_section("Most common outcomes"))
+    if summary.most_common_outcomes:
+        lines.append(format_list(
+            f"{label} (x{count})" for label, count in summary.most_common_outcomes
+        ))
+    else:
+        lines.append(format_list([]))
+
+    if summary.total_records == 0:
+        lines.append("")
+        lines.append("No saved outcomes yet. Play a hand with "
+                     "'play --save-outcome' to start tracking results.")
+
+    lines.append("")
+    lines.append(format_kv("Note", summary.note))
+    return "\n".join(lines)
+
+
+def build_outcomes_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'outcomes' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli outcomes",
+        description=(
+            "Summarise the local outcome / win-loss history of played practice "
+            "hands (educational / local practice only)."
+        ),
+    )
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Summarise only the most recent N outcomes.")
+    parser.add_argument("--profile", default=None, choices=sorted(PROFILES),
+                        help="Only include outcomes for this rule profile.")
+    parser.add_argument("--dir", default=None, dest="history_dir",
+                        help="Outcome history directory (default: "
+                             "./.blackjack_coach/outcomes).")
+    return parser
+
+
+def _run_outcomes(argv: Sequence[str]) -> int:
+    """Handle the 'outcomes' outcome-history subcommand."""
+    parser = build_outcomes_parser()
+    args = parser.parse_args(argv)
+
+    records = list_outcome_records(
+        history_dir=args.history_dir,
+        limit=args.limit,
+        profile_key=args.profile,
+    )
+    summary = summarize_outcomes(records)
+    # Count of all records available (before any limit) is informational only;
+    # the summary reflects exactly the records that were selected.
+    print(build_outcomes_output(summary, shown=len(records), total=len(records)))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -1349,6 +1444,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli split-rules --cards A,A            (split options)
         python -m app.cli matrix --profile SIX_DECK_H17_DAS_LS --section hard
         python -m app.cli audit --cards A,7 --dealer 9       (decision audit)
+        python -m app.cli outcomes --limit 10                (win/loss history)
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] in ("--version", "-V"):
@@ -1376,6 +1472,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_matrix(args[1:])
     if args and args[0] == "audit":
         return _run_audit(args[1:])
+    if args and args[0] == "outcomes":
+        return _run_outcomes(args[1:])
     if args and args[0] == "quiz":
         return _run_quiz(args[1:])
     if args and args[0] == "count-quiz":

@@ -270,3 +270,35 @@ reason), the legal actions under the profile, any warnings, and a plain-language
 explanation. Reads the stable strategy engine and never modifies it. The
 `diagnose` command also shows a compact version of this audit.
 
+## Outcome / win-loss history (v1.8.0)
+
+### play --save-outcome
+
+```bash
+blackjack-coach play --decks 6 --seed 428 --profile SIX_DECK_H17_DAS_LS --save-outcome
+blackjack-coach play --decks 6 --seed 42 --save-outcome --outcome-dir ./my_outcomes
+```
+
+Adds `--save-outcome` (and optional `--outcome-dir`) to the `play` command: it
+plays the hand, records the result as a local JSON file, and prints the saved
+path. Works for both normal hands and split / re-split hands (per-sub-hand
+results are counted). The default directory is `./.blackjack_coach/outcomes`.
+
+### outcomes
+
+```bash
+blackjack-coach outcomes
+blackjack-coach outcomes --limit 10
+blackjack-coach outcomes --profile SIX_DECK_H17_DAS_LS
+blackjack-coach outcomes --dir ./my_outcomes
+```
+
+Summarises the saved outcome history: total records, wins, losses, pushes,
+surrenders, player/dealer busts, split records, average split hands, the most
+common profile, and the most common outcomes. `--limit N` summarises only the
+most recent N records; `--profile <KEY>` filters by rule profile; `--dir <path>`
+reads a custom directory. The history is a summary only - no money, bankroll,
+bets, accounts, or personal data - and is never committed (the
+`.blackjack_coach/` folder is git-ignored).
+
+
