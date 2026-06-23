@@ -6,11 +6,14 @@ A small terminal entry point. Forms supported:
     python -m app.cli count --cards 2,5,K,A,9 --decks-remaining 5
     python -m app.cli simulate --decks 6 --seed 42
     python -m app.cli play --decks 6 --seed 42
+    python -m app.cli quiz --seed 42 --answer H
+    python -m app.cli count-quiz --cards 2,5,K,A,9 --answer 0
 
 The first prints a basic-strategy recommendation; the second runs the Hi-Lo
 counting trainer; the third deals an opening hand from a local virtual shoe;
 the fourth plays a full hand out against the dealer, including basic pair
-splits (all educational / simulated practice only).
+splits; the fifth quizzes basic strategy; the sixth quizzes the Hi-Lo running
+count (all educational / simulated practice only).
 
 Educational/practice tool only: it never connects to a casino, places real
 bets, uses any camera/video, or promises winnings. See docs/PROJECT_RULES.md.
@@ -22,8 +25,14 @@ import argparse
 import sys
 from collections.abc import Sequence
 
-from .counting import CountingState
+from .counting import CountingState, EDUCATIONAL_NOTE, update_running_count_many
 from .explanations import explain_insurance_no
+from .quiz import (
+    ACTION_PROMPT,
+    QuizResult,
+    generate_strategy_question,
+    grade_strategy_answer,
+)
 from .rules import DEFAULT_PROFILE, PROFILES, get_profile
 from .simulator import (
     PlayedHand,
@@ -353,14 +362,123 @@ def _run_play(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_quiz_output(result: QuizResult) -> str:
+    """Render a graded strategy-quiz result as terminal output."""
+    q = result.question
+    verdict = "Correct" if result.is_correct else "Incorrect"
+    return "\n".join([
+        "Strategy quiz (local / educational practice only)",
+        f"Player cards:   {', '.join(q.player_cards)}",
+        f"Dealer upcard:  {q.dealer_upcard}",
+        f"Profile:        {q.profile_key}",
+        f"Your answer:    {result.user_action}",
+        f"Correct action: {result.correct_action}",
+        f"Result:         {verdict}",
+        f"Why:            {result.explanation}",
+    ])
+
+
+def build_quiz_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'quiz' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli quiz",
+        description=(
+            "Basic-strategy quiz (educational practice only). No real betting, "
+            "no casino connectivity, no promise of winnings."
+        ),
+    )
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Optional seed for a reproducible question.")
+    parser.add_argument("--answer", default=None,
+                        help="Your action: H/S/D/P/R (or full name). If "
+                             "omitted, you are prompted interactively.")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
+                        choices=sorted(PROFILES),
+                        help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
+    return parser
+
+
+def _run_quiz(argv: Sequence[str]) -> int:
+    """Handle the 'quiz' basic-strategy subcommand."""
+    parser = build_quiz_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        profile = get_profile(args.profile)
+        question = generate_strategy_question(seed=args.seed, profile=profile)
+
+        answer = args.answer
+        if answer is None:  # interactive mode: ask for the action
+            print("Strategy quiz (local / educational practice only)")
+            print(f"Player cards:   {', '.join(question.player_cards)}")
+            print(f"Dealer upcard:  {question.dealer_upcard}")
+            print(f"Profile:        {question.profile_key}")
+            try:
+                answer = input(ACTION_PROMPT)
+            except EOFError:
+                print("Error: no answer provided.", file=sys.stderr)
+                return 2
+
+        result = grade_strategy_answer(question, answer)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_quiz_output(result))
+    return 0
+
+
+def build_count_quiz_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'count-quiz' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli count-quiz",
+        description=(
+            "Hi-Lo running-count quiz (educational practice only). Not for "
+            "real tables: no camera/video, no betting, no promise of winnings."
+        ),
+    )
+    parser.add_argument("--cards", required=True,
+                        help="Cards observed, comma-separated, e.g. '2,5,K,A,9'.")
+    parser.add_argument("--answer", required=True, type=int,
+                        help="Your running-count answer (an integer).")
+    return parser
+
+
+def _run_count_quiz(argv: Sequence[str]) -> int:
+    """Handle the 'count-quiz' Hi-Lo running-count subcommand."""
+    parser = build_count_quiz_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        cards = _parse_cards(args.cards)
+        correct = update_running_count_many(0, cards)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    is_correct = args.answer == correct
+    verdict = "Correct" if is_correct else "Incorrect"
+    print("\n".join([
+        "Hi-Lo running-count quiz (local / educational practice only)",
+        f"Cards:                {', '.join(cards)}",
+        f"Your answer:          {args.answer:+d}",
+        f"Correct running count: {correct:+d}",
+        f"Result:               {verdict}",
+        f"Note:                 {EDUCATIONAL_NOTE}",
+    ]))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
-    Supports four forms:
+    Supports:
         python -m app.cli --cards A,7 --dealer 9              (basic strategy)
         python -m app.cli count --cards 2,5,K --decks-remaining 5  (Hi-Lo)
         python -m app.cli simulate --decks 6 --seed 42       (opening hand)
         python -m app.cli play --decks 6 --seed 42           (full hand)
+        python -m app.cli quiz --seed 42 --answer H          (strategy quiz)
+        python -m app.cli count-quiz --cards 2,5,K --answer 0  (count quiz)
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] == "count":
@@ -369,6 +487,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_simulate(args[1:])
     if args and args[0] == "play":
         return _run_play(args[1:])
+    if args and args[0] == "quiz":
+        return _run_quiz(args[1:])
+    if args and args[0] == "count-quiz":
+        return _run_count_quiz(args[1:])
     return _run_strategy(args)
 
 

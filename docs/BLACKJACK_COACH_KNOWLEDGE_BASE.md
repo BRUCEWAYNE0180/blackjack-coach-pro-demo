@@ -46,10 +46,14 @@ through v0.6.
   `HandOutcome`, `PlayedHand`, `play_dealer_hand`, `resolve_outcome`,
   `play_training_hand`, `SplitSubHand`, `PlayedSplitHand`, `can_split_hand`,
   `split_initial_hand`, `play_split_subhand`).
+- `app/quiz.py` — Quiz mode: generate and grade basic-strategy questions and
+  normalise user actions (`QuizQuestion`, `QuizResult`,
+  `generate_strategy_question`, `grade_strategy_answer`,
+  `normalize_user_action`).
 - `app/cli.py` — Terminal trainer (`python -m app.cli`, plus `count`,
-  `simulate`, and `play` subcommands).
+  `simulate`, `play`, `quiz`, and `count-quiz` subcommands).
 - `tests/` — Behavioural tests for the evaluator, engine, explanations,
-  counting, shoe, simulator, and CLI.
+  counting, shoe, simulator, quiz, and CLI.
 
 ## Roadmap
 
@@ -253,7 +257,7 @@ Delivered (educational / simulated practice only):
 - Never for real tables: no casino connectivity, no real-money betting, no
   camera/video, no screen scraping, and no promise of winnings.
 
-### v0.6 — Split Hand Simulator (current)
+### v0.6 — Split Hand Simulator (done)
 
 Delivered (educational / simulated practice only):
 
@@ -299,13 +303,52 @@ Delivered (educational / simulated practice only):
 - Never for real tables: no casino connectivity, no real-money betting, no
   camera/video, no screen scraping, and no promise of winnings.
 
-### v0.7 — Visual / UI Layer
+### v0.7 — Training Quiz Mode (current)
+
+Delivered (educational practice only):
+
+- **`app/quiz.py`**:
+  - **`QuizQuestion`** dataclass — `player_cards`, `dealer_upcard`,
+    `profile_key`, `correct_action`, `explanation`, `tags`.
+  - **`QuizResult`** dataclass — `question`, `user_action`, `is_correct`,
+    `correct_action`, `explanation`.
+  - **`generate_strategy_question(seed=None, profile=DEFAULT_PROFILE)`** —
+    builds a reproducible question (never a natural blackjack) using the
+    strategy engine for the correct action and explanation.
+  - **`grade_strategy_answer(question, user_action)`** — grades an answer.
+  - **`normalize_user_action(raw_action)`** — accepts `H/S/D/P/R` and the full
+    names (case-insensitive); rejects anything else.
+- **CLI `quiz` subcommand** — `python -m app.cli quiz --seed 42 --answer H`
+  prints the cards, dealer upcard, profile, your answer, the correct action, a
+  Correct/Incorrect verdict, and an educational explanation. Without `--answer`
+  it prompts interactively (`Your action? [H/S/D/P/R]:`).
+- **CLI `count-quiz` subcommand** — `python -m app.cli count-quiz --cards
+  2,5,K,A,9 --answer 0` checks the Hi-Lo running count and prints the cards,
+  your answer, the correct running count, a Correct/Incorrect verdict, and an
+  educational note.
+
+**Strategy trainer / count trainer**
+
+- The strategy trainer reuses the v0.1+ engine as the source of truth, so quiz
+  answers always match the basic-strategy charts (including H17/S17).
+- The count trainer reuses the v0.3 Hi-Lo tags, so the "correct" running count
+  is the cumulative tag sum of the listed cards.
+
+**Limitations / out of scope for v0.7**
+
+- One question at a time (no scored sessions, streaks, or persistence yet).
+- The strategy quiz grades the opening two-card decision only.
+- No betting spread, no Kelly, no Illustrious 18, no insurance index, no web/UI.
+- Never for real tables: no casino connectivity, no real-money betting, no
+  camera/video, no screen scraping, and no promise of winnings.
+
+### v0.8 — Visual / UI Layer
 
 - Interactive strategy charts and quiz/flashcard UX.
 - Progress tracking and accuracy stats per hand category.
 - Groundwork for a web app front end.
 
-### v0.8 — Web App & Polish
+### v0.9 — Web App & Polish
 
 - Browser-based practice app over the existing engine and simulator.
 - Profile selection, drill history, and shareable practice sessions.

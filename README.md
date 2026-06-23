@@ -7,7 +7,7 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
 > any camera/video at a real table, and makes **no** promise of winnings.
 > See [`docs/PROJECT_RULES.md`](docs/PROJECT_RULES.md).
 
-## What it does (v0.6)
+## What it does (v0.7)
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -21,6 +21,8 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
 - **Plays a full hand against the dealer** (H17/S17 dealer logic + outcome
   resolution), including **basic pair splits**, in a simplified educational
   single-hand model.
+- Offers an interactive/non-interactive **quiz mode** to drill basic strategy
+  and the Hi-Lo running count from the terminal.
 - Ships a simple **command-line trainer**.
 
 ## Requirements
@@ -172,6 +174,50 @@ played as a normal total, with a warning) and special split-Aces rules (Aces
 are split but played normally, with a warning). There is no money, bankroll,
 betting units, or payout modelling.
 
+## Quiz mode (v0.7)
+
+Drill your decisions from the terminal. The **strategy quiz** poses a random
+hand and grades your action; the **count quiz** checks your Hi-Lo running count.
+
+Strategy quiz (non-interactive, pass your answer):
+
+```bash
+python -m app.cli quiz --seed 42 --answer H
+```
+
+```text
+Strategy quiz (local / educational practice only)
+Player cards:   Q, 3
+Dealer upcard:  2
+Profile:        MULTI_DECK_H17_DAS_LS
+Your answer:    HIT
+Correct action: STAND
+Result:         Incorrect
+Why:            Hard 13 vs dealer 2 [MULTI_DECK_H17_DAS_LS]: STAND. ...
+```
+
+Accepted answers: `H`/`HIT`, `S`/`STAND`, `D`/`DOUBLE`, `P`/`SPLIT`,
+`R`/`SURRENDER` (case-insensitive). Omit `--answer` to be prompted
+interactively (`Your action? [H/S/D/P/R]:`).
+
+Count quiz (check your running count):
+
+```bash
+python -m app.cli count-quiz --cards 2,5,K,A,9 --answer 0
+```
+
+```text
+Hi-Lo running-count quiz (local / educational practice only)
+Cards:                2, 5, K, A, 9
+Your answer:          +0
+Correct running count: +0
+Result:               Correct
+Note:                 ... educational practice ...
+```
+
+The quiz is **educational practice only** — no real tables, betting,
+camera/video, or promise of winnings.
+
 ## Library usage
 
 ```python
@@ -194,10 +240,9 @@ ruff check app tests   # lint (if ruff is installed)
 
 ## Scope and roadmap
 
-v0.6 adds **basic pair-split play** to the local simulator on top of v0.5's
-full-hand play, the v0.4 shoe simulator, the v0.3 Hi-Lo trainer, and the v0.2
-basic-strategy coach. **Out of scope** for now: re-splitting, special
-split-Aces rules, betting spread, Kelly bet sizing, the Illustrious 18,
+v0.7 adds an educational **quiz mode** (basic-strategy trainer + Hi-Lo
+running-count trainer) on top of the v0.6 split simulator and earlier features.
+**Out of scope** for now: betting spread, Kelly bet sizing, the Illustrious 18,
 insurance index plays, and a web/UI layer. See
 [`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
 for the full roadmap.
