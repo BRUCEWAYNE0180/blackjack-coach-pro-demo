@@ -12,7 +12,8 @@ class TestCliBasics:
         out = capsys.readouterr().out
         assert exit_code == 0
         assert "Soft 18 vs dealer 9" in out
-        assert "Action:  HIT" in out
+        assert "=== Basic Strategy ===" in out
+        assert "HIT" in out
         assert "MULTI_DECK_H17_DAS_LS" in out
         # Educational explanation is present.
         assert "Take another card" in out
@@ -46,8 +47,9 @@ class TestCliInsurance:
         from app.explanations import explain_insurance_no
 
         assert out.count(explain_insurance_no()) == 1
-        # With only the insurance warning present, no "Notes:" block is shown.
-        assert "Notes:" not in out
+        # With only the insurance warning present, no separate notes block is
+        # shown (the dedicated insurance section already covers it).
+        assert "-- Notes --" not in out
 
 
 class TestCliErrors:
@@ -70,10 +72,11 @@ class TestCliCount:
         )
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Cards seen:       5" in out
-        assert "Running count:    +0" in out
-        assert "Decks remaining:  5.0" in out
-        assert "True count:       +0.00" in out
+        assert "=== Hi-Lo Count ===" in out
+        assert "Cards seen     : 5" in out
+        assert "Running count  : +0" in out
+        assert "Decks remaining: 5.0" in out
+        assert "True count     : +0.00" in out
         # Educational note present.
         assert "educational" in out.lower()
 
@@ -83,8 +86,8 @@ class TestCliCount:
         )
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Running count:    +4" in out
-        assert "True count:       +2.00" in out
+        assert "Running count  : +4" in out
+        assert "True count     : +2.00" in out
 
     def test_count_zero_decks_errors(self, capsys):
         exit_code = cli.main(
@@ -108,12 +111,13 @@ class TestCliSimulate:
         exit_code = cli.main(["simulate", "--decks", "6", "--seed", "42"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Player cards:" in out
-        assert "Dealer upcard:" in out
-        assert "Recommendation:" in out
-        assert "Running count before:" in out
-        assert "Running count after:" in out
-        assert "True count after:" in out
+        assert "=== Training Simulator ===" in out
+        assert "Player cards" in out
+        assert "Dealer upcard" in out
+        assert "Recommendation" in out
+        assert "Running count before" in out
+        assert "Running count after" in out
+        assert "True count after" in out
         assert "simulated" in out.lower()
 
     def test_simulate_seed_is_reproducible(self, capsys):
@@ -135,15 +139,16 @@ class TestCliPlay:
         exit_code = cli.main(["play", "--decks", "6", "--seed", "42"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Player starting cards:" in out
-        assert "Dealer upcard:" in out
-        assert "Actions taken:" in out
-        assert "Final player cards:" in out
-        assert "Final dealer cards:" in out
-        assert "Outcome:" in out
-        assert "Running count before:" in out
-        assert "Running count after:" in out
-        assert "True count after:" in out
+        assert "=== Played Hand ===" in out
+        assert "Player starting cards" in out
+        assert "Dealer upcard" in out
+        assert "Actions taken" in out
+        assert "Final player cards" in out
+        assert "Final dealer cards" in out
+        assert "Outcome" in out
+        assert "Running count before" in out
+        assert "Running count after" in out
+        assert "True count after" in out
         assert "simulated" in out.lower()
 
     def test_play_seed_is_reproducible(self, capsys):
@@ -165,11 +170,11 @@ class TestCliPlay:
         out = capsys.readouterr().out
         assert exit_code == 0
         assert "SPLIT" in out
-        assert "Original hand:" in out
-        assert "Split hand 1:" in out
-        assert "Split hand 2:" in out
-        assert "Final dealer cards:" in out
-        assert "True count after:" in out
+        assert "Original hand" in out
+        assert "Split hand 1" in out
+        assert "Split hand 2" in out
+        assert "Final dealer cards" in out
+        assert "True count after" in out
 
 
 
@@ -179,25 +184,25 @@ class TestCliQuiz:
         exit_code = cli.main(["quiz", "--seed", "42", "--answer", "S"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Player cards:   Q, 3" in out
-        assert "Dealer upcard:  2" in out
-        assert "Your answer:    STAND" in out
+        assert "Player cards  : Q, 3" in out
+        assert "Dealer upcard : 2" in out
+        assert "Your answer   : STAND" in out
         assert "Correct action: STAND" in out
-        assert "Result:         Correct" in out
-        assert "Why:" in out
+        assert "[ CORRECT ]" in out
+        assert "Why" in out
 
     def test_quiz_with_answer_incorrect(self, capsys):
         exit_code = cli.main(["quiz", "--seed", "42", "--answer", "H"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Your answer:    HIT" in out
-        assert "Result:         Incorrect" in out
+        assert "Your answer   : HIT" in out
+        assert "[ INCORRECT ]" in out
 
     def test_quiz_full_name_answer(self, capsys):
         exit_code = cli.main(["quiz", "--seed", "42", "--answer", "stand"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Result:         Correct" in out
+        assert "[ CORRECT ]" in out
 
     def test_quiz_invalid_answer_errors(self, capsys):
         exit_code = cli.main(["quiz", "--seed", "42", "--answer", "Z"])
@@ -211,7 +216,7 @@ class TestCliQuiz:
         exit_code = cli.main(["quiz", "--seed", "42"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Result:         Correct" in out
+        assert "[ CORRECT ]" in out
 
 
 class TestCliCountQuiz:
@@ -222,10 +227,10 @@ class TestCliCountQuiz:
         )
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Cards:                2, 5, K, A, 9" in out
-        assert "Your answer:          +0" in out
+        assert "=== Hi-Lo Count Quiz ===" in out
+        assert "2, 5, K, A, 9" in out
         assert "Correct running count: +0" in out
-        assert "Result:               Correct" in out
+        assert "[ CORRECT ]" in out
         assert "educational" in out.lower()
 
     def test_count_quiz_incorrect(self, capsys):
@@ -234,9 +239,9 @@ class TestCliCountQuiz:
         )
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Your answer:          +3" in out
+        assert "Your answer          : +3" in out
         assert "Correct running count: +0" in out
-        assert "Result:               Incorrect" in out
+        assert "[ INCORRECT ]" in out
 
     def test_count_quiz_positive(self, capsys):
         # 2,3,4,6 -> +4.
@@ -246,7 +251,7 @@ class TestCliCountQuiz:
         out = capsys.readouterr().out
         assert exit_code == 0
         assert "Correct running count: +4" in out
-        assert "Result:               Correct" in out
+        assert "[ CORRECT ]" in out
 
     def test_count_quiz_invalid_card_errors(self, capsys):
         exit_code = cli.main(
@@ -266,11 +271,12 @@ class TestCliQuizSession:
         ])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Total questions:  10" in out
-        assert "Correct:" in out
-        assert "Incorrect:" in out
-        assert "Accuracy:" in out
-        assert "Weak spots:" in out
+        assert "=== Strategy Training Session ===" in out
+        assert "Total questions" in out
+        assert "Correct" in out
+        assert "Incorrect" in out
+        assert "Accuracy" in out
+        assert "Weak spots" in out
         assert "educational" in out.lower()
 
     def test_quiz_session_all_correct(self, capsys):
@@ -285,8 +291,8 @@ class TestCliQuizSession:
         ])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Correct:          5" in out
-        assert "Accuracy:         100.0%" in out
+        assert "Correct        : 5" in out
+        assert "Accuracy       : 100.0%" in out
 
     def test_quiz_session_answer_mismatch_errors(self, capsys):
         exit_code = cli.main([
@@ -302,7 +308,7 @@ class TestCliQuizSession:
         exit_code = cli.main(["quiz-session", "--questions", "3", "--seed", "1"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Total questions:  3" in out
+        assert "Total questions" in out
 
 
 class TestCliCountSession:
@@ -313,10 +319,11 @@ class TestCliCountSession:
         ])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Total questions:  3" in out
-        assert "Correct:          2" in out
-        assert "Incorrect:        1" in out
-        assert "Accuracy:" in out
+        assert "=== Hi-Lo Count Training Session ===" in out
+        assert "Total questions" in out
+        assert "Correct        : 2" in out
+        assert "Incorrect      : 1" in out
+        assert "Accuracy" in out
         assert "Q2" in out  # weak spot
 
     def test_count_session_all_correct(self, capsys):
@@ -326,8 +333,8 @@ class TestCliCountSession:
         ])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Correct:          3" in out
-        assert "Accuracy:         100.0%" in out
+        assert "Correct        : 3" in out
+        assert "Accuracy       : 100.0%" in out
 
     def test_count_session_interactive(self, capsys, monkeypatch):
         answers = iter(["1", "0", "1"])
@@ -337,7 +344,7 @@ class TestCliCountSession:
         ])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert "Correct:          3" in out
+        assert "Correct        : 3" in out
 
     def test_count_session_non_integer_answer_errors(self, capsys):
         exit_code = cli.main([

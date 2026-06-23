@@ -85,6 +85,10 @@ As of v0.9 the project enforces these gates on every change:
   depend on any private secret to run the tests or lint.
 - **Changes land via pull request.** No direct commits to `main`; CI must be
   green before merge.
+- **UX polish must not alter logic.** Presentation/formatting changes (e.g.
+  terminal output) must not change strategy, counting, simulation, split, or
+  scoring results. Any change that could affect those must include specific
+  tests proving the behaviour is unchanged.
 
 ## 8. Release Rules
 

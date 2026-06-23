@@ -8,6 +8,11 @@ The trainer is available two ways once installed: as the `blackjack-coach`
 console command, or as `python -m app.cli ...`. Both accept the same
 subcommands.
 
+> **Formatting note (v1.1.0):** command output uses clear section headers,
+> aligned `label : value` rows, a visible `[ CORRECT ]` / `[ INCORRECT ]`
+> badge, and percentage summaries. This is presentation only — the underlying
+> strategy, counting, simulation, and scoring logic is unchanged.
+
 ## Setup and quality
 
 ### version

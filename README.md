@@ -18,7 +18,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.0.0 feature summary
+## v1.1.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -38,6 +38,29 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   weak-spot summaries for both strategy and counting.
 - Ships a simple **command-line trainer**, installable as the
   `blackjack-coach` command, with CI and modern packaging.
+- **Polished terminal output** (v1.1.0): clear headers, aligned key/value
+  rows, visible pass/fail badges, and percentage summaries.
+
+## Terminal visual polish (v1.1.0)
+
+v1.1.0 makes the CLI clearer and more pleasant to practise with. Output now has
+section headers, aligned labels, and a visible result badge. The strategy,
+counting, simulator, scoring, and grading **logic is unchanged** — this is a
+presentation-only improvement (see `app/formatting.py`).
+
+Example (strategy quiz):
+
+```text
+=== Strategy Quiz ===
+=====================
+Player cards  : Q, 3
+Dealer upcard : 2
+Profile       : MULTI_DECK_H17_DAS_LS
+Your answer   : HIT
+Correct action: STAND
+Result        : [ INCORRECT ]
+Why           : Hard 13 vs dealer 2 [MULTI_DECK_H17_DAS_LS]: STAND. ...
+```
 
 ## Quick start
 
@@ -329,13 +352,13 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.0.0 is the first **stable** release: an educational, local, well-tested
-trainer with modern packaging and CI. It adds no new gameplay over v0.9 — it is
-release polish (docs, changelog, license, metadata, quality).
+v1.1.0 builds on the stable v1.0.0 release with **terminal visual polish**
+(clearer CLI output) and no logic changes. It remains an educational, local,
+well-tested trainer with modern packaging and CI.
 
-Planned next (educational/local only): v1.1 terminal/visual polish, v1.2 saved
-local session history, v1.3 advanced count deviations (educational only), and a
-possible v2.0 web UI if decided later. See
+Planned next (educational/local only): v1.2 saved local session history, v1.3
+advanced count deviations (educational only), and a possible v2.0 web UI if
+decided later. See
 [`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
 for the full roadmap.
 
