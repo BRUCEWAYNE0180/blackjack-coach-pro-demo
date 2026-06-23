@@ -156,6 +156,13 @@ As of v0.9 the project enforces these gates on every change:
   engine: `strategy_engine.recommend` stays unchanged, and the insurance study
   rule is never the coach's final action (insurance advice stays NO). Without a
   true count the coach uses basic strategy.
+- **The probability / EV layer is approximate and advisory.** The probability &
+  EV advisor (v1.12.0: `app/probability_advisor.py`) must clearly label its
+  estimates as approximate and must never override the main recommendation
+  without explicit validation and tests. It reads the engine / coach for the
+  recommended action and surfaces a clear advisory warning when the best-EV
+  action differs. It must stay fast and dependency-free (no large simulations),
+  and must not change `strategy_engine.recommend` or the counting math.
 
 ## 8. Release Rules
 

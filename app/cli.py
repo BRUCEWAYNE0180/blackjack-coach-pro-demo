@@ -57,6 +57,7 @@ from .outcome_history import (
     save_outcome_record,
     summarize_outcomes,
 )
+from .probability_advisor import build_probability_advice
 from .quiz import (
     ACTION_PROMPT,
     QuizResult,
@@ -1493,7 +1494,8 @@ def _run_outcomes(argv: Sequence[str]) -> int:
     return 0
 
 
-def build_coach_step_output(step, player_display=None, dealer_display=None) -> str:
+def build_coach_step_output(step, player_display=None, dealer_display=None,
+                            odds=None) -> str:
     """Render a single guided-coach recommendation for the terminal."""
     cards_line = (player_display if player_display is not None
                   else format_cards(step.player_cards))
@@ -1538,6 +1540,9 @@ def build_coach_step_output(step, player_display=None, dealer_display=None) -> s
         lines.append(format_section("Warnings"))
         lines.append(format_list(extra_warnings))
 
+    if odds is not None:
+        lines += _odds_compact_lines(odds)
+
     lines.append("")
     lines.append(SCOPE_FOOTER)
     return "\n".join(lines)
@@ -1562,6 +1567,8 @@ def build_coach_parser() -> argparse.ArgumentParser:
     parser.add_argument("--true-count", type=float, default=None, dest="true_count",
                         help="Optional Hi-Lo true count; folds in the "
                              "educational deviation study when one applies.")
+    parser.add_argument("--show-odds", action="store_true", dest="show_odds",
+                        help="Append a compact approximate odds / EV summary.")
     return parser
 
 
@@ -1574,9 +1581,14 @@ def _run_coach(argv: Sequence[str]) -> int:
         cards = cards_mod.parse_cards(args.cards)
         dealer_card = cards_mod.parse_card(args.dealer)
         profile = get_profile(args.profile)
-        step = build_coach_step(cards_mod.cards_to_ranks(cards),
-                                dealer_card.rank, profile,
+        ranks = cards_mod.cards_to_ranks(cards)
+        step = build_coach_step(ranks, dealer_card.rank, profile,
                                 true_count=args.true_count)
+        odds = (
+            build_probability_advice(ranks, dealer_card.rank, profile,
+                                     true_count=args.true_count)
+            if args.show_odds else None
+        )
     except (ValueError, KeyError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
@@ -1585,6 +1597,7 @@ def _run_coach(argv: Sequence[str]) -> int:
         step,
         player_display=_render_cards(cards),
         dealer_display=_render_cards([dealer_card]),
+        odds=odds,
     ))
     return 0
 
@@ -1689,6 +1702,130 @@ def _run_coach_play(argv: Sequence[str]) -> int:
     return 0
 
 
+def _pct(value: float) -> str:
+    """Format a probability in [0, 1] as a one-decimal percentage."""
+    return f"{value * 100:.1f}%"
+
+
+def _odds_compact_lines(advice) -> list[str]:
+    """A compact odds summary for embedding in the coach output."""
+    bust = advice.player_bust_estimate.bust_probability
+    dealer_bust = advice.dealer_outcome_estimate.probabilities["dealer_bust"]
+    lines = ["", format_section("Odds (approximate)")]
+    lines += _kv_block([
+        ("Bust if hit", _pct(bust)),
+        ("Dealer bust", _pct(dealer_bust)),
+        ("Best estimated action", advice.best_estimated_action or "(n/a)"),
+        ("Note", "approximate advisory; does not override the recommendation"),
+    ])
+    return lines
+
+
+def build_odds_output(advice, player_display=None, dealer_display=None) -> str:
+    """Render the full probability / EV advisory for the terminal."""
+    bust = advice.player_bust_estimate
+    dealer = advice.dealer_outcome_estimate.probabilities
+    cards_line = (player_display if player_display is not None
+                  else _render_cards(list(advice.player_cards)))
+    dealer_line = (dealer_display if dealer_display is not None
+                   else _render_cards([advice.dealer_upcard]))
+    lines = [format_header("Probability Advisor")]
+    lines += _kv_block([
+        ("Cards", cards_line),
+        ("Dealer upcard", dealer_line),
+        ("Profile", advice.profile_key),
+        ("Recommended action", advice.recommended_action),
+        ("Bust if hit", _pct(bust.bust_probability)),
+        ("Dealer bust", _pct(dealer["dealer_bust"])),
+    ])
+
+    lines.append("")
+    lines.append(format_section("Dealer final probabilities"))
+    lines += _kv_block([
+        ("Dealer 17", _pct(dealer["dealer_17"])),
+        ("Dealer 18", _pct(dealer["dealer_18"])),
+        ("Dealer 19", _pct(dealer["dealer_19"])),
+        ("Dealer 20", _pct(dealer["dealer_20"])),
+        ("Dealer 21", _pct(dealer["dealer_21"])),
+        ("Dealer bust", _pct(dealer["dealer_bust"])),
+    ])
+
+    lines.append("")
+    lines.append(format_section("Action EV estimates"))
+    for est in advice.action_estimates:
+        ev_text = "n/a" if est.estimated_ev is None else f"{est.estimated_ev:+.3f}"
+        lines.append(format_kv(
+            est.action,
+            f"EV {ev_text} | win {_pct(est.win_probability)} "
+            f"loss {_pct(est.loss_probability)} push {_pct(est.push_probability)} "
+            f"bust {_pct(est.bust_probability)}",
+            width=10,
+        ))
+
+    lines.append("")
+    lines += _kv_block([
+        ("Best estimated action", advice.best_estimated_action or "(n/a)"),
+        ("Confidence", advice.confidence_label),
+    ])
+    lines.append("")
+    lines.append(format_kv("Approximation", advice.approximation_note))
+    if advice.warnings:
+        lines.append("")
+        lines.append(format_section("Warnings"))
+        lines.append(format_list(advice.warnings))
+    lines.append("")
+    lines.append(SCOPE_FOOTER)
+    return "\n".join(lines)
+
+
+def build_odds_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'odds' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli odds",
+        description=(
+            "Approximate probability & EV advisor for a hand (educational / "
+            "approximate only; does not override the recommendation)."
+        ),
+    )
+    parser.add_argument("--cards", required=True,
+                        help="Player cards, e.g. '10,6', '10\u2660,6\u2665'.")
+    parser.add_argument("--dealer", required=True,
+                        help="Dealer upcard, e.g. '9', '10', or 'A'.")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
+                        choices=sorted(PROFILES),
+                        help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
+    parser.add_argument("--decks", type=int, default=6,
+                        help="Decks for the idealised model (default: 6).")
+    parser.add_argument("--true-count", type=float, default=None, dest="true_count",
+                        help="Optional true count for the recommended action.")
+    return parser
+
+
+def _run_odds(argv: Sequence[str]) -> int:
+    """Handle the 'odds' probability-advisor subcommand."""
+    parser = build_odds_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        cards = cards_mod.parse_cards(args.cards)
+        dealer_card = cards_mod.parse_card(args.dealer)
+        profile = get_profile(args.profile)
+        advice = build_probability_advice(
+            cards_mod.cards_to_ranks(cards), dealer_card.rank, profile,
+            decks=args.decks, true_count=args.true_count,
+        )
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_odds_output(
+        advice,
+        player_display=_render_cards(cards),
+        dealer_display=_render_cards([dealer_card]),
+    ))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -1713,6 +1850,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli outcomes --limit 10                (win/loss history)
         python -m app.cli coach --cards A,7 --dealer 9       (direct advice)
         python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
+        python -m app.cli odds --cards 10,6 --dealer 10      (probability advisor)
     """
     args = list(sys.argv[1:] if argv is None else argv)
 
@@ -1770,6 +1908,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_coach(args[1:])
     if args and args[0] == "coach-play":
         return _run_coach_play(args[1:])
+    if args and args[0] == "odds":
+        return _run_odds(args[1:])
     if args and args[0] == "quiz":
         return _run_quiz(args[1:])
     if args and args[0] == "count-quiz":

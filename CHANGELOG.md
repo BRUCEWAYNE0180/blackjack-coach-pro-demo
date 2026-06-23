@@ -7,6 +7,48 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.12.0] - 2026-06-23
+
+Approximate probability & EV advisor. The coach can now explain risk - player
+bust chance, the dealer's final-total distribution, and a rough EV per action -
+alongside the recommended play. These are clearly labelled **approximate** and
+never override the strategy recommendation.
+
+### Added
+
+- `app/probability_advisor.py`: `PlayerBustEstimate`, `DealerOutcomeEstimate`,
+  `ActionEVEstimate`, `ProbabilityAdvice`, and the helpers
+  `estimate_player_bust_probability`, `estimate_dealer_outcomes` (deterministic
+  recursive enumeration honouring H17/S17), `estimate_action_ev`, and
+  `build_probability_advice`. Uses an idealised 13-rank shoe and a one-card
+  look-ahead - fast and dependency-free.
+- CLI `odds` command (`--cards`, `--dealer`, `--profile`, `--decks`,
+  `--true-count`): player bust-if-hit, dealer bust, dealer 17/18/19/20/21/bust
+  probabilities, per-action EV estimates, the best estimated action, and the
+  approximation note.
+- CLI `coach --show-odds`: appends a compact approximate odds summary (bust if
+  hit, dealer bust, best estimated action) to the coach output.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.12.0**.
+
+### Quality
+
+- New suite `tests/test_probability_advisor.py` (bust estimates, dealer
+  distribution sums to ~1, surrender EV -0.5, illegal-action warning, advice
+  assembly, engine unchanged) plus CLI tests for `odds` and `coach --show-odds`.
+  Full suite passing; ruff clean; CI on Python 3.9-3.12.
+
+### Safety
+
+- Approximate advisory only: probabilities/EV use a simplified model and do not
+  claim perfect accuracy. They never override the strategy recommendation (a
+  clear advisory warning is shown if the best-EV action differs). No change to
+  `strategy_engine.recommend`, Hi-Lo counting math, guided coaching, outcome
+  history, or session history. No casino connectivity, real betting, bankroll,
+  camera/video, or promise of winnings.
+
 ## [1.11.0] - 2026-06-23
 
 Count-aware coach advice. The guided coach can now fold in the educational
