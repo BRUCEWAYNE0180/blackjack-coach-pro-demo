@@ -37,10 +37,15 @@ through v0.6.
   insurance-NO).
 - `app/counting.py` — Hi-Lo counting trainer: tag values, running count, true
   count, and `CountingState` (educational / simulated practice only).
-- `app/cli.py` — Terminal trainer (`python -m app.cli` and the `count`
-  subcommand).
+- `app/shoe.py` — Virtual multi-deck shoe: build, shuffle (seedable), draw,
+  cards/decks remaining, penetration, and deck validation.
+- `app/simulator.py` — Local training simulator: deals hands from the shoe and
+  ties together the evaluator, strategy engine, and counting (`SimulatedHand`,
+  `deal_initial_hand`, `simulate_training_hand`).
+- `app/cli.py` — Terminal trainer (`python -m app.cli`, plus `count` and
+  `simulate` subcommands).
 - `tests/` — Behavioural tests for the evaluator, engine, explanations,
-  counting, and CLI.
+  counting, shoe, simulator, and CLI.
 
 ## Roadmap
 
@@ -88,7 +93,7 @@ simulator, web app, real-money/casino features, and any external data
 Deferred to later versions: deeper expected-value / house-edge analysis and
 per-profile edge comparisons.
 
-### v0.3 — Hi-Lo Counting Trainer (current)
+### v0.3 — Hi-Lo Counting Trainer (done)
 
 Delivered (educational / simulated practice only):
 
@@ -135,11 +140,61 @@ Delivered (educational / simulated practice only):
 Deferred to later versions: count-based deviations (Illustrious 18 / Fab 4),
 insurance index, and bet sizing.
 
-### v0.4 — Simulator & Drills
+### v0.4 — Local Shoe Simulator (current)
 
-- Local virtual-shoe Monte Carlo engine (no real money, no external feeds).
-- Drill modes: random hands, weakest-cells focus, timed quizzes.
-- Empirical validation of strategy EV and counting concepts.
+Delivered (educational / simulated practice only):
+
+- **`app/shoe.py`** — a virtual multi-deck shoe:
+  - `build_shoe(decks=6)` — 52 cards per deck (e.g. 6 decks = 312 cards).
+  - `shuffle_shoe(cards, seed=None)` — seedable, deterministic shuffle on a
+    copy (original untouched).
+  - `draw_card(shoe)` — draws one card and shrinks the shoe.
+  - `cards_remaining(shoe)`, `decks_remaining(shoe)`,
+    `penetration(shoe, original_size)`.
+  - `validate_decks(decks)` — rejects non-positive / non-integer deck counts.
+- **`app/simulator.py`** — a local trainer that ties the modules together:
+  - **`SimulatedHand`** dataclass — player cards, dealer upcard, optional
+    dealer hole card, running count before/after, true count after, the
+    `recommendation`, plus an educational note and warnings.
+  - `deal_initial_hand(shoe, running_count=0, decks=6)` — deals two player
+    cards plus the dealer up and hole cards. Only the **visible** cards (player
+    cards + upcard) update the running count; the face-down hole card is not
+    counted.
+  - `simulate_training_hand(decks=6, seed=None)` — builds and shuffles a fresh
+    shoe and deals one training hand.
+  - Integrates `app.hand_evaluator` (evaluation), `app.strategy_engine.recommend`
+    (action), and `app.counting` (running/true count).
+- **CLI `simulate` subcommand:**
+
+  ```bash
+  python -m app.cli simulate --decks 6 --seed 42
+  ```
+
+  Prints the player cards, dealer upcard, recommendation, running count before
+  and after, true count after, and an educational note. The strategy and
+  `count` commands are unchanged.
+- **Tests** — shoe sizes (1 deck = 52, 6 decks = 312), `validate_decks`
+  rejects `<= 0`, seeded shuffle determinism, `draw_card` shrinking the shoe,
+  `deal_initial_hand` dealing two player cards + upcard, `simulate_training_hand`
+  returning a recommendation, and the CLI `simulate` flow; all earlier tests
+  remain green.
+
+**Virtual shoe**
+
+- The shoe is a plain list of rank tokens; suits are omitted because they do
+  not affect strategy or Hi-Lo counting. A seedable shuffle gives reproducible
+  practice sessions.
+
+**Limitations / out of scope for v0.4**
+
+- The simulator deals the initial hand and gives the opening recommendation; it
+  does not yet play out full rounds, dealer draws, or bankroll.
+- No betting spread, no Kelly bet sizing, no Illustrious 18, and no insurance
+  index play yet.
+- No web app.
+- Never for real tables: no casino connectivity, no real-money betting, no
+  camera/video, no screen scraping, and no promise of winnings. No external
+  data (PDFs/screenshots/feeds).
 
 ### v0.5 — Visual / UI Layer
 
