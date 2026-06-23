@@ -142,6 +142,13 @@ As of v0.9 the project enforces these gates on every change:
   receives guidance - the user is not asked to choose the action in guided
   mode. Guided coaching reads `strategy_engine.recommend` and the simulator and
   must never change basic strategy.
+- **The card display layer is visual only.** The professional card renderer
+  (v1.10.0: `app/cards.py`) and its suits/colour must never alter strategy,
+  counting, outcomes, or scoring. Every card conversion must preserve the plain
+  rank the engine needs (`cards_to_ranks`), and the engine must always be called
+  with plain ranks. Colour/suit display is presentation only and must degrade to
+  plain text when colour is unsupported or disabled (`--no-color` /
+  `--plain-cards`).
 
 ## 8. Release Rules
 

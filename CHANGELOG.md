@@ -7,6 +7,50 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.10.0] - 2026-06-23
+
+Professional card display. Cards can now be entered and shown with figures,
+suits, and colour - `A♠`, `10♥`, `K♦`, `8♣` - so the coach feels like a complete
+blackjack calculator. Hearts and diamonds render in red; spades and clubs use
+the terminal's default colour. This is a presentation / input layer only: it
+never changes strategy, counting, outcomes, or scoring (every conversion keeps
+the plain rank the engine needs).
+
+### Added
+
+- `app/cards.py`: `RenderedCard`, the `SUIT_SYMBOLS` / `SUIT_NAMES` /
+  `RED_SUITS` / `BLACK_SUITS` constants, and the helpers `normalize_rank`,
+  `normalize_suit`, `parse_card`, `parse_cards`, `cards_to_ranks`,
+  `format_card`, `format_cards`, `strip_ansi`, and `assign_display_suits`
+  (deterministic decorative suits for simulated cards).
+- Card input accepts suits in several forms: `A♠`, `AS`, `A spades`, `Kd`,
+  `10♥`, `Q clubs`, as well as the existing suitless `A,7`.
+- Global display flags `--no-color` (plain, no ANSI) and `--plain-cards` (ranks
+  only, no suit symbols).
+
+### Changed
+
+- The card-facing commands (`coach`, `coach-play`, `play`, `simulate`,
+  `diagnose`, `audit`, `split-rules`) now render hands with suits and colour.
+  User-typed suits are preserved; simulated hands get deterministic decorative
+  suits. Colour is used only on a real terminal (captured / piped output stays
+  plain).
+- Bumped the package and `app.__version__` to **1.10.0**.
+
+### Quality
+
+- New suite `tests/test_cards.py` (rank/suit normalisation, parsing, colour,
+  ANSI stripping, deterministic suits) plus CLI tests for Unicode/letter suit
+  input, `--no-color`, and `--plain-cards`. Full suite passing; ruff clean; CI
+  on Python 3.9-3.12.
+
+### Safety
+
+- Visual / parsing only: no change to `strategy_engine.recommend`, the hand
+  evaluator, Hi-Lo counting, outcomes, scoring, session history, or outcome
+  history. The engine always receives plain ranks. No casino connectivity, real
+  betting, bankroll, camera/video, scraping, or promise of winnings.
+
 ## [1.9.0] - 2026-06-23
 
 Guided coach mode. The coach now picks and explains the best play - the user

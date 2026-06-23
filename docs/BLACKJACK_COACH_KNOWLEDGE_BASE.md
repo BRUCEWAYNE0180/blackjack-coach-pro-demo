@@ -41,6 +41,11 @@ tool relies on and the project's evolution.
   insurance-NO).
 - `app/formatting.py` — Dependency-free terminal formatting helpers (headers,
   aligned key/value rows, result badges, percentages); presentation only.
+- `app/cards.py` — Professional card rendering / parsing: `RenderedCard`, suit
+  constants, `normalize_rank`/`normalize_suit`, `parse_card`/`parse_cards`,
+  `cards_to_ranks`, `format_card`/`format_cards`, `strip_ansi`, and
+  `assign_display_suits`. Visual / input layer only - always preserves plain
+  ranks for the engine.
 - `app/session_history.py` — Local JSON session history (summary only):
   `SessionRecord`, `HistorySummary`, save/load/list, and `summarize_history`.
 - `app/outcome_history.py` — Local outcome / win-loss history (summary only):
@@ -729,7 +734,7 @@ data; no database, network, or cloud. Records live under the git-ignored
 `.blackjack_coach/outcomes/` folder. Per `PROJECT_RULES.md`, outcome history
 must remain a local summary and never store sensitive data.
 
-### v1.9.0 — Guided Coach Mode (current)
+### v1.9.0 — Guided Coach Mode (done)
 
 Lets the coach drive: it picks and explains the best play, and can play a full
 simulated hand step by step. The user asks; the coach decides and teaches. Basic
@@ -754,6 +759,32 @@ Delivered:
 and the outcome stay distinct; the coach decides and the user receives guidance.
 Per `PROJECT_RULES.md`, the user is not asked to choose the action in guided
 mode, and the coach never changes the strategy engine.
+
+### v1.10.0 — Professional Card Renderer (current)
+
+Makes cards look and read like a real blackjack calculator: figures, suits, and
+colour for input and output. Strategy is untouched - this is a presentation /
+parsing layer.
+
+Delivered:
+
+- **`app/cards.py`**: `RenderedCard`; the `SUIT_SYMBOLS` / `SUIT_NAMES` /
+  `RED_SUITS` / `BLACK_SUITS` constants; `normalize_rank`, `normalize_suit`,
+  `parse_card`, `parse_cards`, `cards_to_ranks`, `format_card`, `format_cards`,
+  `strip_ansi`, and `assign_display_suits` (deterministic decorative suits for
+  simulated cards). ANSI red for hearts/diamonds; default colour for
+  spades/clubs.
+- **CLI**: the card-facing commands (`coach`, `coach-play`, `play`, `simulate`,
+  `diagnose`, `audit`, `split-rules`) render suits and colour; global
+  `--no-color` and `--plain-cards` flags; colour auto-disables off a TTY.
+- **Tests**: `tests/test_cards.py` (normalisation, parsing, colour, ANSI
+  stripping, deterministic suits) plus CLI tests for Unicode/letter suit input,
+  `--no-color`, and `--plain-cards`.
+
+**Visual only:** suits and colour never affect strategy, counting, outcomes, or
+scoring. Card input accepts `A♠`, `AS`, `A spades`, `10H`, `Q clubs`, `Kd`, and
+suitless `A,7`; the engine always receives plain ranks (`cards_to_ranks`). Per
+`PROJECT_RULES.md`, the card display layer must preserve ranks for the engine.
 
 ### v2.0 — Possible Web UI (if decided later)
 

@@ -847,3 +847,62 @@ class TestCliCoach:
         err = capsys.readouterr().err
         assert exit_code == 2
         assert "Error" in err
+
+
+class TestCliCardDisplay:
+    def test_coach_accepts_unicode_suits(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "A\u2660,7\u2665",
+                              "--dealer", "9\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "A\u2660" in out and "7\u2665" in out
+        # Engine still sees plain ranks: soft 18 vs 9.
+        assert "Soft 18 vs dealer 9" in out
+        assert "Recommended action: HIT" in out
+
+    def test_coach_accepts_letter_suits(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "AS,7H", "--dealer", "9D",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "A\u2660" in out and "7\u2665" in out
+
+    def test_coach_plain_cards_strips_suits(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "A\u2660,7\u2665",
+                              "--dealer", "9\u2666", "--plain-cards",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Cards             : A, 7" in out
+        assert "\u2660" not in out and "\u2665" not in out
+
+    def test_coach_no_color_has_no_ansi(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "A\u2660,7\u2665",
+                              "--dealer", "9\u2666", "--no-color",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "\033[" not in out
+        # Suits are still shown (colour off, symbols on).
+        assert "A\u2660" in out
+
+    def test_coach_suitless_shows_rank_only(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "A,7", "--dealer", "9",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Cards             : A, 7" in out
+
+    def test_captured_output_has_no_ansi_by_default(self, capsys):
+        # Non-TTY (captured) output should be plain text even without --no-color.
+        cli.main(["coach", "--cards", "A\u2660,7\u2665", "--dealer", "9\u2666"])
+        out = capsys.readouterr().out
+        assert "\033[" not in out
+
+    def test_play_still_works_with_card_display(self, capsys):
+        exit_code = cli.main(["play", "--decks", "6", "--seed", "42"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Played Hand ===" in out
+        assert "Final player cards" in out
