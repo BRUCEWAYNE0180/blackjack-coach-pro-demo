@@ -490,8 +490,42 @@ final recommendation is never overridden automatically.
 
 Honest about exactness: the dealer distribution and the re-split tree are
 enumerated deterministically and split aces (one card then stand) are exact;
-hittable sub-hands use a one-card look-ahead and inter-hand depletion is ignored,
-so those parts stay approximate (reported via `is_exact_for_supported_rules`).
+as of v1.16.0 hittable sub-hands are played with the recursive hit/stand tree;
+intra-hand and inter-hand depletion are ignored, so those parts stay approximate
+(reported via `is_exact_for_supported_rules`).
+
+## Full player EV decision tree (v1.16.0)
+
+### odds (Player EV decision tree)
+
+```bash
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach odds --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach odds --cards 8♠,8♥ --dealer 6♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+```
+
+In composition-aware mode, `odds` adds a **Player EV decision tree** block: the
+best EV action, the EV by action (`STAND` / `HIT` / `DOUBLE` / `SURRENDER`, and
+`SPLIT` for pairs), whether it is exact for the active rules, the
+exactness/approximation note, and whether the best-EV action agrees with the
+coach's recommendation. `HIT` is a recursive optimal hit/stand tree (no longer a
+one-card snapshot). Pairs still show the Split EV estimate block as well.
+
+### coach --show-odds (Player EV decision tree)
+
+```bash
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware
+```
+
+The compact odds block shows the player EV best action and whether it agrees
+with the coach's recommendation (with a short note when it differs). The coach's
+final recommendation is never overridden automatically.
+
+Honest about exactness: `STAND` uses the exact finite-shoe dealer distribution
+and `HIT` is fully recursive; for non-pair hands the HIT/STAND/DOUBLE/SURRENDER
+set is enumerated. The documented simplifications are fixed
+remaining-composition draw probabilities (no intra-hand depletion), the dealer
+distribution from the pre-action shoe, and ten-value aggregation. Advisory only.
 
 ## Adaptive local learning (v1.13.0)
 

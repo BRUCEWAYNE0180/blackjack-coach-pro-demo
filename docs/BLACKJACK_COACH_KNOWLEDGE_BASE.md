@@ -926,7 +926,7 @@ and must not override the main strategy without explicit validation. It does not
 change `strategy_engine.recommend` or the Hi-Lo counting math, adds no external
 dependencies, and runs no large/slow simulations.
 
-### v1.15.0 — Composition-aware Split / Re-split EV Advisor (current)
+### v1.15.0 — Composition-aware Split / Re-split EV Advisor (done)
 
 Builds directly on v1.14.0. The composition layer and exact finite-shoe dealer
 distribution were already in place, but SPLIT EV was a simplified placeholder.
@@ -956,11 +956,49 @@ Delivered:
 `max_split_hands`) are enumerated deterministically, and split aces that cannot
 be hit are evaluated **exactly** (`is_exact_for_supported_rules=True`). Hittable
 sub-hands reuse the one-card-then-stand look-ahead and inter-hand card depletion
-is ignored, so those cases remain **approximate**. Per `PROJECT_RULES.md`,
-split/re-split EV separates exact, approximate, and simplified, and never
-overrides the main strategy without explicit validation. No change to
-`strategy_engine.recommend` or the Hi-Lo math; no external dependencies; no
-Monte Carlo / slow simulations.
+is ignored, so those cases remain **approximate** (improved in v1.16.0). Per
+`PROJECT_RULES.md`, split/re-split EV separates exact, approximate, and
+simplified, and never overrides the main strategy without explicit validation.
+No change to `strategy_engine.recommend` or the Hi-Lo math; no external
+dependencies; no Monte Carlo / slow simulations.
+
+### v1.16.0 — Full Player EV Decision Tree (current)
+
+Builds on v1.15.0. The composition layer, exact finite-shoe dealer
+distribution, and split/re-split EV were already in place, but some hittable
+sub-hands still used a one-card-then-stand look-ahead. v1.16.0 replaces the HIT
+look-ahead with a **recursive optimal hit/stand tree** and unifies every legal
+action's EV into one player decision tree, so the advisor is more professional
+and less approximate.
+
+Delivered:
+
+- **`app/probability_advisor.py`**: `PlayerDecisionEVEstimate`, `PlayerEVBranch`;
+  `estimate_stand_ev_composition` (vs the exact dealer distribution; bust = -1),
+  `estimate_hit_ev_tree` (recursive optimal hit/stand over the remaining
+  composition, memoised on `(total, is_soft)` and depth-capped),
+  `estimate_double_ev_composition` (one card then stand, doubled),
+  `estimate_surrender_ev` (-0.5 when legal), and
+  `estimate_player_decision_tree_ev` (STAND / HIT / DOUBLE / SURRENDER / SPLIT,
+  SPLIT delegated to the split estimator). `build_composition_aware_advice`
+  exposes a `decision_tree` field and takes `best_estimated_action` from it;
+  split sub-hands now play hittable hands with the recursive tree.
+- **CLI**: `odds` shows a "Player EV decision tree" block (best EV action, EV by
+  action, exactness note, EV vs recommendation); `coach --show-odds` shows a
+  compact player EV summary and agreement with the recommendation.
+- **Tests**: extended `tests/test_probability_advisor.py` and CLI tests.
+
+**Limits / honesty:** `STAND` uses the exact finite-shoe dealer distribution and
+`HIT` is a recursive optimal tree, so multi-card draws are no longer truncated to
+one ply (for non-pair hands the HIT/STAND/DOUBLE/SURRENDER set is fully
+enumerated, `is_exact_for_supported_rules=True`). Documented simplifications:
+player-tree draws use fixed remaining-composition probabilities (no intra-hand
+depletion), the dealer distribution is from the pre-action shoe, ten-values are
+aggregated, and the SPLIT portion keeps its own approximations. Per
+`PROJECT_RULES.md`, the player EV tree separates main strategy, advisory EV,
+exactness, and approximation, and never overrides the main strategy without
+explicit validation. No change to `strategy_engine.recommend` or the Hi-Lo math;
+no external dependencies; no Monte Carlo / slow simulations.
 
 ### v2.0 — Possible Web UI (if decided later)
 

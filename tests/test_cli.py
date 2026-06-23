@@ -1134,6 +1134,65 @@ class TestCliSplitEV:
         assert "Recommended action" in out
 
 
+class TestCliPlayerEVTree:
+    """v1.16.0 full player EV decision tree."""
+
+    def test_odds_composition_aware_shows_decision_tree(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--composition-aware"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "-- Player EV decision tree --" in out
+        assert "Best EV action" in out
+        assert "-- EV by action --" in out
+        assert "EV vs recommendation" in out
+
+    def test_odds_16_vs_10_shows_ev_by_action(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--composition-aware"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        # Each legal action has an EV line in the tree block.
+        assert "SURRENDER :" in out
+        assert "HIT       :" in out
+        assert "STAND     :" in out
+
+    def test_odds_soft_18_vs_9_works(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "A\u2660,7\u2665",
+                              "--dealer", "9\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--composition-aware"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "-- Player EV decision tree --" in out
+        assert "Best EV action       : HIT" in out
+
+    def test_odds_pair_shows_both_tree_and_split(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "8\u2660,8\u2665",
+                              "--dealer", "6\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--composition-aware"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "-- Player EV decision tree --" in out
+        assert "-- Split EV estimate --" in out
+
+    def test_coach_show_odds_shows_player_ev_summary(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666", "--show-odds",
+                              "--composition-aware",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Player EV best action" in out
+        assert "EV vs recommendation" in out
+        assert "Recommended action" in out
+
+
 
 class TestCliLearn:
     """Adaptive local-learning 'learn' command and coach --use-history."""

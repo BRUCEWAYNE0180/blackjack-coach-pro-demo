@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.15.0 feature summary
+## v1.16.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -872,12 +872,56 @@ recommendation.
 
 **Honest about exactness:** the dealer distribution and the re-split tree
 (up to `max_split_hands`) are enumerated deterministically, and split aces that
-cannot be hit (one card then stand) are evaluated **exactly**. Hittable
-sub-hands reuse the one-card-then-stand look-ahead and inter-hand card depletion
-is ignored, so those parts stay **approximate** (reported via
-`is_exact_for_supported_rules`). It is **advisory only** - it never overrides
-the coach's final recommendation, `strategy_engine.recommend()`, or the Hi-Lo
-math.
+cannot be hit (one card then stand) are evaluated **exactly**. As of v1.16.0,
+hittable sub-hands are played out with the recursive optimal hit/stand tree
+(below); intra-hand and inter-hand card depletion are still ignored, so those
+parts stay **approximate** (reported via `is_exact_for_supported_rules`). It is
+**advisory only** - it never overrides the coach's final recommendation,
+`strategy_engine.recommend()`, or the Hi-Lo math.
+
+## Full player EV decision tree (v1.16.0)
+
+The HIT EV is no longer a one-card-then-stand snapshot. v1.16.0 plays the hand
+out with a **recursive optimal hit/stand tree** over the remaining shoe, and
+unifies every legal action's EV into one **player EV decision tree** -
+`STAND`, `HIT`, `DOUBLE`, `SURRENDER`, and (for pairs) `SPLIT`.
+
+```bash
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach odds --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach odds --cards 8♠,8♥ --dealer 6♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware
+```
+
+```text
+-- Player EV decision tree --
+Best EV action       : SURRENDER
+Best EV              : -0.500
+Composition aware    : yes
+Exact for these rules: yes
+-- EV by action --
+SURRENDER : -0.500
+HIT       : -0.565
+STAND     : -0.577
+DOUBLE    : -1.129
+
+EV vs recommendation: agrees
+```
+
+When composition-aware is on, `odds` adds a **Player EV decision tree** block
+(best EV action, EV by action, and the exactness / approximation note), and
+`coach --show-odds` adds a compact player EV summary plus whether the advisory
+best-EV action **agrees** with the coach's recommendation. Pairs still show the
+Split EV estimate block.
+
+**Honest about exactness:** `STAND` uses the exact finite-shoe dealer
+distribution and `HIT` is a recursive optimal hit/stand tree, so multi-card
+draws are no longer truncated to one ply (for non-pair hands this set of actions
+is fully enumerated). The documented simplifications are that draws inside the
+player tree use fixed remaining-composition probabilities (no intra-hand
+depletion), the dealer distribution is taken from the pre-action shoe, and
+ten-values are aggregated. It is **advisory only** and never overrides
+`strategy_engine.recommend()` or the Hi-Lo math.
 
 ## Adaptive local learning (v1.13.0)
 

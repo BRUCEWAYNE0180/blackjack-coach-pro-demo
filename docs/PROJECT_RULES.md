@@ -198,6 +198,18 @@ As of v0.9 the project enforces these gates on every change:
   without explicit validation, and must not change `strategy_engine.recommend`
   or the Hi-Lo counting math. It must stay deterministic / memoised
   (no Monte Carlo) and dependency-free.
+- **The player EV decision tree must separate strategy, advisory EV, exactness,
+  and approximation.** The player EV tree (v1.16.0: `app/probability_advisor.py`)
+  must distinguish the main strategy (unchanged), advisory EV, exact computation
+  (the finite-shoe dealer distribution and the fully enumerated
+  hit/stand/double/surrender tree for non-pair hands), and documented
+  approximation (fixed remaining-composition draw probabilities with no
+  intra-hand depletion, the dealer distribution from the pre-action shoe,
+  ten-value aggregation, and the split sub-hand model). It must never overwrite
+  the main strategy recommendation without explicit validation, must report its
+  exactness via `is_exact_for_supported_rules`, and must not change
+  `strategy_engine.recommend` or the Hi-Lo counting math. It must stay
+  deterministic / memoised (no Monte Carlo) and dependency-free.
 
 ## 8. Release Rules
 

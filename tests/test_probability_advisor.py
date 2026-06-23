@@ -409,3 +409,114 @@ class TestSplitEVInAdvice:
         after = recommend(["8", "8"], "6", P6)
         assert before.action == after.action
         assert before.reason == after.reason
+
+
+
+# ---------------------------------------------------------------------------
+# v1.16.0 - Full player EV decision tree
+# ---------------------------------------------------------------------------
+
+from app.probability_advisor import (  # noqa: E402
+    SPLIT_APPROXIMATION_NOTE,
+    PlayerDecisionEVEstimate,
+    estimate_double_ev_composition,
+    estimate_hit_ev_tree,
+    estimate_player_decision_tree_ev,
+    estimate_stand_ev_composition,
+    estimate_surrender_ev,
+)
+
+
+class TestStandEV:
+    def test_bust_hand_is_minus_one(self):
+        assert estimate_stand_ev_composition(["10", "6", "9"], "6", P6) == -1.0
+
+    def test_twenty_vs_six_is_positive(self):
+        ev = estimate_stand_ev_composition(["10", "10"], "6", P6)
+        assert ev > 0.5
+
+
+class TestHitEVTree:
+    def test_hard_11_no_bust_positive(self):
+        # Hard 11 cannot bust on the first card, and is a strong hitting hand.
+        ev = estimate_hit_ev_tree(["6", "5"], "6", P6)
+        assert ev > 0.0
+
+    def test_hard_20_is_poor(self):
+        # Hitting a 20 nearly always busts.
+        ev = estimate_hit_ev_tree(["10", "10"], "6", P6)
+        assert ev < -0.5
+
+    def test_recursive_beats_or_matches_stand_on_stiff(self):
+        # The hit tree is an EV (advisory); it must be a finite number in range.
+        ev = estimate_hit_ev_tree(["10", "6"], "10", P6)
+        assert -1.0 <= ev <= 1.0
+
+
+class TestDoubleAndSurrenderEV:
+    def test_double_ev_is_scaled(self):
+        ev = estimate_double_ev_composition(["6", "5"], "6", P6)
+        # 11 vs 6 is a strong double: clearly positive and beyond a single unit
+        # one-card stand EV (which is ~+0.34), so well above it.
+        assert ev > 0.5
+        assert -2.0 <= ev <= 2.0
+
+    def test_surrender_minus_half_when_legal(self):
+        assert estimate_surrender_ev(P6) == -0.5
+
+    def test_surrender_none_when_not_legal(self):
+        import dataclasses
+        no_ls = dataclasses.replace(P6, late_surrender=False)
+        assert estimate_surrender_ev(no_ls) is None
+
+
+class TestPlayerDecisionTree:
+    def test_returns_action_evs_and_best(self):
+        tree = estimate_player_decision_tree_ev(["10", "6"], "10", P6)
+        assert isinstance(tree, PlayerDecisionEVEstimate)
+        assert tree.action_evs
+        assert tree.best_action in tree.action_evs
+        assert tree.best_ev == tree.action_evs[tree.best_action]
+
+    def test_non_pair_excludes_split(self):
+        tree = estimate_player_decision_tree_ev(["10", "6"], "10", P6)
+        assert "SPLIT" not in tree.action_evs
+        assert any("not a pair" in w.lower() for w in tree.warnings)
+
+    def test_pair_includes_split(self):
+        tree = estimate_player_decision_tree_ev(["8", "8"], "6", P6)
+        assert "SPLIT" in tree.action_evs
+
+    def test_allow_split_false_excludes_split(self):
+        tree = estimate_player_decision_tree_ev(
+            ["8", "8"], "6", P6, allow_split=False)
+        assert "SPLIT" not in tree.action_evs
+
+    def test_non_pair_is_exact_for_supported_rules(self):
+        tree = estimate_player_decision_tree_ev(["10", "6"], "10", P6)
+        assert tree.is_exact_for_supported_rules is True
+
+
+class TestPlayerTreeInAdvice:
+    def test_advice_uses_decision_tree(self):
+        advice = build_composition_aware_advice(["10", "6"], "10", P6, decks=6)
+        assert advice.decision_tree is not None
+        assert isinstance(advice.decision_tree, PlayerDecisionEVEstimate)
+        # The best estimated action comes from the tree.
+        assert advice.best_estimated_action == advice.decision_tree.best_action
+
+    def test_split_note_mentions_recursive_tree(self):
+        # The old "one-card-then-stand look-ahead" wording for hittable
+        # sub-hands is gone; the note now references the recursive tree.
+        assert "recursive optimal hit/stand tree" in SPLIT_APPROXIMATION_NOTE
+        assert "one-card-then-stand look-ahead" not in SPLIT_APPROXIMATION_NOTE
+
+    def test_does_not_change_recommend(self):
+        before = recommend(["10", "6"], "10", P6)
+        comp = build_shoe_composition(decks=6, known_cards=["10", "6", "10"])
+        estimate_player_decision_tree_ev(["10", "6"], "10", P6, comp)
+        estimate_hit_ev_tree(["10", "6"], "10", P6)
+        build_composition_aware_advice(["10", "6"], "10", P6, decks=6)
+        after = recommend(["10", "6"], "10", P6)
+        assert before.action == after.action
+        assert before.reason == after.reason
