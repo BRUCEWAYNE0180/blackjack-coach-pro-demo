@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.17.0 feature summary
+## v1.18.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -100,6 +100,12 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   when the coach's recommendation agreed with the advisory best-EV action - or
   differed - using `ev-review`. Advisory audit only; it never changes the
   recommendation and stores no sensitive data.
+- **Strategy-vs-EV explanation engine** (v1.18.0): `--explain-ev` (on `odds` and
+  `coach --show-odds`) and `ev-review --explain` add a clear, professional
+  explanation of *when* the coach's recommendation agrees with the advisory
+  best-EV action and *when/why* it differs (tiny / small / medium / large EV
+  gap, shoe composition, true count, split / re-split, surrender, or model
+  limits). Explanation only - it never overrides the recommendation.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -138,6 +144,43 @@ data it prints a clear "use `--save-ev-snapshot` first" message.
 A handy local self-study loop is: `coach`/`odds --save-ev-snapshot` →
 `ev-review` → `learn`. Each snapshot stores only a safe local summary - no
 money, bankroll, bets, accounts, tokens, screenshots, or personal data.
+
+## Strategy-vs-EV Explanation Engine (v1.18.0)
+
+The probability / EV advisor is **advisory only**. v1.18.0 adds a plain-language
+explanation of *when the coach's recommendation agrees with the advisory
+best-EV action and when it differs* - and, when it differs, *why*: a tiny /
+small / medium / large EV gap, the remaining-shoe composition, the true count,
+split / re-split context, a surrender threshold, or the documented limits of the
+EV model. It is an explanation layer only and never overrides the
+recommendation.
+
+Add `--explain-ev` to `odds`, or to `coach` together with `--show-odds`:
+
+```bash
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware --explain-ev
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware --explain-ev
+```
+
+`coach --explain-ev` requires `--show-odds` (otherwise there is no odds advisory
+to explain, and the CLI prints a clear error). The block shows the coach
+recommendation, the best EV action, the EV gap, the gap label, the explanation,
+and an advisory note.
+
+The `ev-review` command can explain the saved snapshots too:
+
+```bash
+blackjack-coach ev-review --explain
+blackjack-coach ev-review --disagreements-only --explain
+blackjack-coach ev-review --large-gaps-only --explain
+```
+
+`--explain` appends Strategy-vs-EV explanations for the top disagreement spots
+(largest gap first). `--large-gaps-only` narrows the review to snapshots whose
+EV gap is **LARGE** (or **MEDIUM** when there is no LARGE gap). EV gap bands:
+`TINY` `[0, 0.02)`, `SMALL` `[0.02, 0.05)`, `MEDIUM` `[0.05, 0.15)`, `LARGE`
+`[0.15, ∞)`; a tiny / small gap is probably not a strong difference, while a
+large gap is worth reviewing with `odds` and `audit`.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -216,6 +259,10 @@ blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_D
 blackjack-coach ev-review
 blackjack-coach ev-review --disagreements-only
 blackjack-coach ev-review --profile SIX_DECK_H17_DAS_LS
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware --explain-ev
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware --explain-ev
+blackjack-coach ev-review --disagreements-only --explain
+blackjack-coach ev-review --large-gaps-only --explain
 ```
 
 Without installing, run it as a module from the repository root:

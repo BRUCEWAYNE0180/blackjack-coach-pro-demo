@@ -7,6 +7,62 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.18.0] - 2026-06-23
+
+Strategy-vs-EV explanation engine. The probability / EV advisor stays advisory
+only, but it now **explains itself**: a clear, professional account of when the
+coach's main recommendation agrees with the advisory best-EV action and when it
+differs - and, when it differs, why (a tiny / small / medium / large EV gap, the
+remaining-shoe composition, the true count, split / re-split context, a
+surrender threshold, or the documented limits of the EV model). It never changes
+the main recommendation, never overrides `strategy_engine.recommend`, never
+turns the advisory EV into the final decision, and never touches the Hi-Lo math.
+
+### Added
+
+- `app/ev_explainer.py`: dataclasses `EVGapCategory`, `StrategyEVDisagreement`,
+  and `DisagreementExplanationSummary`, plus `classify_ev_gap` (TINY `[0, 0.02)`,
+  SMALL `[0.02, 0.05)`, MEDIUM `[0.05, 0.15)`, LARGE `[0.15, inf)`, UNKNOWN when
+  there is no gap), `explain_strategy_vs_ev` (accepts a `ProbabilityAdvice`, a
+  `CompositionAwareProbabilityAdvice`, or an `EVSnapshotRecord`),
+  `explain_ev_snapshot_record`, and `summarize_disagreement_explanations`
+  (groups snapshots into agrees / tiny / small / medium / large / missing and
+  generates review notes).
+- CLI `odds --explain-ev` and `coach --show-odds --explain-ev`: append a
+  "Strategy vs EV explanation" block (coach recommendation, best EV action, EV
+  gap, gap label, explanation, advisory note). `coach --explain-ev` without
+  `--show-odds` prints a clear error.
+- CLI `ev-review --explain` (Strategy-vs-EV explanations for the top
+  disagreement spots) and `ev-review --large-gaps-only` (only LARGE-gap
+  snapshots, or MEDIUM when there is no LARGE gap).
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.18.0**.
+
+### Quality
+
+- New suite `tests/test_ev_explainer.py` (gap classification tiny / small /
+  medium / large / unknown; agreement and disagreement explanations; that the
+  explanation includes both actions and the gap label; composition / true-count
+  mentions; the `EVSnapshotRecord` wrapper; grouped summaries; and that
+  explaining never changes `recommend()`) plus `TestCliStrategyVsEVExplanation`
+  in `tests/test_cli.py` for `odds --explain-ev`,
+  `coach --show-odds --explain-ev`, the requires-`--show-odds` error,
+  `ev-review --explain`, `ev-review --large-gaps-only`, and the
+  disagreements-only path. Full suite passing; ruff clean.
+
+### Safety
+
+- The explanation engine is an **explanation layer only**: it keeps a clear
+  separation between the recommended action, the advisory EV action, the size of
+  the gap, the model's limitations, and the final decision, and it never
+  converts the advisory EV into an automatic override. No change to
+  `strategy_engine.recommend`, the Hi-Lo counting math, adaptive learning,
+  guided coaching, outcome history, session history, or the v1.17.0 EV-snapshot
+  history. No external dependencies, no network / cloud / database, and no
+  sensitive data (no money, bankroll, bets, accounts, tokens, or screenshots).
+
 ## [1.17.0] - 2026-06-23
 
 EV snapshot history & Strategy-vs-EV review. The probability / EV advisor stays

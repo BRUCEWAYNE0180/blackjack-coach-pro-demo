@@ -637,6 +637,61 @@ A handy local self-study loop is: `coach`/`odds --save-ev-snapshot` →
 bankroll, bets, accounts, tokens, screenshots, or personal data - stored under
 the git-ignored `.blackjack_coach/` tree and never committed.
 
+## Strategy-vs-EV explanation engine (v1.18.0)
+
+The probability / EV advisor is advisory only. v1.18.0 explains, in plain
+language, when the coach's recommendation agrees with the advisory best-EV
+action and when it differs - and, when it differs, why (a tiny / small / medium
+/ large EV gap, the remaining-shoe composition, the true count, split / re-split
+context, a surrender threshold, or the documented limits of the EV model). It is
+an explanation layer only and never overrides the recommendation,
+`strategy_engine.recommend()`, or the Hi-Lo math.
+
+EV gap bands: `TINY` `[0, 0.02)`, `SMALL` `[0.02, 0.05)`, `MEDIUM` `[0.05,
+0.15)`, `LARGE` `[0.15, inf)`; `UNKNOWN` when there is no EV gap.
+
+### odds --explain-ev
+
+```bash
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware --explain-ev
+```
+
+Appends a "Strategy vs EV explanation" block: the coach recommendation, the best
+EV action, the EV gap, the gap label, the agreement status, the explanation, and
+an advisory note. Combines with `--composition-aware`, `--seen-cards`,
+`--true-count`, and `--save-ev-snapshot`.
+
+### coach --explain-ev
+
+```bash
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware --explain-ev
+```
+
+Adds the same explanation block to the coach output while keeping the main
+decision intact. It **requires `--show-odds`** (there is no advisory to explain
+otherwise); `--explain-ev` without `--show-odds` prints a clear error
+(`--explain-ev requires --show-odds`).
+
+### ev-review --explain
+
+```bash
+blackjack-coach ev-review --explain
+blackjack-coach ev-review --disagreements-only --explain
+```
+
+After the normal review, appends Strategy-vs-EV explanations for the top
+disagreement spots (largest EV gap first).
+
+### ev-review --large-gaps-only
+
+```bash
+blackjack-coach ev-review --large-gaps-only --explain
+```
+
+Narrows the review to snapshots whose EV gap is **LARGE**, or **MEDIUM** when
+there is no LARGE gap. Pair it with `--explain` to see why those spots differ;
+review them with `odds` and `audit`.
+
 
 
 

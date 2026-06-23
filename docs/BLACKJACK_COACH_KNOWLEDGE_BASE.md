@@ -88,6 +88,12 @@ tool relies on and the project's evolution.
   save/load/list (with limit / profile / disagreements-only filters), and
   `summarize_ev_snapshots`. Advisory audit only; it never changes the
   recommendation and stores no sensitive data.
+- `app/ev_explainer.py` — Strategy-vs-EV explanation engine: `EVGapCategory`,
+  `StrategyEVDisagreement`, `DisagreementExplanationSummary`, plus
+  `classify_ev_gap`, `explain_strategy_vs_ev` (advice or snapshot),
+  `explain_ev_snapshot_record`, and `summarize_disagreement_explanations`.
+  Explanation layer only; it never overrides the recommendation or turns the
+  advisory EV into the final decision.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -115,7 +121,8 @@ tool relies on and the project's evolution.
   `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`,
   `deviation-quiz`, `diagnose`, `profiles`, `split-rules`, `matrix`,
   `audit`, `outcomes`, `coach`, `coach-play`, `odds`, `learn`, and `ev-review`
-  subcommands).
+  subcommands; `odds`/`coach --show-odds` accept `--explain-ev` and `ev-review`
+  accepts `--explain` / `--large-gaps-only`).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -1008,7 +1015,7 @@ exactness, and approximation, and never overrides the main strategy without
 explicit validation. No change to `strategy_engine.recommend` or the Hi-Lo math;
 no external dependencies; no Monte Carlo / slow simulations.
 
-### v1.17.0 — EV Snapshot History & Review (current)
+### v1.17.0 — EV Snapshot History & Review (done)
 
 Builds on the v1.12.0-v1.16.0 probability / EV advisor. The advisor is advisory
 only, but there was no way to **remember** its output or to study, over many
@@ -1050,6 +1057,50 @@ never change `strategy_engine.recommend` or the Hi-Lo math, and store no money,
 bankroll, bets, accounts, tokens, screenshots, or personal data - no database,
 no network, no cloud. Saved files live under the git-ignored `.blackjack_coach/`
 tree and are never committed. No external dependencies and no slow simulations.
+
+### v1.18.0 — Strategy-vs-EV Explanation Engine (current)
+
+Builds on the v1.12.0-v1.17.0 probability / EV advisor and the v1.17.0
+EV-snapshot history. The advisor could compute EV, save snapshots, and review
+agreement / disagreement, but it did not yet *explain* a discrepancy in clear
+language. v1.18.0 adds an explanation engine that tells the user when the
+coach's recommendation agrees with the advisory best-EV action and when it
+differs - and why - while keeping a strict separation between the recommended
+action, the advisory EV action, the gap size, the model's limits, and the final
+decision. It never changes play.
+
+Delivered:
+
+- **`app/ev_explainer.py`**: `EVGapCategory` (labelled gap band with meaning and
+  action note), `StrategyEVDisagreement` (player cards, dealer upcard, profile,
+  recommended action, best EV action, strategy / best EV, EV gap, gap label,
+  agreement status, likely reason, explanation, recommendation note,
+  approximation note, warnings), and `DisagreementExplanationSummary`. Functions:
+  `classify_ev_gap` (TINY `[0, 0.02)`, SMALL `[0.02, 0.05)`, MEDIUM `[0.05,
+  0.15)`, LARGE `[0.15, inf)`, UNKNOWN when missing), `explain_strategy_vs_ev`
+  (accepts a `ProbabilityAdvice`, a `CompositionAwareProbabilityAdvice`, or an
+  `EVSnapshotRecord` - reusing the tested `build_ev_snapshot_record` for advice
+  so the explanation matches the saved snapshots), `explain_ev_snapshot_record`,
+  and `summarize_disagreement_explanations` (groups into agrees / tiny / small /
+  medium / large / missing with review notes).
+- **CLI**: `odds --explain-ev` and `coach --show-odds --explain-ev` append a
+  "Strategy vs EV explanation" block; `coach --explain-ev` requires
+  `--show-odds` (clear error otherwise). `ev-review --explain` adds explanations
+  for the top disagreement spots, and `ev-review --large-gaps-only` narrows the
+  review to LARGE-gap (or MEDIUM when no LARGE) snapshots.
+- **Tests**: new `tests/test_ev_explainer.py` and `TestCliStrategyVsEVExplanation`
+  in `tests/test_cli.py`.
+
+**Limits / honesty:** the explanation engine is an explanation layer only. When
+the advisory best-EV action differs from the recommendation it only *reports and
+explains* it; it never converts the advisory EV into an automatic override. A
+tiny / small gap is flagged as probably not a strong difference; a large gap is
+flagged for review with `odds` and `audit`. Per `PROJECT_RULES.md`, the
+explanations always separate the recommended action, the advisory EV action, the
+gap size, the model limitations, and the final decision. No change to
+`strategy_engine.recommend`, the Hi-Lo math, adaptive learning, guided coaching,
+outcome / session history, or the EV-snapshot history; no external dependencies;
+no network / cloud / database; no sensitive data.
 
 ### v2.0 — Possible Web UI (if decided later)
 

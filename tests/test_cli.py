@@ -1406,8 +1406,127 @@ class TestCliEVSnapshotHistory:
         assert exit_code == 0
         assert "No saved EV snapshots yet" in out
 
-    def test_version_prints_1_17_0(self, capsys):
+    def test_version_prints_1_18_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.17.0"
+        assert out.strip() == "blackjack-coach 1.18.0"
+
+
+
+class TestCliStrategyVsEVExplanation:
+    """v1.18.0 Strategy-vs-EV explanation engine."""
+
+    def test_odds_explain_ev_works(self, capsys):
+        exit_code = cli.main([
+            "odds", "--cards", "10\u2660,6\u2665", "--dealer", "10\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--explain-ev",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Strategy vs EV explanation" in out
+        assert "Coach recommendation" in out
+        assert "Best EV action" in out
+        assert "Gap label" in out
+        assert "Advisory note" in out
+
+    def test_odds_composition_aware_explain_ev(self, capsys):
+        exit_code = cli.main([
+            "odds", "--cards", "10\u2660,6\u2665", "--dealer", "10\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--composition-aware",
+            "--explain-ev",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Strategy vs EV explanation" in out
+        assert "Explanation" in out
+
+    def test_odds_explain_ev_disagreement(self, capsys):
+        # 2,9 vs A: coach recommends DOUBLE, advisory best EV is HIT (LARGE gap).
+        exit_code = cli.main([
+            "odds", "--cards", "2\u2660,9\u2665", "--dealer", "A\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--composition-aware",
+            "--explain-ev",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Agreement           : DIFFERS" in out
+        assert "never overrides the strategy recommendation" in out
+
+    def test_coach_show_odds_explain_ev(self, capsys):
+        exit_code = cli.main([
+            "coach", "--cards", "10\u2660,6\u2665", "--dealer", "10\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--show-odds",
+            "--composition-aware", "--explain-ev",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Strategy vs EV explanation" in out
+        # The coach's main recommendation is still shown (no override).
+        assert "Recommended action" in out
+
+    def test_coach_explain_ev_without_show_odds_errors(self, capsys):
+        exit_code = cli.main([
+            "coach", "--cards", "10\u2660,6\u2665", "--dealer", "10\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--explain-ev",
+        ])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "--explain-ev requires --show-odds" in err
+
+    def test_ev_review_explain_with_snapshots(self, capsys, tmp_path):
+        # Save an agreement and a disagreement snapshot.
+        cli.main([
+            "odds", "--cards", "10\u2660,6\u2665", "--dealer", "10\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--composition-aware",
+            "--save-ev-snapshot", "--ev-dir", str(tmp_path),
+        ])
+        cli.main([
+            "odds", "--cards", "2\u2660,9\u2665", "--dealer", "A\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--composition-aware",
+            "--save-ev-snapshot", "--ev-dir", str(tmp_path),
+        ])
+        capsys.readouterr()  # discard odds output
+        exit_code = cli.main(["ev-review", "--dir", str(tmp_path), "--explain"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total snapshots" in out
+        assert "Strategy vs EV explanations" in out
+        # The disagreement spot is explained.
+        assert "DIFFERS" in out or "Best EV action" in out
+
+    def test_ev_review_large_gaps_only(self, capsys, tmp_path):
+        # Agreement + a LARGE-gap disagreement (2,9 vs A) + a MEDIUM one.
+        for cards, dealer in [
+            ("10\u2660,6\u2665", "10\u2666"),   # agreement
+            ("2\u2660,9\u2665", "A\u2666"),     # LARGE gap (DOUBLE vs HIT)
+            ("4\u2660,10\u2665", "A\u2666"),    # MEDIUM gap (HIT vs SURRENDER)
+        ]:
+            cli.main([
+                "odds", "--cards", cards, "--dealer", dealer,
+                "--profile", "SIX_DECK_H17_DAS_LS", "--composition-aware",
+                "--save-ev-snapshot", "--ev-dir", str(tmp_path),
+            ])
+        capsys.readouterr()
+        exit_code = cli.main([
+            "ev-review", "--dir", str(tmp_path), "--large-gaps-only", "--explain",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        # Only the LARGE-gap snapshot survives the filter.
+        assert "Total snapshots    : 1" in out
+
+    def test_ev_review_disagreements_only_explain(self, capsys, tmp_path):
+        cli.main([
+            "odds", "--cards", "2\u2660,9\u2665", "--dealer", "A\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--composition-aware",
+            "--save-ev-snapshot", "--ev-dir", str(tmp_path),
+        ])
+        capsys.readouterr()
+        exit_code = cli.main([
+            "ev-review", "--dir", str(tmp_path), "--disagreements-only",
+            "--explain",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Strategy vs EV explanations" in out

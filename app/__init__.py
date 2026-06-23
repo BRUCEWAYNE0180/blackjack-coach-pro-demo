@@ -34,6 +34,15 @@ from .deviations import (
     normalize_true_count,
     recommend_with_deviation,
 )
+from .ev_explainer import (
+    DisagreementExplanationSummary,
+    EVGapCategory,
+    StrategyEVDisagreement,
+    classify_ev_gap,
+    explain_ev_snapshot_record,
+    explain_strategy_vs_ev,
+    summarize_disagreement_explanations,
+)
 from .ev_history import (
     EVReviewSummary,
     EVSnapshotRecord,
@@ -151,7 +160,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.17.0"
+__version__ = "1.18.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -170,6 +179,9 @@ __all__ = [
     "EIGHT_DECK_S17_DAS_LS",
     "EVReviewSummary",
     "EVSnapshotRecord",
+    "EVGapCategory",
+    "StrategyEVDisagreement",
+    "DisagreementExplanationSummary",
     "FOUR_DECK_H17_DAS_LS",
     "HandEvaluation",
     "HandOutcome",
@@ -200,6 +212,10 @@ __all__ = [
     "build_history_context",
     "build_learning_summary",
     "build_ev_snapshot_record",
+    "classify_ev_gap",
+    "explain_strategy_vs_ev",
+    "explain_ev_snapshot_record",
+    "summarize_disagreement_explanations",
     "can_double_after_split",
     "can_hit_split_aces",
     "can_resplit",
