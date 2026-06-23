@@ -58,7 +58,13 @@ from .quiz import (
     run_count_session,
     run_strategy_session,
 )
-from .rules import DEFAULT_PROFILE, PROFILES, get_profile
+from .rules import (
+    DEFAULT_PROFILE,
+    PROFILES,
+    describe_rule_profile,
+    get_profile,
+    list_rule_profiles,
+)
 from .session_history import (
     build_session_record,
     list_session_records,
@@ -856,7 +862,7 @@ def _run_deviations(argv: Sequence[str]) -> int:
     return 0
 
 
-def build_diagnose_output(diag) -> str:
+def build_diagnose_output(diag, profile) -> str:
     """Render a decision diagnostic as terminal output."""
     lines = [format_header("Decision Diagnostic")]
     lines += _kv_block([
@@ -869,6 +875,17 @@ def build_diagnose_output(diag) -> str:
     lines.append("")
     lines.append(format_section("Decision factors"))
     lines.append(format_list(diag.rule_factors))
+
+    lines.append("")
+    lines.append(format_section("Profile context"))
+    lines.append(format_kv("Rules", describe_rule_profile(profile)))
+    if profile.profile_description:
+        lines.append(format_kv("About", profile.profile_description))
+    lines.append(format_kv(
+        "Metadata note",
+        "resplit / max split hands / hit-split-aces are descriptive metadata "
+        "and do not yet change engine play.",
+    ))
 
     extra_warnings = [w for w in diag.warnings if w != explain_insurance_no()]
     if extra_warnings:
@@ -914,7 +931,74 @@ def _run_diagnose(argv: Sequence[str]) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
 
-    print(build_diagnose_output(diag))
+    print(build_diagnose_output(diag, profile))
+    return 0
+
+
+def build_profiles_list_output() -> str:
+    """Render a compact list of all rule profiles."""
+    lines = [format_header("Rule Profiles")]
+    for profile in list_rule_profiles():
+        lines.append("")
+        lines.append(format_section(profile.key))
+        lines += _kv_block([
+            ("Rules", describe_rule_profile(profile)),
+            ("About", profile.profile_description or "(no description)"),
+        ])
+    return "\n".join(lines)
+
+
+def build_profile_detail_output(profile) -> str:
+    """Render the full detail of a single rule profile."""
+    lines = [format_header("Rule Profile")]
+    lines += _kv_block([
+        ("Key", profile.key),
+        ("Name", profile.name),
+        ("Number of decks", profile.number_of_decks),
+        ("Dealer soft 17", "hits (H17)" if profile.dealer_hits_soft_17 else "stands (S17)"),
+        ("Double after split", "yes" if profile.double_after_split else "no"),
+        ("Late surrender", "yes" if profile.late_surrender else "no"),
+        ("Resplit allowed", "yes" if profile.resplit_allowed else "no"),
+        ("Max split hands", profile.max_split_hands),
+        ("Hit split aces", "yes" if profile.hit_split_aces else "no"),
+        ("Blackjack payout", f"{profile.blackjack_payout} (e.g. 3:2 = 1.5)"),
+    ])
+    lines.append("")
+    lines.append(format_kv("Description", profile.profile_description or "(none)"))
+    if profile.notes:
+        lines.append(format_kv("Notes", profile.notes))
+    return "\n".join(lines)
+
+
+def build_profiles_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'profiles' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli profiles",
+        description="List and inspect the available rule profiles.",
+    )
+    parser.add_argument("--list", action="store_true",
+                        help="List all available rule profiles.")
+    parser.add_argument("--profile", default=None, choices=sorted(PROFILES),
+                        help="Show full detail for one profile.")
+    return parser
+
+
+def _run_profiles(argv: Sequence[str]) -> int:
+    """Handle the 'profiles' subcommand."""
+    parser = build_profiles_parser()
+    args = parser.parse_args(argv)
+
+    if args.profile:
+        try:
+            profile = get_profile(args.profile)
+        except KeyError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print(build_profile_detail_output(profile))
+        return 0
+
+    # Default to listing when no specific profile is requested.
+    print(build_profiles_list_output())
     return 0
 
 
@@ -1030,6 +1114,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli deviations --cards 10,6 --dealer 10 --true-count 1
         python -m app.cli deviation-quiz --seed 42 --answer S
         python -m app.cli diagnose --cards A,7 --dealer 9   (decision factors)
+        python -m app.cli profiles --list                   (rule profiles)
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] in ("--version", "-V"):
@@ -1049,6 +1134,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_deviation_quiz(args[1:])
     if args and args[0] == "diagnose":
         return _run_diagnose(args[1:])
+    if args and args[0] == "profiles":
+        return _run_profiles(args[1:])
     if args and args[0] == "quiz":
         return _run_quiz(args[1:])
     if args and args[0] == "count-quiz":

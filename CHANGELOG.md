@@ -7,6 +7,45 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.4.0] - 2026-06-23
+
+Expanded rule profiles. Adds a range of professional rule profiles and helpers
+so the coach understands and explains more blackjack configurations. No changes
+to the basic-strategy engine, Hi-Lo math, simulator, split handling, or
+scoring.
+
+### Added
+
+- Extended `RuleProfile` with professional metadata: `number_of_decks` (alias
+  of `decks`), `resplit_allowed`, `max_split_hands`, `hit_split_aces`,
+  `profile_description`, and `notes`.
+- Nine new profiles: `SINGLE_DECK_H17_NDAS_NS`, `SINGLE_DECK_S17_DAS_LS`,
+  `DOUBLE_DECK_H17_DAS_NS`, `DOUBLE_DECK_S17_DAS_LS`, `FOUR_DECK_H17_DAS_LS`,
+  `SIX_DECK_H17_DAS_LS`, `SIX_DECK_S17_DAS_LS`, `EIGHT_DECK_H17_DAS_LS`,
+  `EIGHT_DECK_S17_DAS_LS` (existing multi-deck profiles unchanged).
+- Helpers: `list_rule_profiles`, `get_rule_profile`, `describe_rule_profile`,
+  `normalize_profile_key`, and `profile_supports_{surrender,das,resplit,
+  hit_split_aces}`.
+- `profiles` command (`--list`, `--profile <KEY>`); `diagnose` now includes a
+  profile-context section.
+
+### Changed
+
+- All `--profile` commands accept the new profiles. Bumped the package and
+  `app.__version__` to **1.4.0**.
+
+### Quality
+
+- Added `tests/test_rules.py` and CLI tests for `profiles` and new-profile
+  acceptance. Full suite passing; ruff clean; CI on Python 3.9-3.12.
+
+### Safety
+
+- `resplit_allowed`, `max_split_hands`, and `hit_split_aces` are descriptive
+  **metadata** and do not yet change engine play; this is documented wherever
+  they appear. The strategy engine, simulator, and scoring are unchanged.
+  Responsible scope is preserved in the Safety / Educational Scope section.
+
 ## [1.3.0] - 2026-06-23
 
 Professional rules & decision intelligence. Reframes the coach around decision

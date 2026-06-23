@@ -27,7 +27,10 @@ tool relies on and the project's evolution.
 
 ## Architecture (current)
 
-- `app/rules.py` — `RuleProfile` definitions and the profile registry.
+- `app/rules.py` — `RuleProfile` (with professional metadata) and the profile
+  registry; 11 built-in profiles (single/double/four/six/eight deck) plus
+  helpers (`list_rule_profiles`, `get_rule_profile`, `describe_rule_profile`,
+  `normalize_profile_key`, `profile_supports_*`).
 - `app/hand_evaluator.py` — Normalises cards and classifies hands (hard/soft/
   pair), computing totals, blackjack, and bust.
 - `app/strategy_engine.py` — Basic-strategy tables and the `recommend()` API,
@@ -67,7 +70,7 @@ tool relies on and the project's evolution.
 - `app/cli.py` — Terminal trainer (`python -m app.cli` or the installed
   `blackjack-coach` command, plus `count`, `simulate`, `play`, `quiz`,
   `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`,
-  `deviation-quiz`, and `diagnose` subcommands).
+  `deviation-quiz`, `diagnose`, and `profiles` subcommands).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -510,7 +513,7 @@ accuracy, weak spots, timestamp, id). It never stores money, bankroll, bets,
 accounts, personal data, secrets, screenshots, or casino data; there is no
 database, network, or cloud, and history files are never committed.
 
-### v1.3.0 — Professional Rules & Decision Intelligence (current)
+### v1.3.0 — Professional Rules & Decision Intelligence (done)
 
 Reframes the coach around decision intelligence and adds true-count deviation
 study plus decision diagnostics. No changes to the basic-strategy engine, Hi-Lo
@@ -544,6 +547,36 @@ deviation never changes the engine's insurance recommendation (always NO). The
 deviation set is intentionally small (not the full Illustrious 18), and
 recommendations note their dependence on the rule profile, deck estimation,
 true-count rounding, and table context.
+
+### v1.4.0 — Expanded Rule Profiles (current)
+
+Expands the rule profiles so the coach understands and explains more blackjack
+configurations. No changes to the basic-strategy engine, Hi-Lo math, simulator,
+split, or scoring.
+
+Delivered:
+
+- **`RuleProfile` metadata**: added `number_of_decks` (alias of `decks`),
+  `resplit_allowed`, `max_split_hands`, `hit_split_aces`, `profile_description`,
+  and `notes`. Existing profiles and fields are unchanged (backward
+  compatible).
+- **Nine new profiles** alongside the original two: `SINGLE_DECK_H17_NDAS_NS`,
+  `SINGLE_DECK_S17_DAS_LS`, `DOUBLE_DECK_H17_DAS_NS`, `DOUBLE_DECK_S17_DAS_LS`,
+  `FOUR_DECK_H17_DAS_LS`, `SIX_DECK_H17_DAS_LS`, `SIX_DECK_S17_DAS_LS`,
+  `EIGHT_DECK_H17_DAS_LS`, `EIGHT_DECK_S17_DAS_LS`.
+- **Helpers**: `list_rule_profiles`, `get_rule_profile`, `describe_rule_profile`,
+  `normalize_profile_key`, and `profile_supports_{surrender,das,resplit,
+  hit_split_aces}`.
+- **CLI**: a `profiles` command (`--list`, `--profile <KEY>`); all `--profile`
+  commands accept the new profiles; `diagnose` adds a profile-context section.
+
+**Rule codes:** H17/S17 = dealer hits/stands on soft 17; DAS/NDAS =
+double-after-split allowed / not; LS/NS = late surrender / none.
+
+**Metadata note:** `resplit_allowed`, `max_split_hands`, and `hit_split_aces`
+are descriptive metadata for now and do not yet change engine play; this is
+documented on the fields and in profile notes. Every new profile has a
+description and tests.
 
 ### v2.0 — Possible Web UI (if decided later)
 

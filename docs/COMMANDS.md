@@ -184,3 +184,25 @@ Explains the factors behind the recommended play: hand shape (hard/soft/pair),
 dealer upcard strength, which options (double/surrender/split) are available or
 fall back, and the H17/S17 rule context. Reads the stable strategy engine and
 never modifies it.
+
+## Rule profiles (v1.4.0)
+
+### profiles
+
+```bash
+blackjack-coach profiles --list
+blackjack-coach profiles --profile MULTI_DECK_H17_DAS_LS
+```
+
+`--list` shows every profile's key, decks, soft-17 rule, DAS/NDAS, LS/NS, and a
+short description. `--profile <KEY>` shows full detail (name, number of decks,
+dealer soft-17 rule, double-after-split, late surrender, resplit allowed, max
+split hands, hit split aces, blackjack payout, notes, and description).
+
+Rule codes: **H17/S17** = dealer hits/stands on soft 17; **DAS/NDAS** =
+double-after-split allowed / not; **LS/NS** = late surrender / none. The
+`resplit_allowed`, `max_split_hands`, and `hit_split_aces` fields are
+descriptive metadata and do not yet change engine play.
+
+Any profile key can be passed to the other commands via `--profile`, e.g.
+`blackjack-coach diagnose --cards A,7 --dealer 9 --profile SIX_DECK_S17_DAS_LS`.

@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.3.0 feature summary
+## v1.4.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -53,6 +53,9 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 - **Decision diagnostics** (v1.3.0): `diagnose` explains the factors behind a
   recommended play — hand shape, dealer strength, available options, and the
   rule-profile context.
+- **Expanded rule profiles** (v1.4.0): single/double/four/six/eight-deck
+  profiles with H17/S17, DAS/NDAS, LS/NS, plus a `profiles` command to list and
+  inspect them.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -408,6 +411,29 @@ It prints the recommended action plus the **decision factors**: the hand shape
 (double / surrender / split) are available or fall back, and the rule-profile
 (H17/S17) context. It reads the stable strategy engine and never modifies it.
 
+## Expanded rule profiles (v1.4.0)
+
+The coach ships a range of rule profiles for single, double, four, six, and
+eight decks, covering H17/S17, DAS/NDAS, and LS/NS combinations. List and
+inspect them, and pass any profile to the other commands:
+
+```bash
+blackjack-coach profiles --list
+blackjack-coach profiles --profile MULTI_DECK_H17_DAS_LS
+blackjack-coach diagnose --cards A,7 --dealer 9 --profile SIX_DECK_S17_DAS_LS
+```
+
+`profiles --list` shows each profile's key, decks, soft-17 rule, DAS/NDAS,
+LS/NS, and a short description; `profiles --profile <KEY>` shows full detail
+(name, decks, soft-17, DAS, surrender, resplit, max split hands, hit split
+aces, blackjack payout, notes, and description).
+
+Shorthand for the rule codes: **H17/S17** = dealer hits/stands on soft 17;
+**DAS/NDAS** = double-after-split allowed / not allowed; **LS/NS** = late
+surrender / no surrender. Some fields (`resplit_allowed`, `max_split_hands`,
+`hit_split_aces`) are professional **metadata** for description and are not yet
+used to vary engine play; this is stated wherever they appear.
+
 ## Library usage
 
 ```python
@@ -435,11 +461,11 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.3.0 adds **decision intelligence**: a deviation study mode (true-count
-playing deviations) and a `diagnose` command that explains the factors behind
-each recommended play. No changes to the strategy engine, Hi-Lo math,
-simulator, split, or scoring. It is a professional coach for local practice,
-demo money, video games, recreational tournaments, and training.
+v1.4.0 expands the **rule profiles** (single/double/four/six/eight deck, with
+H17/S17, DAS/NDAS, LS/NS) and adds a `profiles` command to list and inspect
+them. No changes to the strategy engine, Hi-Lo math, simulator, split, or
+scoring. It is a professional coach for local practice, demo money, video
+games, recreational tournaments, and training.
 
 Planned next (educational/local only): a possible v2.0 web UI if decided later.
 See
