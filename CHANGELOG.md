@@ -7,6 +7,64 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.16.0] - 2026-06-23
+
+Full player EV decision tree. v1.15.0 made SPLIT/re-split EV strong, but some
+hittable sub-hands still used a one-card-then-stand look-ahead. v1.16.0 replaces
+the HIT look-ahead with a recursive optimal hit/stand tree and unifies every
+legal action's EV into a single player decision tree, so the advisor is more
+professional and less approximate. It remains advisory only and never changes
+the recommendation or the Hi-Lo math.
+
+### Added
+
+- `app/probability_advisor.py`: dataclasses `PlayerDecisionEVEstimate` and
+  `PlayerEVBranch`, plus `estimate_stand_ev_composition`,
+  `estimate_hit_ev_tree` (recursive optimal hit/stand over the remaining
+  composition, memoised and depth-capped), `estimate_double_ev_composition`,
+  `estimate_surrender_ev`, and `estimate_player_decision_tree_ev` (STAND / HIT /
+  DOUBLE / SURRENDER / SPLIT EV in one place, SPLIT delegated to the split
+  estimator).
+- `odds` (composition-aware) now shows a "Player EV decision tree" block (best
+  EV action, EV by action, exactness/approximation note, EV vs recommendation).
+- `coach --show-odds` (composition-aware) shows a compact player EV summary and
+  whether the advisory best-EV action agrees with the coach's recommendation.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.16.0**.
+- `build_composition_aware_advice` now evaluates actions through the recursive
+  player decision tree and exposes a `decision_tree` field; `best_estimated_action`
+  comes from the tree.
+- Split sub-hands (`estimate_subhand_ev_after_split`) now play hittable hands
+  with the recursive hit/stand tree instead of one-card-then-stand; the split
+  approximation note was updated accordingly.
+
+### Quality
+
+- Extended `tests/test_probability_advisor.py` (stand EV: bust = -1, 20 vs 6
+  positive; hit tree: hard 11 positive / no first-card bust, hard 20 poor;
+  double EV scaled; surrender -0.5 when legal and None otherwise; decision tree
+  returns action EVs and a best action; non-pairs exclude SPLIT and pairs
+  include it; advice uses the decision tree; the old one-card wording is gone;
+  `recommend()` unchanged) plus CLI tests for the Player EV decision tree block
+  on `odds` (10,6 / A,7 / 8,8) and `coach --show-odds`. Full suite passing; ruff
+  clean.
+
+### Safety
+
+- The player EV tree cleanly separates the main strategy (unchanged), advisory
+  EV, exact computation (finite-shoe dealer distribution; fully enumerated
+  hit/stand/double/surrender for non-pair hands), and documented approximations
+  (fixed remaining-composition draw probabilities with no intra-hand depletion;
+  dealer distribution from the pre-action shoe; ten-value aggregation; split
+  sub-hand model). It never overrides the recommendation or
+  `strategy_engine.recommend`, makes no change to the Hi-Lo counting math,
+  adaptive learning, guided coaching, outcome history, or session history, adds
+  no external dependencies, and runs no Monte Carlo / slow simulations
+  (deterministic + memoised). No money, bankroll, accounts, tokens, screenshots,
+  or sensitive data.
+
 ## [1.15.0] - 2026-06-23
 
 Composition-aware SPLIT / re-split EV. In v1.14.0 the shoe composition and the

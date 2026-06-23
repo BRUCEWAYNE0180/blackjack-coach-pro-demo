@@ -1790,16 +1790,56 @@ def _odds_compact_lines(advice) -> list[str]:
     ]
     lines += _kv_block(rows)
 
-    # v1.15.0: compact Split EV summary for pairs, and whether the advisory
-    # best-EV action agrees with the coach's recommendation (no override).
-    split_estimate = getattr(advice, "split_estimate", None)
-    if split_estimate is not None and split_estimate.estimated_ev is not None:
-        agrees = (advice.best_estimated_action == advice.recommended_action)
-        lines += _kv_block([
-            ("Split EV", f"{split_estimate.estimated_ev:+.3f}"),
+    # v1.16.0: compact player EV decision-tree summary (best action + whether it
+    # agrees with the coach's recommendation). No automatic override.
+    decision_tree = getattr(advice, "decision_tree", None)
+    if decision_tree is not None and decision_tree.best_action is not None:
+        agrees = (decision_tree.best_action == advice.recommended_action)
+        tree_rows = [
+            ("Player EV best action", decision_tree.best_action),
             ("EV vs recommendation",
              "agrees" if agrees else "differs (recommendation stands)"),
+        ]
+        if not agrees:
+            tree_rows.append((
+                "Note",
+                f"EV favours {decision_tree.best_action}; the coach still "
+                f"recommends {advice.recommended_action}."))
+        lines += _kv_block(tree_rows)
+
+    # Compact Split EV summary for pairs.
+    split_estimate = getattr(advice, "split_estimate", None)
+    if split_estimate is not None and split_estimate.estimated_ev is not None:
+        lines += _kv_block([
+            ("Split EV", f"{split_estimate.estimated_ev:+.3f}"),
         ])
+    return lines
+
+
+def _player_tree_lines(tree, advice) -> list[str]:
+    """Render the v1.16.0 Player EV decision tree block."""
+    lines = ["", format_section("Player EV decision tree")]
+    rows = [
+        ("Best EV action", tree.best_action or "(n/a)"),
+        ("Best EV", "n/a" if tree.best_ev is None else f"{tree.best_ev:+.3f}"),
+        ("Composition aware", "yes" if tree.is_composition_aware else "no"),
+        ("Exact for these rules",
+         "yes" if tree.is_exact_for_supported_rules else "no"),
+    ]
+    lines += _kv_block(rows)
+    lines.append(format_section("EV by action"))
+    for action in sorted(tree.action_evs, key=lambda a: tree.action_evs[a],
+                         reverse=True):
+        lines.append(format_kv(action, f"{tree.action_evs[action]:+.3f}",
+                               width=10))
+    agrees = (tree.best_action == advice.recommended_action)
+    lines.append("")
+    lines.append(format_kv(
+        "EV vs recommendation",
+        "agrees" if agrees else "differs (recommendation stands)"))
+    lines.append(format_kv("Tree note", tree.approximation_note))
+    if tree.warnings:
+        lines.append(format_list(tree.warnings))
     return lines
 
 
@@ -1909,6 +1949,10 @@ def build_odds_output(advice, player_display=None, dealer_display=None,
             f"bust {_pct(est.bust_probability)}",
             width=10,
         ))
+
+    decision_tree = getattr(advice, "decision_tree", None)
+    if decision_tree is not None:
+        lines += _player_tree_lines(decision_tree, advice)
 
     split_estimate = getattr(advice, "split_estimate", None)
     if split_estimate is not None:

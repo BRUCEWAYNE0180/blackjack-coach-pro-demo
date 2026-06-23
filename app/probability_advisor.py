@@ -455,6 +455,7 @@ class CompositionAwareProbabilityAdvice:
     approximation_note: str
     warnings: list[str] = field(default_factory=list)
     split_estimate: SplitEVEstimate | None = None
+    decision_tree: PlayerDecisionEVEstimate | None = None
 
 
 def build_initial_rank_counts(decks: int = 6) -> dict[str, int]:
@@ -855,31 +856,45 @@ def build_composition_aware_advice(
     if pair_hand.is_pair and profile.split_allowed:
         split_estimate = estimate_split_ev_composition(
             player_cards, dealer_upcard, profile, composition, decks=decks)
-        if split_estimate.estimated_ev is not None:
-            action_estimates = [
-                ActionEVEstimate(
-                    action=Action.SPLIT.value,
-                    estimated_ev=split_estimate.estimated_ev,
-                    win_probability=0.0, loss_probability=0.0,
-                    push_probability=0.0, bust_probability=0.0,
-                    note="Composition-aware split / re-split EV (see split "
-                         "estimate).",
-                )
-                if e.action == Action.SPLIT.value else e
-                for e in action_estimates
-            ]
+
+    # v1.16.0: evaluate every legal action through the recursive player EV
+    # decision tree, then override the per-action EVs with the tree's values
+    # (the probability fields stay as a one-card outcome snapshot for context).
+    split_ev = split_estimate.estimated_ev if split_estimate else None
+    decision_tree = estimate_player_decision_tree_ev(
+        player_cards, dealer_upcard, profile, composition,
+        allow_split=True, _split_ev=split_ev)
+
+    def _with_tree_ev(estimate: ActionEVEstimate) -> ActionEVEstimate:
+        tree_ev = decision_tree.action_evs.get(estimate.action)
+        if tree_ev is None:
+            return estimate
+        note = estimate.note
+        if estimate.action == Action.HIT.value:
+            note = "Recursive optimal hit/stand tree EV (probabilities show the "
+            note += "one-card snapshot)."
+        elif estimate.action == Action.SPLIT.value:
+            note = "Composition-aware split / re-split EV (see split estimate)."
+        return ActionEVEstimate(
+            action=estimate.action,
+            estimated_ev=tree_ev,
+            win_probability=estimate.win_probability,
+            loss_probability=estimate.loss_probability,
+            push_probability=estimate.push_probability,
+            bust_probability=estimate.bust_probability,
+            note=note,
+        )
+
+    action_estimates = [_with_tree_ev(e) for e in action_estimates]
 
     scored = [e for e in action_estimates if e.estimated_ev is not None]
-    best_estimated_action = (
+    best_estimated_action = decision_tree.best_action or (
         max(scored, key=lambda e: e.estimated_ev).action if scored else None
     )
 
     warnings = [_COMPOSITION_ADVISORY_WARNING, *comp_warnings]
     if split_estimate is not None:
         warnings.extend(split_estimate.warnings)
-    elif any(e.action == Action.SPLIT.value and e.estimated_ev is None
-             for e in action_estimates):
-        warnings.append(_SPLIT_SIMPLIFIED_WARNING)
     if best_estimated_action and best_estimated_action != recommended_action:
         warnings.append(
             f"Approximate best-EV action ({best_estimated_action}) differs from "
@@ -902,9 +917,10 @@ def build_composition_aware_advice(
         action_estimates=action_estimates,
         best_estimated_action=best_estimated_action,
         composition_note=composition.note,
-        approximation_note=COMPOSITION_APPROXIMATION_NOTE,
+        approximation_note=PLAYER_TREE_APPROXIMATION_NOTE,
         warnings=warnings,
         split_estimate=split_estimate,
+        decision_tree=decision_tree,
     )
 
 
@@ -931,10 +947,11 @@ def build_composition_aware_advice(
 SPLIT_APPROXIMATION_NOTE = (
     "Split/re-split EV uses the exact finite-shoe dealer distribution and "
     "enumerates the re-split tree up to max_split_hands. Split aces that cannot "
-    "be hit are evaluated exactly (one card then stand); hittable sub-hands use "
-    "a one-card-then-stand look-ahead and inter-hand depletion is ignored, so "
-    "those parts stay approximate. Advisory only - it never overrides the "
-    "strategy recommendation."
+    "be hit are evaluated exactly (one card then stand). Hittable sub-hands are "
+    "played out with the recursive optimal hit/stand tree (v1.16.0); the "
+    "remaining simplifications are that intra-hand and inter-hand card depletion "
+    "are ignored, so those parts stay approximate. Advisory only - it never "
+    "overrides the strategy recommendation."
 )
 
 
@@ -1017,11 +1034,16 @@ def estimate_subhand_ev_after_split(
     candidates[Action.STAND.value] = stand_ev
 
     if not aces_locked:
-        hit_ev, _, _, _, _ = _one_card_then_stand_composition(
-            total, is_soft, raw_dist, counts, total_cards)
-        candidates[Action.HIT.value] = hit_ev
+        # v1.16.0: use the recursive optimal hit/stand tree (not one-card).
+        probs = _composition_probs(shoe_composition)
+        tree_memo: dict[tuple[int, bool], float] = {}
+        candidates[Action.HIT.value] = _hit_tree_value(
+            total, is_soft, raw_dist, probs, tree_memo,
+            _PLAYER_TREE_MAX_DEPTH, 0)
         if profile.double_after_split:
-            candidates[Action.DOUBLE.value] = 2.0 * hit_ev
+            one_card_ev, _, _, _, _ = _one_card_then_stand_composition(
+                total, is_soft, raw_dist, counts, total_cards)
+            candidates[Action.DOUBLE.value] = 2.0 * one_card_ev
 
     # Re-split option: a fresh pair, allowed by the profile, under the cap.
     can_resplit_here = (
@@ -1201,4 +1223,288 @@ def compare_pair_actions_ev(
         estimates,
         key=lambda e: (e.estimated_ev is not None, e.estimated_ev or 0.0),
         reverse=True,
+    )
+
+
+
+# ---------------------------------------------------------------------------
+# v1.16.0 - Full player EV decision tree
+#
+# Replaces the one-card-then-stand HIT look-ahead with a recursive optimal
+# hit/stand tree, and unifies STAND / HIT / DOUBLE / SURRENDER / SPLIT EV into a
+# single PlayerDecisionEVEstimate. Hittable split sub-hands reuse the same
+# recursive tree.
+#
+# What is exact vs approximate (see docs/PROJECT_RULES.md):
+#   * The dealer final-total distribution is exact finite-shoe (from v1.14.0).
+#   * HIT is evaluated as a recursive optimal hit/stand tree over the aggregated
+#     ranks, so multi-card draws are no longer truncated to one ply.
+#   * Simplifications kept (documented, advisory only): draws inside the player
+#     tree use fixed remaining-composition probabilities (no intra-hand
+#     depletion); the dealer distribution is taken from the pre-action shoe
+#     (cards the player draws are not removed from it); ten-values are
+#     aggregated; SPLIT delegates to the split estimator (with its own notes).
+# ---------------------------------------------------------------------------
+
+PLAYER_TREE_APPROXIMATION_NOTE = (
+    "Player EV decision tree: STAND uses the exact finite-shoe dealer "
+    "distribution; HIT is a recursive optimal hit/stand tree over the remaining "
+    "composition; DOUBLE is one card then stand (doubled); SURRENDER is -0.5. "
+    "Simplifications (advisory only): player draws use fixed remaining-composition "
+    "probabilities (no intra-hand depletion), the dealer distribution is from the "
+    "pre-action shoe, and ten-values are aggregated. It never overrides the "
+    "strategy recommendation."
+)
+
+# Safety cap on the player's hit recursion. Totals strictly increase (after at
+# most one soft->hard conversion), so the natural depth is small; this is only a
+# guard against pathological inputs.
+_PLAYER_TREE_MAX_DEPTH = 21
+
+
+@dataclass(frozen=True)
+class PlayerEVBranch:
+    """EV of one node in the player's decision tree (advisory)."""
+
+    branch_cards: tuple[str, ...]
+    action: str
+    estimated_ev: float
+    depth: int
+    branch_probability: float
+    branch_note: str = ""
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class PlayerDecisionEVEstimate:
+    """Composition-aware EV of every legal action via the player decision tree."""
+
+    player_cards: tuple[str, ...]
+    dealer_upcard: str
+    profile_key: str
+    decks: int
+    available_actions: list[str]
+    action_evs: dict[str, float]
+    best_action: str | None
+    best_ev: float | None
+    is_composition_aware: bool
+    is_exact_for_supported_rules: bool
+    approximation_note: str
+    warnings: list[str] = field(default_factory=list)
+
+
+def _composition_probs(shoe_composition: ShoeComposition) -> dict[str, float]:
+    """Per-rank draw probabilities from the remaining composition."""
+    total = shoe_composition.total_cards
+    if total <= 0:
+        return {rank: 0.0 for rank in COMPOSITION_RANKS}
+    return {
+        rank: shoe_composition.rank_counts.get(rank, 0) / total
+        for rank in COMPOSITION_RANKS
+    }
+
+
+def _optimal_hand_value(
+    total: int,
+    is_soft: bool,
+    raw_dist: dict[str, float],
+    probs: dict[str, float],
+    memo: dict[tuple[int, bool], float],
+    max_depth: int,
+    depth: int,
+) -> float:
+    """Optimal EV of a hand assuming the player plays hit/stand optimally.
+
+    Memoised on ``(total, is_soft)`` - the transition graph is acyclic (totals
+    only ever increase after at most one soft->hard conversion).
+    """
+    if total > 21:
+        return -1.0
+    key = (total, is_soft)
+    cached = memo.get(key)
+    if cached is not None:
+        return cached
+    stand_value, _, _, _ = _stand_outcome(total, raw_dist)
+    if depth >= max_depth:
+        memo[key] = stand_value
+        return stand_value
+    hit_value = _hit_tree_value(
+        total, is_soft, raw_dist, probs, memo, max_depth, depth)
+    value = max(stand_value, hit_value)
+    memo[key] = value
+    return value
+
+
+def _hit_tree_value(
+    total: int,
+    is_soft: bool,
+    raw_dist: dict[str, float],
+    probs: dict[str, float],
+    memo: dict[tuple[int, bool], float],
+    max_depth: int,
+    depth: int,
+) -> float:
+    """EV of taking at least one more card, then playing optimally."""
+    ev = 0.0
+    for rank in COMPOSITION_RANKS:
+        prob = probs.get(rank, 0.0)
+        if prob <= 0.0:
+            continue
+        new_total, new_soft, busted = _add_card(total, is_soft, rank)
+        if busted:
+            ev += prob * -1.0
+        else:
+            ev += prob * _optimal_hand_value(
+                new_total, new_soft, raw_dist, probs, memo, max_depth, depth + 1)
+    return ev
+
+
+def estimate_stand_ev_composition(
+    player_cards: list[str] | tuple[str, ...],
+    dealer_upcard: RenderedCard | str,
+    profile: RuleProfile = DEFAULT_PROFILE,
+    shoe_composition: ShoeComposition | None = None,
+) -> float:
+    """EV of standing, vs the exact finite-shoe dealer distribution.
+
+    A busted hand returns -1.0.
+    """
+    if shoe_composition is None:
+        shoe_composition = build_shoe_composition(
+            decks=profile.decks, known_cards=[*player_cards, dealer_upcard])
+    ev_hand = evaluate_hand(player_cards)
+    if ev_hand.total > 21:
+        return -1.0
+    raw_dist = _dealer_distribution_composition(
+        dealer_upcard, profile.dealer_hits_soft_17, shoe_composition.rank_counts)
+    stand_value, _, _, _ = _stand_outcome(ev_hand.total, raw_dist)
+    return stand_value
+
+
+def estimate_hit_ev_tree(
+    player_cards: list[str] | tuple[str, ...],
+    dealer_upcard: RenderedCard | str,
+    profile: RuleProfile = DEFAULT_PROFILE,
+    shoe_composition: ShoeComposition | None = None,
+    depth: int = 0,
+    max_depth: int | None = None,
+) -> float:
+    """EV of hitting now, then playing the optimal hit/stand tree afterwards.
+
+    Recurses over the remaining composition; busting a branch scores -1.0.
+    SPLIT is intentionally not explored inside the hit tree (it is handled by
+    the split estimator). Memoised and depth-capped to avoid runaway recursion.
+    """
+    if shoe_composition is None:
+        shoe_composition = build_shoe_composition(
+            decks=profile.decks, known_cards=[*player_cards, dealer_upcard])
+    ev_hand = evaluate_hand(player_cards)
+    if ev_hand.total > 21:
+        return -1.0
+    if max_depth is None:
+        max_depth = _PLAYER_TREE_MAX_DEPTH
+    raw_dist = _dealer_distribution_composition(
+        dealer_upcard, profile.dealer_hits_soft_17, shoe_composition.rank_counts)
+    probs = _composition_probs(shoe_composition)
+    memo: dict[tuple[int, bool], float] = {}
+    return _hit_tree_value(
+        ev_hand.total, ev_hand.is_soft, raw_dist, probs, memo, max_depth, depth)
+
+
+def estimate_double_ev_composition(
+    player_cards: list[str] | tuple[str, ...],
+    dealer_upcard: RenderedCard | str,
+    profile: RuleProfile = DEFAULT_PROFILE,
+    shoe_composition: ShoeComposition | None = None,
+) -> float:
+    """EV of doubling: take exactly one card then stand, stakes doubled."""
+    if shoe_composition is None:
+        shoe_composition = build_shoe_composition(
+            decks=profile.decks, known_cards=[*player_cards, dealer_upcard])
+    ev_hand = evaluate_hand(player_cards)
+    raw_dist = _dealer_distribution_composition(
+        dealer_upcard, profile.dealer_hits_soft_17, shoe_composition.rank_counts)
+    one_card_ev, _, _, _, _ = _one_card_then_stand_composition(
+        ev_hand.total, ev_hand.is_soft, raw_dist,
+        shoe_composition.rank_counts, shoe_composition.total_cards)
+    return 2.0 * one_card_ev
+
+
+def estimate_surrender_ev(profile: RuleProfile = DEFAULT_PROFILE) -> float | None:
+    """EV of late surrender (-0.5) when legal, else ``None``."""
+    return -0.5 if profile.late_surrender else None
+
+
+def estimate_player_decision_tree_ev(
+    player_cards: list[str] | tuple[str, ...],
+    dealer_upcard: RenderedCard | str,
+    profile: RuleProfile = DEFAULT_PROFILE,
+    shoe_composition: ShoeComposition | None = None,
+    allow_split: bool = True,
+    *,
+    _split_ev: float | None = None,
+) -> PlayerDecisionEVEstimate:
+    """Evaluate every legal action's EV via the player decision tree.
+
+    Advisory only - it computes EVs but never changes the recommendation. SPLIT
+    (for pairs, when ``allow_split``) delegates to
+    :func:`estimate_split_ev_composition`.
+    """
+    if shoe_composition is None:
+        shoe_composition = build_shoe_composition(
+            decks=profile.decks, known_cards=[*player_cards, dealer_upcard])
+    decks = shoe_composition.decks
+
+    legal = {a.value for a in legal_actions_for_hand(player_cards, profile)}
+    ev_hand = evaluate_hand(player_cards)
+    is_pair = ev_hand.is_pair
+    action_evs: dict[str, float] = {}
+    warnings: list[str] = []
+
+    if Action.STAND.value in legal:
+        action_evs[Action.STAND.value] = estimate_stand_ev_composition(
+            player_cards, dealer_upcard, profile, shoe_composition)
+    if Action.HIT.value in legal:
+        action_evs[Action.HIT.value] = estimate_hit_ev_tree(
+            player_cards, dealer_upcard, profile, shoe_composition)
+    if Action.DOUBLE.value in legal:
+        action_evs[Action.DOUBLE.value] = estimate_double_ev_composition(
+            player_cards, dealer_upcard, profile, shoe_composition)
+    if Action.SURRENDER.value in legal:
+        surrender = estimate_surrender_ev(profile)
+        if surrender is not None:
+            action_evs[Action.SURRENDER.value] = surrender
+
+    if is_pair and allow_split and Action.SPLIT.value in legal:
+        if _split_ev is None:
+            _split_ev = estimate_split_ev_composition(
+                player_cards, dealer_upcard, profile, shoe_composition,
+                decks=decks).estimated_ev
+        if _split_ev is not None:
+            action_evs[Action.SPLIT.value] = _split_ev
+    elif not is_pair:
+        warnings.append("Not a pair; SPLIT is excluded from the decision tree.")
+
+    best_action = best_ev = None
+    if action_evs:
+        best_action = max(action_evs, key=lambda a: action_evs[a])
+        best_ev = action_evs[best_action]
+
+    return PlayerDecisionEVEstimate(
+        player_cards=tuple(str(c) for c in player_cards),
+        dealer_upcard=str(
+            dealer_upcard.rank if isinstance(dealer_upcard, RenderedCard)
+            else dealer_upcard),
+        profile_key=profile.key,
+        decks=decks,
+        available_actions=sorted(action_evs),
+        action_evs=action_evs,
+        best_action=best_action,
+        best_ev=best_ev,
+        is_composition_aware=True,
+        # Non-pair hit/stand/double/surrender are fully enumerated; pairs still
+        # lean on the (approximate) split sub-hand model.
+        is_exact_for_supported_rules=not is_pair,
+        approximation_note=PLAYER_TREE_APPROXIMATION_NOTE,
+        warnings=warnings,
     )
