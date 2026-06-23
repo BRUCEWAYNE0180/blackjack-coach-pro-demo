@@ -176,6 +176,16 @@ As of v0.9 the project enforces these gates on every change:
   external dependencies, and no money, bankroll, accounts, tokens, screenshots,
   or sensitive data. Confidence must be LOW below 10 total records, and a spot
   with fewer than 5 records must be flagged as a small sample.
+- **Composition-aware probabilities must separate exact, approximate, and
+  advisory.** The composition-aware EV layer (v1.14.0: `app/probability_advisor.py`)
+  must clearly distinguish exact / finite-shoe computation (the dealer
+  distribution from the remaining-card composition), approximation (player
+  HIT/DOUBLE one-card look-ahead and the simplified SPLIT EV), and advisory
+  output. It must not overwrite the main strategy recommendation without
+  explicit validation, must label its approximations, must surface a clear
+  warning for inconsistent / impossible compositions (never negative counts),
+  and must not change `strategy_engine.recommend` or the Hi-Lo counting math. It
+  must stay dependency-free and fast (no large/slow simulations).
 
 ## 8. Release Rules
 

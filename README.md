@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.13.0 feature summary
+## v1.14.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -156,6 +156,8 @@ blackjack-coach learn
 blackjack-coach learn --profile SIX_DECK_H17_DAS_LS
 blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --use-history
 blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --seen-cards 2♣,5♦,K♠,A♥ --composition
 ```
 
 Without installing, run it as a module from the repository root:
@@ -784,6 +786,55 @@ look-ahead) and are for understanding risk only. They **never override** the
 strategy recommendation - if the best-EV action differs, the coach says so and
 keeps the recommendation. `--true-count` and `--decks` are accepted; the global
 `--no-color` / `--plain-cards` flags apply.
+
+## Composition-aware Probability & EV (v1.14.0)
+
+The advisor can use the **actual composition** of the remaining shoe. Tell it
+which cards you know - your cards, the dealer upcard, and any other cards you
+have seen or that were removed - and it sharpens the numbers. The dealer
+final-total distribution is then computed **exactly for that finite shoe**
+(ten-values aggregated, with card depletion as the dealer draws), while player
+HIT/DOUBLE EV uses a one-card look-ahead and stays approximate.
+
+```bash
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --seen-cards 2♣,5♦,K♠,A♥ --composition
+blackjack-coach odds --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS --seen-cards 10♣,10♦,A♥
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --true-count 1 --show-odds --seen-cards 2♣,5♦,K♠,A♥
+```
+
+```text
+=== Probability Advisor ===
+Cards              : 10♠, 6♥
+Dealer upcard      : 10♦
+Composition-aware  : yes
+Cards remaining    : 305
+Removed/known cards: 7
+Recommended action : SURRENDER
+Bust if hit        : 61.6%
+
+-- Shoe composition --
+Total cards remaining: 305
+Rank counts     : 2:23  3:24  ...  10:93  A:23
+```
+
+Flags:
+
+- `--composition-aware` turns on the finite-shoe calculation.
+- `--seen-cards <cards>` lists other exposed/removed cards (e.g.
+  `2♣,5♦,K♠,A♥`) and **auto-enables** composition-aware mode.
+- `--composition` prints the remaining-shoe summary (total cards, removed
+  count, and compact per-rank counts); it implies `--composition-aware`.
+- On `coach`, `--composition-aware` / `--seen-cards` apply when combined with
+  `--show-odds` (and stack with `--true-count`).
+
+This layer **separates exact, approximate, and advisory** clearly: the dealer
+distribution is exact finite-shoe, player HIT/DOUBLE EV is an approximate
+one-card look-ahead, and SPLIT EV is simplified (a full exact split tree
+remains future work). Impossible compositions (e.g. five aces in one deck) are
+flagged with a clear warning. As always, it is **advisory only** and never
+changes `strategy_engine.recommend()` or the Hi-Lo counting math.
 
 ## Adaptive local learning (v1.13.0)
 

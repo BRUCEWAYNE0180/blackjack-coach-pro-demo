@@ -62,7 +62,11 @@ from .outcome_history import (
     save_outcome_record,
     summarize_outcomes,
 )
-from .probability_advisor import build_probability_advice
+from .probability_advisor import (
+    COMPOSITION_RANKS,
+    build_composition_aware_advice,
+    build_probability_advice,
+)
 from .quiz import (
     ACTION_PROMPT,
     QuizResult,
@@ -1595,6 +1599,13 @@ def build_coach_parser() -> argparse.ArgumentParser:
                              "educational deviation study when one applies.")
     parser.add_argument("--show-odds", action="store_true", dest="show_odds",
                         help="Append a compact approximate odds / EV summary.")
+    parser.add_argument("--seen-cards", default=None, dest="seen_cards",
+                        help="Other exposed/removed cards for composition-aware "
+                             "odds (with --show-odds), e.g. '2\u2663,5\u2666'.")
+    parser.add_argument("--composition-aware", action="store_true",
+                        dest="composition_aware",
+                        help="Use composition-aware (finite-shoe) odds with "
+                             "--show-odds.")
     parser.add_argument("--use-history", action="store_true", dest="use_history",
                         help="Append a local-history context block built from "
                              "saved outcomes (never changes the recommendation).")
@@ -1616,11 +1627,22 @@ def _run_coach(argv: Sequence[str]) -> int:
         ranks = cards_mod.cards_to_ranks(cards)
         step = build_coach_step(ranks, dealer_card.rank, profile,
                                 true_count=args.true_count)
-        odds = (
-            build_probability_advice(ranks, dealer_card.rank, profile,
-                                     true_count=args.true_count)
-            if args.show_odds else None
-        )
+        composition_aware = bool(args.composition_aware or args.seen_cards)
+        if args.show_odds and composition_aware:
+            seen_ranks = (
+                cards_mod.cards_to_ranks(cards_mod.parse_cards(args.seen_cards))
+                if args.seen_cards else None
+            )
+            odds = build_composition_aware_advice(
+                ranks, dealer_card.rank, profile,
+                decks=profile.decks, seen_cards=seen_ranks,
+                true_count=args.true_count,
+            )
+        elif args.show_odds:
+            odds = build_probability_advice(ranks, dealer_card.rank, profile,
+                                            true_count=args.true_count)
+        else:
+            odds = None
         history_ctx = (
             build_history_context(ranks, dealer_card.rank, profile,
                                   history_dir=args.history_dir)
@@ -1747,20 +1769,37 @@ def _pct(value: float) -> str:
 
 def _odds_compact_lines(advice) -> list[str]:
     """A compact odds summary for embedding in the coach output."""
+    composition_aware = hasattr(advice, "shoe_composition")
     bust = advice.player_bust_estimate.bust_probability
     dealer_bust = advice.dealer_outcome_estimate.probabilities["dealer_bust"]
+    note = (
+        "composition-aware finite-shoe; advisory only, does not override the "
+        "recommendation"
+        if composition_aware else
+        "approximate advisory; does not override the recommendation"
+    )
     lines = ["", format_section("Odds (approximate)")]
-    lines += _kv_block([
+    rows = [("Composition-aware", "yes" if composition_aware else "no")]
+    if composition_aware:
+        rows.append(("Cards remaining", advice.shoe_composition.total_cards))
+    rows += [
         ("Bust if hit", _pct(bust)),
         ("Dealer bust", _pct(dealer_bust)),
         ("Best estimated action", advice.best_estimated_action or "(n/a)"),
-        ("Note", "approximate advisory; does not override the recommendation"),
-    ])
+        ("Note", note),
+    ]
+    lines += _kv_block(rows)
     return lines
 
 
-def build_odds_output(advice, player_display=None, dealer_display=None) -> str:
-    """Render the full probability / EV advisory for the terminal."""
+def build_odds_output(advice, player_display=None, dealer_display=None,
+                      show_composition=False) -> str:
+    """Render the full probability / EV advisory for the terminal.
+
+    Handles both the idealised :class:`ProbabilityAdvice` and the
+    composition-aware advice (detected by the ``shoe_composition`` attribute).
+    """
+    composition_aware = hasattr(advice, "shoe_composition")
     bust = advice.player_bust_estimate
     dealer = advice.dealer_outcome_estimate.probabilities
     cards_line = (player_display if player_display is not None
@@ -1768,14 +1807,41 @@ def build_odds_output(advice, player_display=None, dealer_display=None) -> str:
     dealer_line = (dealer_display if dealer_display is not None
                    else _render_cards([advice.dealer_upcard]))
     lines = [format_header("Probability Advisor")]
-    lines += _kv_block([
+
+    top_rows = [
         ("Cards", cards_line),
         ("Dealer upcard", dealer_line),
         ("Profile", advice.profile_key),
+    ]
+    if composition_aware:
+        comp = advice.shoe_composition
+        top_rows += [
+            ("Decks", advice.decks),
+            ("Composition-aware", "yes"),
+            ("Cards remaining", comp.total_cards),
+            ("Removed/known cards", comp.removed_cards),
+        ]
+    top_rows += [
         ("Recommended action", advice.recommended_action),
         ("Bust if hit", _pct(bust.bust_probability)),
         ("Dealer bust", _pct(dealer["dealer_bust"])),
-    ])
+    ]
+    lines += _kv_block(top_rows)
+
+    if composition_aware and show_composition:
+        comp = advice.shoe_composition
+        lines.append("")
+        lines.append(format_section("Shoe composition"))
+        lines += _kv_block([
+            ("Total cards remaining", comp.total_cards),
+            ("Removed cards", comp.removed_cards),
+            ("Known/seen cards",
+             ", ".join(comp.known_cards) if comp.known_cards else "(none)"),
+        ])
+        rank_line = "  ".join(
+            f"{rank}:{comp.rank_counts.get(rank, 0)}" for rank in COMPOSITION_RANKS
+        )
+        lines.append(format_kv("Rank counts", rank_line))
 
     lines.append("")
     lines.append(format_section("Dealer final probabilities"))
@@ -1801,11 +1867,13 @@ def build_odds_output(advice, player_display=None, dealer_display=None) -> str:
         ))
 
     lines.append("")
-    lines += _kv_block([
-        ("Best estimated action", advice.best_estimated_action or "(n/a)"),
-        ("Confidence", advice.confidence_label),
-    ])
+    last_rows = [("Best estimated action", advice.best_estimated_action or "(n/a)")]
+    if hasattr(advice, "confidence_label"):
+        last_rows.append(("Confidence", advice.confidence_label))
+    lines += _kv_block(last_rows)
     lines.append("")
+    if composition_aware:
+        lines.append(format_kv("Composition note", advice.composition_note))
     lines.append(format_kv("Approximation", advice.approximation_note))
     if advice.warnings:
         lines.append("")
@@ -1836,6 +1904,16 @@ def build_odds_parser() -> argparse.ArgumentParser:
                         help="Decks for the idealised model (default: 6).")
     parser.add_argument("--true-count", type=float, default=None, dest="true_count",
                         help="Optional true count for the recommended action.")
+    parser.add_argument("--seen-cards", default=None, dest="seen_cards",
+                        help="Other exposed/removed cards, comma-separated, e.g. "
+                             "'2\u2663,5\u2666,K\u2660,A\u2665'. Enables "
+                             "composition-aware mode automatically.")
+    parser.add_argument("--composition-aware", action="store_true",
+                        dest="composition_aware",
+                        help="Use the composition-aware (finite-shoe) calculation.")
+    parser.add_argument("--composition", action="store_true", dest="show_composition",
+                        help="Show the remaining-shoe composition summary "
+                             "(implies --composition-aware).")
     return parser
 
 
@@ -1844,14 +1922,30 @@ def _run_odds(argv: Sequence[str]) -> int:
     parser = build_odds_parser()
     args = parser.parse_args(argv)
 
+    composition_aware = bool(
+        args.composition_aware or args.show_composition or args.seen_cards
+    )
+
     try:
         cards = cards_mod.parse_cards(args.cards)
         dealer_card = cards_mod.parse_card(args.dealer)
         profile = get_profile(args.profile)
-        advice = build_probability_advice(
-            cards_mod.cards_to_ranks(cards), dealer_card.rank, profile,
-            decks=args.decks, true_count=args.true_count,
+        ranks = cards_mod.cards_to_ranks(cards)
+        seen_ranks = (
+            cards_mod.cards_to_ranks(cards_mod.parse_cards(args.seen_cards))
+            if args.seen_cards else None
         )
+        if composition_aware:
+            advice = build_composition_aware_advice(
+                ranks, dealer_card.rank, profile,
+                decks=args.decks, seen_cards=seen_ranks,
+                true_count=args.true_count,
+            )
+        else:
+            advice = build_probability_advice(
+                ranks, dealer_card.rank, profile,
+                decks=args.decks, true_count=args.true_count,
+            )
     except (ValueError, KeyError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
@@ -1860,6 +1954,7 @@ def _run_odds(argv: Sequence[str]) -> int:
         advice,
         player_display=_render_cards(cards),
         dealer_display=_render_cards([dealer_card]),
+        show_composition=args.show_composition,
     ))
     return 0
 
