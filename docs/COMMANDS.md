@@ -771,6 +771,49 @@ flags a **LOW sample / limited data** note. The dashboard uses no external chart
 libraries (trends are plain text / Markdown tables), exports no sensitive data,
 and never changes the strategy recommendation - it only suggests practice.
 
+## Weak-spot drill generator (v1.21.0)
+
+### drill
+
+```bash
+blackjack-coach drill
+blackjack-coach drill --focus pairs --count 10
+blackjack-coach drill --focus ev --profile SIX_DECK_H17_DAS_LS
+blackjack-coach drill --seed 42 --spot 1 --answer HIT
+blackjack-coach drill --focus weak --count 5 --plan-only
+```
+
+Generates focused practice drills from your weak spots, high-loss hands, and
+Strategy-vs-EV disagreement spots (or a small, well-known educational set when
+there is no saved history), then poses a drill and grades your answer. The
+correct play always comes from the strategy engine - drills never duplicate
+rules or change the recommendation.
+
+Behaviour:
+
+- Without `--answer`: builds the plan, prints it, and (unless `--plan-only`)
+  poses the selected drill (default the first) as a question.
+- With `--answer H/S/D/P/R` (or a full name): regenerates the same plan (use
+  `--seed` for a stable order), grades the `--spot` drill (default 1), and
+  prints the result and explanation. An unrecognised action prints a clear
+  error.
+- `--plan-only`: prints the plan only.
+
+Flags:
+
+- `--profile <KEY>` - rule profile for the drills.
+- `--focus weak|pairs|soft|hard|surrender|ev|mixed` - what to drill (default
+  `weak`).
+- `--count N` - maximum number of drills (default 20).
+- `--seed N` - deterministic drill order.
+- `--answer <ACTION>` / `--spot <index>` - answer and grade one drill.
+- `--session-dir` / `--outcome-dir` / `--ev-dir` - read from custom history
+  folders.
+
+With no saved history it uses the educational fallback set and says so clearly.
+Drills are local practice only - they store no sensitive data and never promise
+results.
+
 
 
 

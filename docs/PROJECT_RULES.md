@@ -260,6 +260,17 @@ As of v0.9 the project enforces these gates on every change:
   database. Dashboard files live under the git-ignored `.blackjack_coach/reports`
   tree (unless the user passes an explicit `--output` path) and are never
   committed.
+- **Drills are local practice training built on the engine.** The weak-spot
+  drill generator (v1.21.0: `app/drill_generator.py`, the `drill` command) must
+  obtain the correct action for every drill from the existing
+  `strategy_engine.recommend` / decision audit - it must never duplicate or
+  re-implement strategy rules. It must never change the main strategy
+  recommendation, the Hi-Lo counting math, adaptive learning, guided coaching,
+  outcome / session history, the EV-snapshot history, the Strategy-vs-EV engine,
+  the reporting module, or the dashboard. It suggests and runs practice without
+  promising results, stores / exports no money, bankroll, real bets, accounts,
+  tokens, screenshots, or sensitive/personal data, and stays dependency-free
+  with no network, cloud, or database.
 
 ## 8. Release Rules
 

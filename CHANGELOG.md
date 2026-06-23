@@ -7,6 +7,60 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.21.0] - 2026-06-23
+
+Local weak-spot drill generator. A new `drill` command turns the coach's "what
+to practise" guidance into focused practice sessions: it builds drills from your
+weak spots, high-loss hands, and Strategy-vs-EV disagreement spots (or a small
+educational set when there is no history), poses them, and grades your answer.
+The correct play for every drill comes from the stable strategy engine - this
+never duplicates strategy rules and never changes the recommendation or the
+Hi-Lo math.
+
+### Added
+
+- `app/drill_generator.py`: dataclasses `DrillSpot`, `DrillPlan`, and
+  `DrillResult`, plus `classify_drill_category`, `build_drill_spot_from_hand`
+  (correct action via `strategy_engine.recommend`; supports suited input),
+  `build_drill_plan` (prioritises EV disagreement / weak / high-variance spots
+  from local history with `focus`, `count`, and `seed`; falls back to a
+  well-known educational set), `grade_drill_answer` (accepts H/S/D/P/R or full
+  names), `render_drill_plan`, and `render_drill_result`.
+- CLI `drill` command with `--profile`, `--focus`
+  (weak/pairs/soft/hard/surrender/ev/mixed), `--count`, `--seed`, `--answer`,
+  `--spot`, `--session-dir`, `--outcome-dir`, `--ev-dir`, and `--plan-only`.
+  Without `--answer` it prints the plan and poses a drill; with `--answer` it
+  grades the selected drill. An invalid action prints a clear error.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.21.0**.
+- `dashboard` text / Markdown now point to `drill --focus weak` for practising
+  the highlighted spots (no change to dashboard data).
+
+### Quality
+
+- New suite `tests/test_drill_generator.py` (category classification; spot
+  builder returns the engine's action and supports suited input; no-history
+  fallback; `count` / `seed` determinism; `focus pairs` / `focus hard`
+  filtering; invalid focus raises; answer grading for H/HIT, correct, and
+  incorrect; plan / result renderers; and that building drills never changes
+  `recommend()`) plus `TestCliDrill` in `tests/test_cli.py` for the `drill`
+  command (no-history plan + question, `--plan-only`, `--focus pairs --count`,
+  `--seed`/`--spot`/`--answer`, the invalid-answer error, `--profile`, and
+  `--version` = 1.21.0). Full suite passing; ruff clean.
+
+### Safety
+
+- Drills are **local practice training** only: the correct play always comes
+  from the existing strategy engine (no duplicated rules), and the generator
+  never changes `strategy_engine.recommend`, the Hi-Lo math, adaptive learning,
+  guided coaching, outcome / session history, the EV-snapshot history, the
+  Strategy-vs-EV engine, the reporting module, or the dashboard. It stores no
+  money, bankroll, real bets, accounts, tokens, screenshots, or any
+  sensitive/personal data, suggests practice without promising results, and uses
+  no external dependencies, network, cloud, or database.
+
 ## [1.20.0] - 2026-06-23
 
 Local per-profile training dashboard & trends. A new `dashboard` command turns

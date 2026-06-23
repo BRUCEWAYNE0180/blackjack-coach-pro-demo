@@ -51,6 +51,12 @@ from .deviations import (
     normalize_true_count,
     recommend_with_deviation,
 )
+from .drill_generator import (
+    build_drill_plan,
+    grade_drill_answer,
+    render_drill_plan,
+    render_drill_result,
+)
 from .ev_explainer import (
     GAP_LARGE,
     GAP_MEDIUM,
@@ -2588,6 +2594,100 @@ def _run_dashboard(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_drill_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'drill' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli drill",
+        description=(
+            "Generate and practise focused drills from your weak spots, EV "
+            "disagreements, and history (or a base educational set). The correct "
+            "play always comes from the strategy engine; drills never change the "
+            "recommendation (educational / local only)."
+        ),
+    )
+    parser.add_argument("--profile", default=None, choices=sorted(PROFILES),
+                        help="Rule profile for the drills.")
+    parser.add_argument("--focus", default="weak",
+                        help="Focus: weak|pairs|soft|hard|surrender|ev|mixed "
+                             "(default: weak).")
+    parser.add_argument("--count", type=int, default=20,
+                        help="Maximum number of drills (default: 20).")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Seed for a deterministic drill order.")
+    parser.add_argument("--answer", default=None,
+                        help="Your action for the selected drill: H/S/D/P/R "
+                             "(or full name). Grades that drill.")
+    parser.add_argument("--spot", type=int, default=1,
+                        help="1-based index of the drill to answer (default: 1).")
+    parser.add_argument("--session-dir", default=None, dest="session_dir",
+                        help="Session history directory.")
+    parser.add_argument("--outcome-dir", default=None, dest="outcome_dir",
+                        help="Outcome history directory.")
+    parser.add_argument("--ev-dir", default=None, dest="ev_dir",
+                        help="EV snapshot directory.")
+    parser.add_argument("--plan-only", action="store_true", dest="plan_only",
+                        help="Only print the drill plan; do not pose a drill.")
+    return parser
+
+
+def _run_drill(argv: Sequence[str]) -> int:
+    """Handle the 'drill' weak-spot practice subcommand."""
+    parser = build_drill_parser()
+    args = parser.parse_args(argv)
+
+    if args.count <= 0:
+        print("Error: --count must be >= 1.", file=sys.stderr)
+        return 2
+
+    try:
+        plan = build_drill_plan(
+            profile_key=args.profile,
+            focus=args.focus,
+            count=args.count,
+            session_dir=args.session_dir,
+            outcome_dir=args.outcome_dir,
+            ev_dir=args.ev_dir,
+            seed=args.seed,
+        )
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    # Answer mode: grade the selected drill.
+    if args.answer is not None:
+        if not plan.spots:
+            print("Error: no drills available to answer.", file=sys.stderr)
+            return 2
+        if args.spot < 1 or args.spot > len(plan.spots):
+            print(f"Error: --spot must be between 1 and {len(plan.spots)}.",
+                  file=sys.stderr)
+            return 2
+        spot = plan.spots[args.spot - 1]
+        try:
+            result = grade_drill_answer(spot, args.answer)
+        except ValueError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print(render_drill_result(result))
+        return 0
+
+    # Plan mode: print the plan, and (unless --plan-only) pose the first spot.
+    print(render_drill_plan(plan))
+    if not args.plan_only and plan.spots:
+        index = args.spot if 1 <= args.spot <= len(plan.spots) else 1
+        spot = plan.spots[index - 1]
+        cards_text = ", ".join(spot.player_cards)
+        print("")
+        print(format_section(f"Drill {index}"))
+        print(format_kv("Hand", f"{cards_text} vs {spot.dealer_upcard}"))
+        print(format_kv("Profile", spot.profile_key))
+        print(format_kv(
+            "Question",
+            "What is the best play? Re-run with --answer H/S/D/P/R "
+            f"--spot {index} to check."))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -2614,6 +2714,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli ev-review --limit 20               (Strategy-vs-EV review)
         python -m app.cli report --format markdown --print   (exportable report)
         python -m app.cli dashboard --profile SIX_DECK_H17_DAS_LS (profile dashboard)
+        python -m app.cli drill --focus weak --count 5         (practice drills)
         python -m app.cli coach --cards A,7 --dealer 9       (direct advice)
         python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
         python -m app.cli odds --cards 10,6 --dealer 10      (probability advisor)
@@ -2678,6 +2779,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_report(args[1:])
     if args and args[0] == "dashboard":
         return _run_dashboard(args[1:])
+    if args and args[0] == "drill":
+        return _run_drill(args[1:])
     if args and args[0] == "coach":
         return _run_coach(args[1:])
     if args and args[0] == "coach-play":
