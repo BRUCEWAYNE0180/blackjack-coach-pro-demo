@@ -11,3 +11,6 @@ __pycache__/
 .venv/
 venv/
 env/
+
+# Local practice session history (never committed)
+.blackjack_coach/

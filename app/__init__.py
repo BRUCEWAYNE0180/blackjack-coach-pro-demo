@@ -52,6 +52,17 @@ from .rules import (
     RuleProfile,
     get_profile,
 )
+from .session_history import (
+    HistorySummary,
+    SessionRecord,
+    build_session_record,
+    default_history_dir,
+    ensure_history_dir,
+    list_session_records,
+    load_session_record,
+    save_session_record,
+    summarize_history,
+)
 from .shoe import (
     build_shoe,
     cards_remaining,
@@ -83,7 +94,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -93,6 +104,7 @@ __all__ = [
     "DEFAULT_PROFILE",
     "HandEvaluation",
     "HandOutcome",
+    "HistorySummary",
     "MULTI_DECK_H17_DAS_LS",
     "MULTI_DECK_S17_DAS_LS",
     "PROFILES",
@@ -103,8 +115,10 @@ __all__ = [
     "QuizSessionResult",
     "Recommendation",
     "RuleProfile",
+    "SessionRecord",
     "SimulatedHand",
     "SplitSubHand",
+    "build_session_record",
     "build_shoe",
     "build_strategy_questions",
     "can_split_hand",
@@ -113,7 +127,9 @@ __all__ = [
     "counting_summary",
     "deal_initial_hand",
     "decks_remaining",
+    "default_history_dir",
     "draw_card",
+    "ensure_history_dir",
     "evaluate_hand",
     "explain_action",
     "explain_insurance_no",
@@ -131,6 +147,8 @@ __all__ = [
     "grade_strategy_answer",
     "hilo_value",
     "is_counting_allowed_context",
+    "list_session_records",
+    "load_session_record",
     "normalize_rank",
     "normalize_user_action",
     "penetration",
@@ -141,10 +159,12 @@ __all__ = [
     "resolve_outcome",
     "run_count_session",
     "run_strategy_session",
+    "save_session_record",
     "should_take_insurance",
     "shuffle_shoe",
     "simulate_training_hand",
     "split_initial_hand",
+    "summarize_history",
     "true_count",
     "update_running_count",
     "update_running_count_many",

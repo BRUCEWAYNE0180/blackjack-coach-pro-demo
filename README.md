@@ -18,7 +18,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.1.0 feature summary
+## v1.2.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -40,6 +40,8 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   `blackjack-coach` command, with CI and modern packaging.
 - **Polished terminal output** (v1.1.0): clear headers, aligned key/value
   rows, visible pass/fail badges, and percentage summaries.
+- **Local session history** (v1.2.0): optionally save scored sessions to local
+  JSON files and review your progress with `blackjack-coach history`.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -321,9 +323,39 @@ Weak spots:       Q2 (A,9,3)
 Note:             You answered 2/3 running counts correctly. ...
 ```
 
-Omit `--answers` in either command to be prompted per question/batch. Sessions
-are **not** saved (no files, no database, no login) and are **educational
-practice only**.
+Omit `--answers` in either command to be prompted per question/batch.
+
+## Local session history (v1.2.0)
+
+Add `--save` to a session to store a small JSON **summary** locally, then
+review your progress with `history`:
+
+```bash
+blackjack-coach quiz-session --questions 10 --seed 42 --answers H,S,D,H,R,S,H,D,P,S --save
+blackjack-coach history
+```
+
+Example `history` output:
+
+```text
+=== Practice History ===
+========================
+Total sessions  : 2
+Average accuracy: 50.0%
+Best accuracy   : 100.0%
+Worst accuracy  : 0.0%
+
+-- Most common weak spots --
+  - hard (x1)
+  - hit (x1)
+```
+
+Files are written to `./.blackjack_coach/history` by default; override with
+`--history-dir <path>` (on a session) or `--dir <path>` (on `history`), and
+limit the summary with `history --limit N`. The history stores **only a
+summary** (mode, totals, accuracy, weak spots) — never money, bankroll, bets,
+accounts, or personal data — and the `.blackjack_coach/` folder is git-ignored
+so nothing is committed.
 
 ## Library usage
 
@@ -352,13 +384,13 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.1.0 builds on the stable v1.0.0 release with **terminal visual polish**
-(clearer CLI output) and no logic changes. It remains an educational, local,
-well-tested trainer with modern packaging and CI.
+v1.2.0 adds **local session history** (opt-in JSON summaries + a `history`
+command) on top of v1.1.0's terminal polish, with no changes to strategy,
+counting, simulation, split, or scoring logic. It remains an educational,
+local, well-tested trainer with modern packaging and CI.
 
-Planned next (educational/local only): v1.2 saved local session history, v1.3
-advanced count deviations (educational only), and a possible v2.0 web UI if
-decided later. See
+Planned next (educational/local only): v1.3 advanced count deviations
+(educational only), and a possible v2.0 web UI if decided later. See
 [`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
 for the full roadmap.
 

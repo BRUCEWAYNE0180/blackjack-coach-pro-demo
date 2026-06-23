@@ -353,3 +353,66 @@ class TestCliCountSession:
         err = capsys.readouterr().err
         assert exit_code == 2
         assert "Error" in err
+
+
+
+class TestCliSessionHistory:
+    def test_quiz_session_save_creates_file(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "quiz-session", "--questions", "3", "--seed", "42",
+            "--answers", "H,S,D", "--save", "--history-dir", str(tmp_path),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Saved" in out
+        files = list(tmp_path.glob("session_*.json"))
+        assert len(files) == 1
+
+    def test_count_session_save_creates_file(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "count-session", "--batches", "2,5,K|A,9,3|10,6,2",
+            "--answers", "1,0,1", "--save", "--history-dir", str(tmp_path),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Saved" in out
+        assert len(list(tmp_path.glob("session_*.json"))) == 1
+
+    def test_history_shows_total_sessions(self, capsys, tmp_path):
+        # Save two sessions, then summarise them.
+        cli.main(["quiz-session", "--questions", "3", "--seed", "42",
+                  "--answers", "H,S,D", "--save", "--history-dir", str(tmp_path)])
+        cli.main(["count-session", "--batches", "2,5,K|A,9,3",
+                  "--answers", "1,0", "--save", "--history-dir", str(tmp_path)])
+        capsys.readouterr()  # clear
+        exit_code = cli.main(["history", "--dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Practice History ===" in out
+        assert "Total sessions  : 2" in out
+        assert "Average accuracy" in out
+        assert "Best accuracy" in out
+        assert "Worst accuracy" in out
+
+    def test_history_empty_dir(self, capsys, tmp_path):
+        exit_code = cli.main(["history", "--dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "No saved sessions yet" in out
+
+    def test_history_limit_respected(self, capsys, tmp_path):
+        # Save three sessions; --limit 0 should summarise none.
+        for _ in range(3):
+            cli.main(["count-session", "--batches", "2,5,K",
+                      "--answers", "1", "--save", "--history-dir", str(tmp_path)])
+        capsys.readouterr()
+        exit_code = cli.main(["history", "--dir", str(tmp_path), "--limit", "0"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "No saved sessions yet" in out
+
+        # --limit 2 should summarise only two of the three sessions.
+        exit_code = cli.main(["history", "--dir", str(tmp_path), "--limit", "2"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total sessions  : 2" in out
