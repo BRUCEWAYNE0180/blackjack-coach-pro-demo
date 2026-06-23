@@ -56,6 +56,19 @@ from .drill_generator import (
     render_drill_plan,
     render_drill_result,
 )
+from .drill_history import (
+    DrillReviewSummary,
+    DrillSessionRecord,
+    DrillSpotHistory,
+    build_drill_session_record,
+    build_spot_history,
+    default_drill_history_dir,
+    ensure_drill_history_dir,
+    list_drill_session_records,
+    load_drill_session_record,
+    save_drill_session_record,
+    summarize_drill_history,
+)
 from .ev_explainer import (
     DisagreementExplanationSummary,
     EVGapCategory,
@@ -193,7 +206,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.21.0"
+__version__ = "1.22.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -223,6 +236,9 @@ __all__ = [
     "DrillPlan",
     "DrillResult",
     "DrillSpot",
+    "DrillReviewSummary",
+    "DrillSessionRecord",
+    "DrillSpotHistory",
     "FOUR_DECK_H17_DAS_LS",
     "HandEvaluation",
     "HandOutcome",
@@ -276,6 +292,14 @@ __all__ = [
     "grade_drill_answer",
     "render_drill_plan",
     "render_drill_result",
+    "build_drill_session_record",
+    "build_spot_history",
+    "default_drill_history_dir",
+    "ensure_drill_history_dir",
+    "list_drill_session_records",
+    "load_drill_session_record",
+    "save_drill_session_record",
+    "summarize_drill_history",
     "can_double_after_split",
     "can_hit_split_aces",
     "can_resplit",

@@ -814,6 +814,34 @@ With no saved history it uses the educational fallback set and says so clearly.
 Drills are local practice only - they store no sensitive data and never promise
 results.
 
+### drill --save / --review (v1.22.0)
+
+```bash
+blackjack-coach drill --seed 42 --spot 1 --answer HIT --save
+blackjack-coach drill --review
+blackjack-coach drill --review --due-only
+blackjack-coach drill --profile SIX_DECK_H17_DAS_LS --review
+```
+
+v1.22.0 adds a local drill-session history and a spaced-review summary:
+
+- `--save` (with `--drill-dir <path>`): save the graded drill result to the
+  local drill-session history and print the saved path. It **requires
+  `--answer`** (there is nothing to grade otherwise); `--save` without
+  `--answer` prints `--save requires --answer`. Sessions are stored under
+  `./.blackjack_coach/drill_sessions` by default.
+- `--review`: show the drill review instead of posing a new drill - total
+  sessions, attempts, overall accuracy, weak / mastered spots, the
+  due-for-review list, and practice recommendations. Mastery levels: NEW
+  (< 2 attempts), WEAK (< 60%), LEARNING (60-85%), MASTERED (>= 85% over >= 3
+  attempts). With no saved sessions it prints "No saved drill sessions yet. Use
+  drill --answer <ACTION> --save first."
+- `--review --due-only`: show only the spots that still need review.
+- `--profile <KEY>`: scope the review to one rule profile.
+
+The drill history is local practice training only - it stores no sensitive data,
+never changes the correct answers or the recommendation, and is never committed.
+
 
 
 

@@ -57,6 +57,12 @@ from .drill_generator import (
     render_drill_plan,
     render_drill_result,
 )
+from .drill_history import (
+    build_drill_session_record,
+    list_drill_session_records,
+    save_drill_session_record,
+    summarize_drill_history,
+)
 from .ev_explainer import (
     GAP_LARGE,
     GAP_MEDIUM,
@@ -2627,7 +2633,66 @@ def build_drill_parser() -> argparse.ArgumentParser:
                         help="EV snapshot directory.")
     parser.add_argument("--plan-only", action="store_true", dest="plan_only",
                         help="Only print the drill plan; do not pose a drill.")
+    parser.add_argument("--save", action="store_true",
+                        help="Save the graded drill result to the local drill "
+                             "session history (requires --answer).")
+    parser.add_argument("--drill-dir", default=None, dest="drill_dir",
+                        help="Drill session directory (default: "
+                             "./.blackjack_coach/drill_sessions).")
+    parser.add_argument("--review", action="store_true",
+                        help="Show the drill review summary (mastery / spaced "
+                             "review) instead of posing a new drill.")
+    parser.add_argument("--due-only", action="store_true", dest="due_only",
+                        help="With --review, show only spots due for review.")
     return parser
+
+
+def build_drill_review_output(summary, due_only: bool = False) -> str:
+    """Render a drill review summary (mastery / spaced review) for the terminal."""
+    lines = [format_header("Drill Review")]
+    if summary.total_sessions == 0:
+        lines.append("No saved drill sessions yet. Use drill --answer <ACTION> "
+                     "--save first.")
+        lines.append("")
+        lines.append(format_kv("Data quality", summary.data_quality_note))
+        return "\n".join(lines)
+
+    lines += _kv_block([
+        ("Total sessions", summary.total_sessions),
+        ("Total attempts", summary.total_attempts),
+        ("Overall accuracy", format_percentage(summary.overall_accuracy)),
+        ("Newest session", summary.newest_session_id or "(n/a)"),
+    ])
+
+    if due_only:
+        lines.append("")
+        lines.append(format_section("Due for review"))
+        lines.append(format_list(summary.due_review_spots or ["(none - all caught up)"]))
+        lines.append("")
+        lines.append(format_kv("Data quality", summary.data_quality_note))
+        return "\n".join(lines)
+
+    lines.append("")
+    lines.append(format_section("Weak spots"))
+    lines.append(format_list(summary.weak_spots or ["(none)"]))
+    lines.append("")
+    lines.append(format_section("Mastered spots"))
+    lines.append(format_list(summary.mastered_spots or ["(none)"]))
+    lines.append("")
+    lines.append(format_section("Due for review"))
+    lines.append(format_list(summary.due_review_spots or ["(none - all caught up)"]))
+    lines.append("")
+    lines.append(format_section("Practice recommendations"))
+    lines.append(format_list(summary.practice_recommendations))
+    lines.append("")
+    lines.append(format_kv("Data quality", summary.data_quality_note))
+    if summary.warnings:
+        lines.append("")
+        lines.append(format_section("Warnings"))
+        lines.append(format_list(summary.warnings))
+    lines.append("")
+    lines.append(SCOPE_FOOTER)
+    return "\n".join(lines)
 
 
 def _run_drill(argv: Sequence[str]) -> int:
@@ -2635,8 +2700,20 @@ def _run_drill(argv: Sequence[str]) -> int:
     parser = build_drill_parser()
     args = parser.parse_args(argv)
 
+    # Review mode: show the drill session history / mastery summary.
+    if args.review:
+        records = list_drill_session_records(
+            history_dir=args.drill_dir, profile_key=args.profile)
+        summary = summarize_drill_history(records)
+        print(build_drill_review_output(summary, due_only=args.due_only))
+        return 0
+
     if args.count <= 0:
         print("Error: --count must be >= 1.", file=sys.stderr)
+        return 2
+
+    if args.save and args.answer is None:
+        print("Error: --save requires --answer", file=sys.stderr)
         return 2
 
     try:
@@ -2669,6 +2746,12 @@ def _run_drill(argv: Sequence[str]) -> int:
             print(f"Error: {exc}", file=sys.stderr)
             return 2
         print(render_drill_result(result))
+        if args.save:
+            record = build_drill_session_record(
+                plan, [result], profile_key=plan.profile_key)
+            path = save_drill_session_record(record, args.drill_dir)
+            print("")
+            print(format_kv("Saved drill session", str(path)))
         return 0
 
     # Plan mode: print the plan, and (unless --plan-only) pose the first spot.

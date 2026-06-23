@@ -271,6 +271,19 @@ As of v0.9 the project enforces these gates on every change:
   promising results, stores / exports no money, bankroll, real bets, accounts,
   tokens, screenshots, or sensitive/personal data, and stays dependency-free
   with no network, cloud, or database.
+- **Drill history is local training only.** The drill-session history and spaced
+  review (v1.22.0: `app/drill_history.py`, the `drill --save` / `drill --review`
+  flags) are local and read-only. They must never re-derive or change the
+  correct answers (these always come from the existing drill results / strategy
+  engine), and must never change `strategy_engine.recommend`, the Hi-Lo counting
+  math, adaptive learning, guided coaching, outcome / session history, the
+  EV-snapshot history, the Strategy-vs-EV engine, the reporting module, the
+  dashboard, or the drill generator. They store no money, bankroll, real bets,
+  accounts, tokens, screenshots, or sensitive/personal data, suggest review
+  without promising results, and stay dependency-free with no network, cloud, or
+  database. Drill-session files live under the git-ignored
+  `.blackjack_coach/drill_sessions` tree (unless the user passes a `--drill-dir`
+  path) and are never committed.
 
 ## 8. Release Rules
 

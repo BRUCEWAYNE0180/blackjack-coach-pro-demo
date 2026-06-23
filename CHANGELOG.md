@@ -7,6 +7,61 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.22.0] - 2026-06-23
+
+Local drill-session history & spaced review. The v1.21.0 drill generator can now
+**remember** your graded drills: save them with `drill --answer ... --save`, and
+`drill --review` computes per-spot mastery (NEW / WEAK / LEARNING / MASTERED) and
+suggests what to review next - a light, local spaced-repetition layer. It never
+re-derives the correct play (that always comes from the strategy engine) and
+never changes the recommendation or the Hi-Lo math.
+
+### Added
+
+- `app/drill_history.py`: dataclasses `DrillSessionRecord`, `DrillSpotHistory`,
+  and `DrillReviewSummary`, plus `default_drill_history_dir`,
+  `ensure_drill_history_dir`, `build_drill_session_record` (from a `DrillPlan` +
+  graded `DrillResult`s), `save_drill_session_record`,
+  `load_drill_session_record`, `list_drill_session_records` (with `limit` /
+  `profile_key`), `build_spot_history` (groups by spot / profile and assigns a
+  mastery level), and `summarize_drill_history` (mastered / weak / due-review
+  spots, overall accuracy, a data-quality note, and practice recommendations).
+- CLI `drill` flags `--save`, `--drill-dir`, `--review`, and `--due-only`.
+  `drill --answer ... --save` saves the graded result and prints the path;
+  `drill --review` shows the mastery / spaced-review summary; `--due-only`
+  narrows it to spots still needing work. `--save` without `--answer` prints a
+  clear error, and `--review` with no history prints a clear message.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.22.0**.
+- `dashboard` text / Markdown now also point to `drill --review` (no dashboard
+  data change).
+
+### Quality
+
+- New suite `tests/test_drill_history.py` (correct / incorrect / accuracy in a
+  session record; save/load roundtrip; `list` with `limit` and `profile_key`;
+  per-spot grouping; mastery NEW / WEAK / LEARNING / MASTERED; empty and
+  populated summaries; weak / mastered detection; no sensitive field names; and
+  that building history never changes `recommend()`) plus `TestCliDrillHistory`
+  in `tests/test_cli.py` for the `drill --save` / `--review` / `--due-only`
+  flows, the `--save` requires-`--answer` error, the no-history message, and a
+  profile-scoped review. Full suite passing; ruff clean.
+
+### Safety
+
+- Drill history is **local practice training** only. It never re-derives or
+  changes the correct answers (these come from the existing drill results /
+  strategy engine) and never changes `strategy_engine.recommend`, the Hi-Lo
+  math, adaptive learning, guided coaching, outcome / session history, the
+  EV-snapshot history, the Strategy-vs-EV engine, reporting, the dashboard, or
+  the drill generator. Records store no money, bankroll, real bets, accounts,
+  tokens, screenshots, or any sensitive/personal data, and suggest review
+  without promising results. Saved files live under the git-ignored
+  `.blackjack_coach/drill_sessions` tree (unless a `--drill-dir` is given) and
+  are never committed. No external dependencies, no network / cloud / database.
+
 ## [1.21.0] - 2026-06-23
 
 Local weak-spot drill generator. A new `drill` command turns the coach's "what

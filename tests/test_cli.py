@@ -1406,11 +1406,11 @@ class TestCliEVSnapshotHistory:
         assert exit_code == 0
         assert "No saved EV snapshots yet" in out
 
-    def test_version_prints_1_21_0(self, capsys):
+    def test_version_prints_1_22_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.21.0"
+        assert out.strip() == "blackjack-coach 1.22.0"
 
 
 
@@ -1733,11 +1733,11 @@ class TestCliDashboard:
         assert out_file.exists()
         assert str(out_file) in out
 
-    def test_version_prints_1_21_0(self, capsys):
+    def test_version_prints_1_22_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.21.0"
+        assert out.strip() == "blackjack-coach 1.22.0"
 
 
 
@@ -1817,8 +1817,87 @@ class TestCliDrill:
         assert exit_code == 0
         assert "Profile     : SIX_DECK_H17_DAS_LS" in out
 
-    def test_version_prints_1_21_0(self, capsys):
+    def test_version_prints_1_22_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.21.0"
+        assert out.strip() == "blackjack-coach 1.22.0"
+
+
+
+class TestCliDrillHistory:
+    """v1.22.0 drill session history & spaced review."""
+
+    def test_drill_answer_save_creates_file(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "drill", "--seed", "42", "--spot", "1", "--answer", "HIT", "--save",
+            "--drill-dir", str(tmp_path),
+            "--session-dir", str(tmp_path / "s"),
+            "--outcome-dir", str(tmp_path / "o"),
+            "--ev-dir", str(tmp_path / "e"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Saved drill session" in out
+        assert len(list(tmp_path.glob("drill_session_*.json"))) == 1
+
+    def test_drill_save_without_answer_errors(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "drill", "--save", "--drill-dir", str(tmp_path),
+            "--session-dir", str(tmp_path / "s"),
+            "--outcome-dir", str(tmp_path / "o"),
+            "--ev-dir", str(tmp_path / "e"),
+        ])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "--save requires --answer" in err
+
+    def test_drill_review_no_data_message(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "drill", "--review", "--drill-dir", str(tmp_path / "empty"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Drill Review ===" in out
+        assert "No saved drill sessions yet" in out
+
+    def test_drill_review_with_data_shows_total(self, capsys, tmp_path):
+        for seed in (1, 2):
+            cli.main([
+                "drill", "--seed", str(seed), "--spot", "1", "--answer", "HIT",
+                "--save", "--drill-dir", str(tmp_path),
+                "--session-dir", str(tmp_path / "s"),
+                "--outcome-dir", str(tmp_path / "o"),
+                "--ev-dir", str(tmp_path / "e"),
+            ])
+        capsys.readouterr()
+        exit_code = cli.main(["drill", "--review", "--drill-dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total sessions  : 2" in out
+        assert "Practice recommendations" in out
+
+    def test_drill_review_due_only(self, capsys, tmp_path):
+        cli.main([
+            "drill", "--seed", "1", "--spot", "1", "--answer", "HIT",
+            "--save", "--drill-dir", str(tmp_path),
+            "--session-dir", str(tmp_path / "s"),
+            "--outcome-dir", str(tmp_path / "o"),
+            "--ev-dir", str(tmp_path / "e"),
+        ])
+        capsys.readouterr()
+        exit_code = cli.main([
+            "drill", "--review", "--due-only", "--drill-dir", str(tmp_path),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Due for review" in out
+
+    def test_drill_profile_review_works(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "drill", "--profile", "SIX_DECK_H17_DAS_LS", "--review",
+            "--drill-dir", str(tmp_path / "empty"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Drill Review ===" in out
