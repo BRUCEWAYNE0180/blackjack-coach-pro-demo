@@ -39,11 +39,13 @@ through v0.6.
   count, and `CountingState` (educational / simulated practice only).
 - `app/shoe.py` — Virtual multi-deck shoe: build, shuffle (seedable), draw,
   cards/decks remaining, penetration, and deck validation.
-- `app/simulator.py` — Local training simulator: deals hands from the shoe and
-  ties together the evaluator, strategy engine, and counting (`SimulatedHand`,
-  `deal_initial_hand`, `simulate_training_hand`).
-- `app/cli.py` — Terminal trainer (`python -m app.cli`, plus `count` and
-  `simulate` subcommands).
+- `app/simulator.py` — Local training simulator: deals hands from the shoe,
+  plays a full hand against the dealer (H17/S17), and resolves the outcome.
+  Ties together the evaluator, strategy engine, and counting (`SimulatedHand`,
+  `deal_initial_hand`, `simulate_training_hand`, `HandOutcome`, `PlayedHand`,
+  `play_dealer_hand`, `resolve_outcome`, `play_training_hand`).
+- `app/cli.py` — Terminal trainer (`python -m app.cli`, plus `count`,
+  `simulate`, and `play` subcommands).
 - `tests/` — Behavioural tests for the evaluator, engine, explanations,
   counting, shoe, simulator, and CLI.
 
@@ -140,7 +142,7 @@ Delivered (educational / simulated practice only):
 Deferred to later versions: count-based deviations (Illustrious 18 / Fab 4),
 insurance index, and bet sizing.
 
-### v0.4 — Local Shoe Simulator (current)
+### v0.4 — Local Shoe Simulator (done)
 
 Delivered (educational / simulated practice only):
 
@@ -196,13 +198,66 @@ Delivered (educational / simulated practice only):
   camera/video, no screen scraping, and no promise of winnings. No external
   data (PDFs/screenshots/feeds).
 
-### v0.5 — Visual / UI Layer
+### v0.5 — Complete Hand Simulator (current)
+
+Delivered (educational / simulated practice only):
+
+- **`HandOutcome`** enum — `PLAYER_WIN`, `DEALER_WIN`, `PUSH`, `PLAYER_BUST`,
+  `DEALER_BUST`, `SURRENDER`.
+- **`PlayedHand`** dataclass — player cards, dealer cards, actions taken, final
+  outcome (or `None` when a split was indicated), running count before/after,
+  true count after, the recommendations consulted, plus note and warnings.
+- **`play_dealer_hand(shoe, dealer_cards, profile)`** — the dealer draws to a
+  hard 17+, and on soft 17 hits under **H17** but stands under **S17**.
+- **`resolve_outcome(player_cards, dealer_cards, surrendered=False)`** — maps a
+  finished hand to a `HandOutcome` (player bust loses first; naturals are
+  treated simply as 21, with no payout modelling since no money is involved).
+- **`play_training_hand(decks=6, seed=None, profile=DEFAULT_PROFILE)`** — plays
+  one full hand using a simplified single-hand model:
+  - `SURRENDER` ends the hand; `DOUBLE` takes exactly one card then stands;
+    `HIT` draws until strategy says stand or the hand busts; `STAND` ends the
+    turn.
+  - The dealer reveals its hole card and plays only if the player did not
+    surrender, bust, or hit a split.
+  - The running count is updated with **visible** cards as they appear; the
+    dealer hole card counts once revealed.
+- **CLI `play` subcommand:**
+
+  ```bash
+  python -m app.cli play --decks 6 --seed 42
+  ```
+
+  Prints the starting cards, dealer upcard, actions taken, final player and
+  dealer cards, outcome, running count before/after, true count after, and an
+  educational note. The strategy, `count`, and `simulate` commands are
+  unchanged.
+- **Tests** — H17 hits soft 17 / S17 stands soft 17, each `resolve_outcome`
+  result (player/dealer bust, push, player/dealer win, surrender),
+  `play_training_hand` returning a `PlayedHand`, and the CLI `play` flow; all
+  earlier tests remain green.
+
+**Dealer H17 / S17**
+
+- The dealer's only decision is whether to draw. It always draws below 17 and
+  stands on hard 17+. On soft 17 the behaviour follows the profile.
+
+**Limitations / out of scope for v0.5**
+
+- **Pair-splitting is not played out.** When basic strategy indicates SPLIT,
+  the hand is recorded with a `SPLIT_NOT_IMPLEMENTED` marker and ends with a
+  clear note; no money and no split rounds are simulated.
+- No betting spread, no Kelly bet sizing, no Illustrious 18, no insurance index.
+- No web app.
+- Never for real tables: no casino connectivity, no real-money betting, no
+  camera/video, no screen scraping, and no promise of winnings.
+
+### v0.6 — Visual / UI Layer
 
 - Interactive strategy charts and quiz/flashcard UX.
 - Progress tracking and accuracy stats per hand category.
 - Groundwork for a web app front end.
 
-### v0.6 — Web App & Polish
+### v0.7 — Web App & Polish
 
 - Browser-based practice app over the existing engine and simulator.
 - Profile selection, drill history, and shareable practice sessions.
