@@ -7,7 +7,7 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
 > any camera/video at a real table, and makes **no** promise of winnings.
 > See [`docs/PROJECT_RULES.md`](docs/PROJECT_RULES.md).
 
-## What it does (v0.5)
+## What it does (v0.6)
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -19,7 +19,8 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
 - Includes a **local shoe simulator** that deals hands from a virtual shoe so
   you can practise basic strategy and counting together, fully offline.
 - **Plays a full hand against the dealer** (H17/S17 dealer logic + outcome
-  resolution) in a simplified single-hand educational model.
+  resolution), including **basic pair splits**, in a simplified educational
+  single-hand model.
 - Ships a simple **command-line trainer**.
 
 ## Requirements
@@ -156,9 +157,20 @@ Note:                  ... educational practice ...
 ```
 
 Possible outcomes: `PLAYER_WIN`, `DEALER_WIN`, `PUSH`, `PLAYER_BUST`,
-`DEALER_BUST`, `SURRENDER`. **Pair-splitting is out of scope for v0.5**: when
-basic strategy says SPLIT, the hand is recorded and ends without being played
-out. No money is ever involved.
+`DEALER_BUST`, `SURRENDER`. No money is ever involved.
+
+### Pair splits (v0.6)
+
+When basic strategy says SPLIT on a pair, the simulator now plays it out: the
+pair is divided into two hands, each gets a new card, and each is played
+independently. The dealer then plays **once** and each sub-hand is resolved
+against the dealer's final hand. The CLI prints the original hand, both split
+hands with their actions and outcomes, and the dealer's final cards.
+
+**Out of scope for v0.6:** re-splitting (if a split hand could split again it is
+played as a normal total, with a warning) and special split-Aces rules (Aces
+are split but played normally, with a warning). There is no money, bankroll,
+betting units, or payout modelling.
 
 ## Library usage
 
@@ -182,10 +194,10 @@ ruff check app tests   # lint (if ruff is installed)
 
 ## Scope and roadmap
 
-v0.5 adds **full-hand play** against the dealer (H17/S17 dealer logic + outcome
-resolution) on top of the v0.4 local shoe simulator, the v0.3 Hi-Lo trainer,
-and the v0.2 basic-strategy coach. **Out of scope** for now: pair-splitting in
-the simulator, betting spread, Kelly bet sizing, the Illustrious 18, insurance
-index plays, and a web app. See
+v0.6 adds **basic pair-split play** to the local simulator on top of v0.5's
+full-hand play, the v0.4 shoe simulator, the v0.3 Hi-Lo trainer, and the v0.2
+basic-strategy coach. **Out of scope** for now: re-splitting, special
+split-Aces rules, betting spread, Kelly bet sizing, the Illustrious 18,
+insurance index plays, and a web/UI layer. See
 [`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
-for the full v0.1-v0.6 roadmap.
+for the full roadmap.

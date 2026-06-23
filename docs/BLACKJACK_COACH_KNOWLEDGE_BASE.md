@@ -40,10 +40,12 @@ through v0.6.
 - `app/shoe.py` — Virtual multi-deck shoe: build, shuffle (seedable), draw,
   cards/decks remaining, penetration, and deck validation.
 - `app/simulator.py` — Local training simulator: deals hands from the shoe,
-  plays a full hand against the dealer (H17/S17), and resolves the outcome.
-  Ties together the evaluator, strategy engine, and counting (`SimulatedHand`,
-  `deal_initial_hand`, `simulate_training_hand`, `HandOutcome`, `PlayedHand`,
-  `play_dealer_hand`, `resolve_outcome`, `play_training_hand`).
+  plays a full hand against the dealer (H17/S17), plays basic pair splits, and
+  resolves the outcome. Ties together the evaluator, strategy engine, and
+  counting (`SimulatedHand`, `deal_initial_hand`, `simulate_training_hand`,
+  `HandOutcome`, `PlayedHand`, `play_dealer_hand`, `resolve_outcome`,
+  `play_training_hand`, `SplitSubHand`, `PlayedSplitHand`, `can_split_hand`,
+  `split_initial_hand`, `play_split_subhand`).
 - `app/cli.py` — Terminal trainer (`python -m app.cli`, plus `count`,
   `simulate`, and `play` subcommands).
 - `tests/` — Behavioural tests for the evaluator, engine, explanations,
@@ -198,7 +200,7 @@ Delivered (educational / simulated practice only):
   camera/video, no screen scraping, and no promise of winnings. No external
   data (PDFs/screenshots/feeds).
 
-### v0.5 — Complete Hand Simulator (current)
+### v0.5 — Complete Hand Simulator (done)
 
 Delivered (educational / simulated practice only):
 
@@ -251,13 +253,59 @@ Delivered (educational / simulated practice only):
 - Never for real tables: no casino connectivity, no real-money betting, no
   camera/video, no screen scraping, and no promise of winnings.
 
-### v0.6 — Visual / UI Layer
+### v0.6 — Split Hand Simulator (current)
+
+Delivered (educational / simulated practice only):
+
+- **`can_split_hand(player_cards)`** — true for a two-card pair (including any
+  two ten-valued cards, e.g. K,Q).
+- **`split_initial_hand(shoe, player_cards)`** — divides a pair into two hands
+  and deals one new (visible) card to each.
+- **`SplitSubHand`** dataclass — one split hand's `cards`, `actions_taken`,
+  `final_outcome`, `recommendations`, and `is_complete`.
+- **`play_split_subhand(shoe, subhand_cards, dealer_upcard, profile,
+  running_count)`** — plays one sub-hand: no surrender after a split; DOUBLE
+  honours `profile.double_after_split` and takes one card then stands; HIT
+  draws until stand or bust. If strategy would re-split, a
+  `RESPLIT_NOT_IMPLEMENTED` marker is recorded and the hand is played as a
+  normal total instead.
+- **`PlayedSplitHand`** dataclass — the original pair, the dealer's final
+  cards, the two `split_hands`, plus `actions_by_hand`, `outcomes_by_hand`,
+  `recommendations_by_hand`, running count before/after, true count after,
+  note, and warnings.
+- **`play_training_hand`** now returns a `PlayedSplitHand` when the opening
+  recommendation is SPLIT on a real pair: both sub-hands are played, the dealer
+  reveals its hole card and plays **once**, and each sub-hand is resolved
+  against the dealer's final hand. The running count is updated with visible
+  cards as they appear.
+- **CLI** — `python -m app.cli play` prints the split layout (original hand,
+  both split hands with actions and outcomes, dealer final cards, counts, and
+  warnings) when a split occurs.
+- **Tests** — `can_split_hand` (8,8 and K,Q true; 10,9 false), split deal
+  creating two hands and shrinking the shoe, `play_split_subhand` completeness,
+  a split seed returning a `PlayedSplitHand` with two outcomes, the dealer
+  playing once, and split-Aces / re-split warning paths; all earlier tests
+  remain green.
+
+**Limitations / out of scope for v0.6**
+
+- **Re-splitting is not modelled** (a split hand that could split again is
+  played as a normal total, with a warning).
+- **Special split-Aces rules** (one card per Ace, no re-split) are not
+  modelled; Aces are split but played normally, with a warning.
+- No money, bankroll, betting units, or payout modelling. Double-after-split is
+  honoured only insofar as `profile.double_after_split` allows a normal double.
+- No betting spread, no Kelly, no Illustrious 18, no insurance index, no UI.
+- Never for real tables: no casino connectivity, no real-money betting, no
+  camera/video, no screen scraping, and no promise of winnings.
+
+### v0.7 — Visual / UI Layer
 
 - Interactive strategy charts and quiz/flashcard UX.
 - Progress tracking and accuracy stats per hand category.
 - Groundwork for a web app front end.
 
-### v0.7 — Web App & Polish
+### v0.8 — Web App & Polish
 
 - Browser-based practice app over the existing engine and simulator.
 - Profile selection, drill history, and shareable practice sessions.
