@@ -138,6 +138,13 @@ tool relies on and the project's evolution.
   `summarize_practice_pack_history`, and
   `render_practice_pack_progress_summary`. Records pack completion / accuracy /
   streaks locally; never changes the correct answers or the recommendation.
+- `app/repeat_pack.py` — Local repeat-pack generator for missed spots:
+  `RepeatPackItem`, `RepeatPack`, `RepeatPackExport`, plus `build_repeat_pack`,
+  `build_repeat_pack_item_from_spot`, `render_repeat_pack`,
+  `render_repeat_pack_markdown`, and `export_repeat_pack`. Combines the
+  practice-pack completion history (missed / skipped / low-accuracy spots) with
+  the review queue and an educational fallback; the correct play comes from the
+  strategy engine, so it never duplicates rules or changes the recommendation.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -166,7 +173,8 @@ tool relies on and the project's evolution.
   `deviation-quiz`, `diagnose`, `profiles`, `split-rules`, `matrix`,
   `audit`, `outcomes`, `coach`, `coach-play`, `odds`, `learn`, `ev-review`,
   `report`, and `dashboard` subcommands, plus `drill` (with `--save` /
-  `--review`) and `review-queue` and `practice-pack`; `odds`/`coach --show-odds` accept
+  `--review`) and `review-queue` and `practice-pack` (with `--complete` /
+  `--progress`) and `repeat-pack`; `odds`/`coach --show-odds` accept
   `--explain-ev` and `ev-review` accepts `--explain` / `--large-gaps-only`).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
@@ -1368,7 +1376,7 @@ without promising results, keeps exported files under the git-ignored
 `.blackjack_coach/reports` tree (unless an `--output` path is given), and uses no
 external dependencies, network, cloud, or database.
 
-### v1.25.0 — Practice Pack Completion History (current)
+### v1.25.0 — Practice Pack Completion History (done)
 
 Builds on the v1.24.0 daily practice pack. The generator could create a pack but
 not record whether it was done; v1.25.0 adds a local completion history (items
@@ -1403,6 +1411,41 @@ review scheduler, or the practice-pack generator. Per `PROJECT_RULES.md` it
 stores no sensitive data, keeps files under the git-ignored
 `.blackjack_coach/practice_packs` tree (unless a `--pack-dir` is given), and uses
 no external dependencies, network, cloud, or database.
+
+### v1.26.0 — Repeat Pack for Missed Spots (current)
+
+Builds on the v1.25.0 completion history. The history could summarise progress
+but did not turn missed spots back into practice; v1.26.0 adds a `repeat-pack`
+command that rebuilds a focused session from the spots the user keeps getting
+wrong. It stays local, read-only, deterministic with a seed, and never changes
+play.
+
+Delivered:
+
+- **`app/repeat_pack.py`**: `RepeatPackItem`, `RepeatPack`, and
+  `RepeatPackExport`, plus `build_repeat_pack` (priority: missed / low-accuracy
+  spots -> skipped -> due review-queue items -> educational fallback;
+  reconstructs hands from spot ids; correct action from the drill generator /
+  strategy engine; `count` / `seed` / spot-id de-duplication),
+  `build_repeat_pack_item_from_spot`, `render_repeat_pack`,
+  `render_repeat_pack_markdown` (a checklist), and `export_repeat_pack`.
+- **CLI**: new `repeat-pack` command with `--profile`, `--count`, `--seed`,
+  `--today`, `--pack-dir`, `--drill-dir`, `--markdown`, `--export`, and
+  `--output`.
+- **Tests**: new `tests/test_repeat_pack.py` and `TestCliRepeatPack` in
+  `tests/test_cli.py`.
+
+**Limits / honesty:** the repeat pack is local practice training. The correct
+play for every item comes from the existing strategy engine via the drill
+generator (no strategy logic is duplicated), and it never changes
+`strategy_engine.recommend`, the Hi-Lo math, adaptive learning, guided coaching,
+outcome / session history, the EV-snapshot history, the Strategy-vs-EV engine,
+reporting, the dashboard, the drill generator, the drill history, the review
+scheduler, the practice-pack generator, or the practice-pack completion history.
+Per `PROJECT_RULES.md` it stores no sensitive data, suggests practice without
+promising results, keeps exported files under the git-ignored
+`.blackjack_coach/reports` tree (unless an `--output` path is given), and uses no
+external dependencies, network, cloud, or database.
 
 ### v2.0 — Possible Web UI (if decided later)
 

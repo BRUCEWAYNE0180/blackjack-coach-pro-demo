@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.25.0 feature summary
+## v1.26.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -142,6 +142,11 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   completion rate, accuracy), and `practice-pack --progress` summarises pack
   **streaks** and progress over time. Local and read-only; it never changes the
   correct answers or the recommendation.
+- **Repeat pack for missed spots** (v1.26.0): `repeat-pack` builds a focused
+  session from the spots you keep missing (recently / repeatedly missed,
+  low-accuracy, and skipped), with a starter educational set when there is no
+  missed history. Reproducible with `--seed`, exportable to Markdown. Local and
+  read-only; it never changes the correct answers or the recommendation.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -400,6 +405,31 @@ chooses where completions are stored (default
 clearly. Completion records are a local summary only - no money, accounts, or
 sensitive data - and are never committed.
 
+## Repeat Pack for Missed Spots (v1.26.0)
+
+`repeat-pack` builds a focused session from the spots you keep getting wrong,
+using your practice-pack completion history (v1.25.0): recently missed,
+repeatedly missed, low-accuracy, and skipped spots, topped up with the review
+queue and a starter educational set when there is no missed history. The correct
+play for every item comes from the strategy engine - it never changes it.
+
+```bash
+blackjack-coach repeat-pack
+blackjack-coach repeat-pack --count 10
+blackjack-coach repeat-pack --profile SIX_DECK_H17_DAS_LS
+blackjack-coach repeat-pack --today 2026-06-23 --seed 42
+blackjack-coach repeat-pack --markdown
+blackjack-coach repeat-pack --export --output repeat_pack.md
+```
+
+`--count` caps the items; `--seed` makes the pack deterministic; `--profile`
+scopes it; `--today YYYY-MM-DD` drives the due-review top-up; `--pack-dir` /
+`--drill-dir` point at custom history folders; `--markdown` prints a checklist;
+and `--export` (with optional `--output`) saves it under
+`./.blackjack_coach/reports`. With no missed history it prints a starter
+educational pack and says so. After repeating, record results with
+`practice-pack --complete --correct-spots ... --missed-spots ...`.
+
 ## Terminal visual polish (v1.1.0)
 
 v1.1.0 makes the CLI clearer and more pleasant to practise with. Output now has
@@ -503,6 +533,8 @@ blackjack-coach practice-pack --focus due --count 10
 blackjack-coach practice-pack --markdown
 blackjack-coach practice-pack --complete
 blackjack-coach practice-pack --progress
+blackjack-coach repeat-pack
+blackjack-coach repeat-pack --markdown
 ```
 
 Without installing, run it as a module from the repository root:

@@ -141,6 +141,16 @@ from .quiz import (
     run_count_session,
     run_strategy_session,
 )
+from .repeat_pack import (
+    RepeatPack,
+    RepeatPackExport,
+    RepeatPackItem,
+    build_repeat_pack,
+    build_repeat_pack_item_from_spot,
+    export_repeat_pack,
+    render_repeat_pack,
+    render_repeat_pack_markdown,
+)
 from .reporting import (
     ExportedReport,
     ReportSummary,
@@ -242,7 +252,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.25.0"
+__version__ = "1.26.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -283,6 +293,9 @@ __all__ = [
     "PracticePackItem",
     "PracticePackCompletionRecord",
     "PracticePackProgressSummary",
+    "RepeatPack",
+    "RepeatPackExport",
+    "RepeatPackItem",
     "FOUR_DECK_H17_DAS_LS",
     "HandEvaluation",
     "HandOutcome",
@@ -366,6 +379,11 @@ __all__ = [
     "render_practice_pack_progress_summary",
     "save_practice_pack_completion_record",
     "summarize_practice_pack_history",
+    "build_repeat_pack",
+    "build_repeat_pack_item_from_spot",
+    "export_repeat_pack",
+    "render_repeat_pack",
+    "render_repeat_pack_markdown",
     "can_double_after_split",
     "can_hit_split_aces",
     "can_resplit",

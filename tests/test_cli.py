@@ -1406,11 +1406,11 @@ class TestCliEVSnapshotHistory:
         assert exit_code == 0
         assert "No saved EV snapshots yet" in out
 
-    def test_version_prints_1_25_0(self, capsys):
+    def test_version_prints_1_26_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.25.0"
+        assert out.strip() == "blackjack-coach 1.26.0"
 
 
 
@@ -1733,11 +1733,11 @@ class TestCliDashboard:
         assert out_file.exists()
         assert str(out_file) in out
 
-    def test_version_prints_1_25_0(self, capsys):
+    def test_version_prints_1_26_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.25.0"
+        assert out.strip() == "blackjack-coach 1.26.0"
 
 
 
@@ -1817,11 +1817,11 @@ class TestCliDrill:
         assert exit_code == 0
         assert "Profile     : SIX_DECK_H17_DAS_LS" in out
 
-    def test_version_prints_1_25_0(self, capsys):
+    def test_version_prints_1_26_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.25.0"
+        assert out.strip() == "blackjack-coach 1.26.0"
 
 
 
@@ -2006,11 +2006,11 @@ class TestCliReviewQueue:
         assert out_file.exists()
         assert "Saved review queue" in out
 
-    def test_version_prints_1_25_0(self, capsys):
+    def test_version_prints_1_26_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.25.0"
+        assert out.strip() == "blackjack-coach 1.26.0"
 
 
 
@@ -2080,11 +2080,11 @@ class TestCliPracticePack:
         assert out_file.exists()
         assert "Saved practice pack" in out
 
-    def test_version_prints_1_25_0(self, capsys):
+    def test_version_prints_1_26_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.25.0"
+        assert out.strip() == "blackjack-coach 1.26.0"
 
 
 
@@ -2169,8 +2169,75 @@ class TestCliPracticePackHistory:
         assert "Saved practice pack" in out
         assert "Saved pack completion" in out
 
-    def test_version_prints_1_25_0(self, capsys):
+    def test_version_prints_1_26_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.25.0"
+        assert out.strip() == "blackjack-coach 1.26.0"
+
+
+
+class TestCliRepeatPack:
+    """v1.26.0 repeat pack for missed spots."""
+
+    def test_repeat_pack_no_data_starter(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "repeat-pack", "--count", "4",
+            "--pack-dir", str(tmp_path / "p"), "--drill-dir", str(tmp_path / "dr"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Repeat Pack ===" in out
+        assert "starter educational repeat pack" in out
+
+    def test_repeat_pack_count(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "repeat-pack", "--count", "10", "--pack-dir", str(tmp_path / "p"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Repeat Pack ===" in out
+
+    def test_repeat_pack_profile(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "repeat-pack", "--profile", "SIX_DECK_H17_DAS_LS",
+            "--pack-dir", str(tmp_path / "p"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Repeat Pack ===" in out
+
+    def test_repeat_pack_today_seed(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "repeat-pack", "--today", "2026-06-23", "--seed", "42",
+            "--pack-dir", str(tmp_path / "p"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Date        : 2026-06-23" in out
+
+    def test_repeat_pack_markdown(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "repeat-pack", "--markdown", "--pack-dir", str(tmp_path / "p"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "# Blackjack Coach Pro Demo - Repeat Pack" in out
+        assert "## Repeat checklist" in out
+
+    def test_repeat_pack_export_output(self, capsys, tmp_path):
+        out_file = tmp_path / "repeat_pack.md"
+        exit_code = cli.main([
+            "repeat-pack", "--export", "--output", str(out_file),
+            "--pack-dir", str(tmp_path / "p"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert out_file.exists()
+        assert "Saved repeat pack" in out
+
+    def test_version_prints_1_26_0(self, capsys):
+        exit_code = cli.main(["--version"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert out.strip() == "blackjack-coach 1.26.0"

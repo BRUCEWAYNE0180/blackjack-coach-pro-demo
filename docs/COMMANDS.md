@@ -947,6 +947,45 @@ The completion history is local practice training only - it stores no sensitive
 data, never changes the correct answers or the strategy recommendation, and is
 never committed.
 
+## Repeat pack for missed spots (v1.26.0)
+
+### repeat-pack
+
+```bash
+blackjack-coach repeat-pack
+blackjack-coach repeat-pack --count 10
+blackjack-coach repeat-pack --profile SIX_DECK_H17_DAS_LS
+blackjack-coach repeat-pack --today 2026-06-23 --seed 42
+blackjack-coach repeat-pack --markdown
+blackjack-coach repeat-pack --export --output repeat_pack.md
+```
+
+Builds a focused repeat session from your practice-pack completion history: the
+spots you keep getting wrong. Priority: recently / repeatedly missed spots and
+low-accuracy spots, then skipped spots, then due review-queue items, then a
+starter educational set when there is no missed history. The correct play for
+every item comes from the strategy engine - the pack never re-derives or changes
+it.
+
+Flags:
+
+- `--profile <KEY>` - rule profile for the pack.
+- `--count N` - maximum number of items (default 20).
+- `--seed N` - deterministic pack order.
+- `--today YYYY-MM-DD` - treat this date as today (for the due-review top-up).
+- `--pack-dir <path>` - practice-pack completion directory (default
+  `./.blackjack_coach/practice_packs`).
+- `--drill-dir <path>` - drill session directory (for the review top-up).
+- `--markdown` - print a Markdown checklist instead of text.
+- `--export` / `--output <path>` - save a Markdown file (default under
+  `./.blackjack_coach/reports`) and print the path.
+
+With no missed history it prints "No missed practice pack history yet. Using
+starter educational repeat pack." The repeat pack is local practice only - it
+stores no sensitive data, never changes the correct answers or the strategy
+recommendation, and is never committed. After repeating, record results with
+`practice-pack --complete --correct-spots ... --missed-spots ...`.
+
 
 
 

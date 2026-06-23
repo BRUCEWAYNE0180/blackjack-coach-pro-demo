@@ -7,6 +7,61 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.26.0] - 2026-06-23
+
+Local repeat pack for missed spots. Using the practice-pack completion history
+(v1.25.0), the new `repeat-pack` command builds a focused session from the spots
+the user keeps getting wrong: recently / repeatedly missed spots, low-accuracy
+spots, and skipped spots (topped up with the review queue, or a starter
+educational set when there is no missed history). The correct play for every
+item comes from the strategy engine - no strategy logic is duplicated, and
+nothing changes the recommendation or the Hi-Lo math.
+
+### Added
+
+- `app/repeat_pack.py`: dataclasses `RepeatPackItem`, `RepeatPack`, and
+  `RepeatPackExport`, plus `build_repeat_pack` (priority: missed / low-accuracy
+  spots -> skipped -> due review-queue items -> educational fallback, with
+  `profile_key` / `count` / `today` / `seed` and spot-id de-duplication;
+  reconstructs hands from spot ids and gets the correct action from the drill
+  generator / strategy engine), `build_repeat_pack_item_from_spot`,
+  `render_repeat_pack`, `render_repeat_pack_markdown` (a checklist), and
+  `export_repeat_pack`.
+- CLI `repeat-pack` command with `--profile`, `--count`, `--seed`, `--today`,
+  `--pack-dir`, `--drill-dir`, `--markdown`, `--export`, and `--output`. With no
+  missed history it prints a starter educational repeat pack.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.26.0**.
+
+### Quality
+
+- New suite `tests/test_repeat_pack.py` (starter pack with no history; `count`
+  respected; `seed` determinism; prioritises missed spots; includes skipped
+  spots; profile filter; no duplicate spot ids; engine-sourced action; item
+  helper; text + Markdown renderers; export saves a file; no sensitive field
+  names; and that building a pack never changes `recommend()`) plus
+  `TestCliRepeatPack` in `tests/test_cli.py` for the `repeat-pack` command
+  (starter pack, `--count`, `--profile`, `--today`/`--seed`, `--markdown`,
+  `--export --output`, and `--version` = 1.26.0). Full suite passing; ruff
+  clean.
+
+### Safety
+
+- The repeat pack is **local practice training** only. The correct play for
+  every item comes from the existing strategy engine (via the drill generator);
+  no strategy logic is duplicated. It never changes `strategy_engine.recommend`,
+  the Hi-Lo math, adaptive learning, guided coaching, outcome / session history,
+  the EV-snapshot history, the Strategy-vs-EV engine, reporting, the dashboard,
+  the drill generator, the drill history, the review scheduler, the
+  practice-pack generator, or the practice-pack completion history. It stores /
+  exports no money, bankroll, real bets, accounts, tokens, screenshots, or any
+  sensitive/personal data, suggests practice without promising results, and uses
+  no external dependencies, network, cloud, or database. Exported packs live
+  under the git-ignored `.blackjack_coach/reports` tree (unless an explicit
+  `--output` path is given) and are never committed.
+
 ## [1.25.0] - 2026-06-23
 
 Local practice-pack completion history. The v1.24.0 daily practice pack can now
