@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 
 from .hand_evaluator import card_value, evaluate_hand
 from .rules import DEFAULT_PROFILE, RuleProfile
+from .split_rules import explain_split_rules, is_pair_hand
 from .strategy_engine import recommend
 
 
@@ -101,6 +102,33 @@ def _option_factors(ev, profile: RuleProfile, two_cards: bool) -> list[str]:
     return factors
 
 
+def _split_rule_factors(cards, profile: RuleProfile) -> list[str]:
+    """Describe profile-aware split rules for the hand."""
+    decision = explain_split_rules(cards, profile)
+    factors = [
+        f"Split rules: {'pair' if decision.is_pair else 'not a pair'}; "
+        f"split {'allowed' if decision.can_split else 'not applicable/allowed'} "
+        f"({decision.reason})"
+    ]
+    if decision.is_pair:
+        factors.append(
+            "Split details: "
+            f"resplit {'allowed' if decision.resplit_allowed else 'not allowed'}, "
+            f"up to {decision.max_split_hands} hands, "
+            f"double-after-split {'allowed' if decision.double_after_split else 'not allowed'}."
+        )
+    if decision.is_aces:
+        if decision.hit_split_aces:
+            factors.append(
+                "Split aces: this rule set allows hitting split aces."
+            )
+        else:
+            factors.append(
+                "Split aces: each receives one card only (no hitting) here."
+            )
+    return factors
+
+
 def _profile_factor(profile: RuleProfile) -> str:
     """Describe the soft-17 and profile context."""
     soft17 = "hits" if profile.dealer_hits_soft_17 else "stands on"
@@ -131,6 +159,10 @@ def explain_decision_factors(
         _hand_type_factor(ev),
         _dealer_factor(up_value),
         *_option_factors(ev, profile, two_cards),
+        *(
+            _split_rule_factors(ev.cards, profile)
+            if is_pair_hand(ev.cards) else []
+        ),
         _profile_factor(profile),
     ]
 

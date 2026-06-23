@@ -81,3 +81,22 @@ class TestEngineUnmodified:
         explain_decision_factors(["A", "7"], "9", H17)
         after = recommend(["A", "7"], "9", H17).action.value
         assert before == after
+
+
+
+class TestSplitRuleFactors:
+    def test_pair_eights_split_context(self):
+        diag = explain_decision_factors(["8", "8"], "10", H17)
+        text = _factors_text(diag)
+        assert "split rules" in text
+        assert "resplit" in text
+        assert "double-after-split" in text
+
+    def test_pair_aces_split_aces_context(self):
+        diag = explain_decision_factors(["A", "A"], "6", H17)
+        text = _factors_text(diag)
+        assert "split aces" in text
+
+    def test_non_pair_has_no_split_rule_factor(self):
+        diag = explain_decision_factors(["10", "6"], "10", H17)
+        assert "split rules:" not in _factors_text(diag)

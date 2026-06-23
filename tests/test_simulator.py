@@ -1,11 +1,14 @@
 """Tests for app.simulator (local training simulator)."""
 
+from dataclasses import replace as _replace
+
 import pytest
 
 from app.counting import hilo_value
 from app.rules import MULTI_DECK_H17_DAS_LS, MULTI_DECK_S17_DAS_LS
 from app.shoe import build_shoe, shuffle_shoe
 from app.simulator import (
+    RESPLIT_NOT_IMPLEMENTED,
     HandOutcome,
     PlayedHand,
     PlayedSplitHand,
@@ -286,3 +289,51 @@ class TestPlayTrainingHandSplit:
             RESPLIT_NOT_IMPLEMENTED in actions for actions in hand.actions_by_hand
         )
         assert any("re-split" in w for w in hand.warnings)
+
+
+
+# Seed 164 deals a pair of Aces; seed 428 produces a re-split scenario.
+ACES_SEED = 164
+RESPLIT_SEED = 428
+
+
+class TestProfileAwareSplits:
+    def test_split_aces_no_hit_gets_one_card(self):
+        hand = play_training_hand(decks=6, seed=ACES_SEED, profile=H17)
+        assert hand.original_player_cards == ("A", "A")
+        for sub in hand.split_hands:
+            assert sub.actions_taken == ["ONE_CARD"]
+            assert len(sub.cards) == 2  # exactly one card added to the ace
+        assert any("one card" in w.lower() for w in hand.warnings)
+
+    def test_split_aces_hit_allowed_plays_normally(self):
+        profile = _replace(H17, hit_split_aces=True)
+        hand = play_training_hand(decks=6, seed=ACES_SEED, profile=profile)
+        for sub in hand.split_hands:
+            assert "ONE_CARD" not in sub.actions_taken
+        assert any("allows hitting split aces" in w.lower() for w in hand.warnings)
+
+    def test_subhand_no_double_when_das_disallowed(self):
+        ndas = _replace(H17, double_after_split=False)
+        shoe = shuffle_shoe(build_shoe(2), seed=3)
+        # 11 vs 6 would normally double; without DAS it must not double.
+        sub, _ = play_split_subhand(shoe, ["5", "6"], "6", ndas, 0)
+        assert "DOUBLE" not in sub.actions_taken
+
+    def test_subhand_double_when_das_allowed(self):
+        shoe = shuffle_shoe(build_shoe(2), seed=3)
+        sub, _ = play_split_subhand(shoe, ["5", "6"], "6", H17, 0)
+        assert "DOUBLE" in sub.actions_taken
+
+    def test_locked_split_ace_subhand(self):
+        # allow_hit=False keeps the two cards and marks the hand complete.
+        sub, rc = play_split_subhand([], ["A", "9"], "6", H17, 0, allow_hit=False)
+        assert sub.actions_taken == ["ONE_CARD"]
+        assert sub.cards == ("A", "9")
+        assert sub.is_complete is True
+
+    def test_resplit_blocked_warning(self):
+        no_resplit = _replace(H17, resplit_allowed=False)
+        hand = play_training_hand(decks=6, seed=RESPLIT_SEED, profile=no_resplit)
+        if any(RESPLIT_NOT_IMPLEMENTED in a for a in hand.actions_by_hand):
+            assert any("not allowed" in w.lower() for w in hand.warnings)

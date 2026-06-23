@@ -206,3 +206,23 @@ descriptive metadata and do not yet change engine play.
 
 Any profile key can be passed to the other commands via `--profile`, e.g.
 `blackjack-coach diagnose --cards A,7 --dealer 9 --profile SIX_DECK_S17_DAS_LS`.
+
+## Profile-aware split rules (v1.5.0)
+
+### split-rules
+
+```bash
+blackjack-coach split-rules --cards A,A --profile SIX_DECK_H17_DAS_LS
+blackjack-coach split-rules --cards 8,8 --split-hands 2
+```
+
+Shows whether the hand is a pair / aces, whether it can split or re-split, the
+max split hands, hit-split-aces, double-after-split, a reason, and any
+warnings. `--split-hands N` sets how many hands currently exist (1 = an initial
+split; 2+ considers a re-split).
+
+In v1.5.0 the simulator and `diagnose` are profile-aware: split aces get one
+card each when `hit_split_aces` is false, split sub-hands double only when
+`double_after_split` is allowed, and re-split is gated by `resplit_allowed` /
+`max_split_hands` (full multi-round re-split is still simplified, with an honest
+warning).
