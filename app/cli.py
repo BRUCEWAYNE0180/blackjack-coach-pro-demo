@@ -48,6 +48,7 @@ from .formatting import (
     format_section,
     format_warning,
 )
+from .guided_coach import build_coach_step, build_guided_result
 from .outcome_history import (
     build_outcome_record,
     list_outcome_records,
@@ -948,6 +949,8 @@ def build_diagnose_output(diag, profile) -> str:
     lines.append("")
     lines.append(format_kv("Why", diag.basic_reason))
     lines.append(format_kv("Confidence", diag.confidence_note))
+    lines.append(format_kv("Tip", "Use `coach` for direct action advice, or "
+                                  "`audit` for the technical breakdown."))
     return "\n".join(lines)
 
 
@@ -1423,6 +1426,158 @@ def _run_outcomes(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_coach_step_output(step) -> str:
+    """Render a single guided-coach recommendation for the terminal."""
+    lines = [format_header("Guided Coach")]
+    lines += _kv_block([
+        ("Cards", format_cards(step.player_cards)),
+        ("Dealer upcard", step.dealer_upcard),
+        ("Profile", step.profile_key),
+        ("Hand", step.hand_description),
+        ("Recommended action", step.recommended_action.value),
+        ("Raw table action", step.raw_table_action.value),
+        ("Fallback applied", "yes" if step.fallback_applied else "no"),
+        ("Legal actions", format_cards([a.value for a in step.legal_actions])),
+    ])
+    lines.append("")
+    lines.append(format_kv("Why", step.explanation))
+
+    extra_warnings = [w for w in step.warnings if w != explain_insurance_no()]
+    if extra_warnings:
+        lines.append("")
+        lines.append(format_section("Warnings"))
+        lines.append(format_list(extra_warnings))
+
+    lines.append("")
+    lines.append(SCOPE_FOOTER)
+    return "\n".join(lines)
+
+
+def build_coach_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'coach' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli coach",
+        description=(
+            "Ask the coach for the single best play on a hand: it decides and "
+            "explains (educational / local practice only)."
+        ),
+    )
+    parser.add_argument("--cards", required=True,
+                        help="Player cards, comma-separated, e.g. 'A,7'.")
+    parser.add_argument("--dealer", required=True,
+                        help="Dealer upcard, e.g. '9', '10', or 'A'.")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
+                        choices=sorted(PROFILES),
+                        help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
+    return parser
+
+
+def _run_coach(argv: Sequence[str]) -> int:
+    """Handle the 'coach' direct-advice subcommand."""
+    parser = build_coach_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        cards = _parse_cards(args.cards)
+        profile = get_profile(args.profile)
+        step = build_coach_step(cards, args.dealer, profile)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_coach_step_output(step))
+    return 0
+
+
+def build_coach_play_output(result) -> str:
+    """Render a fully coached, simulated hand for the terminal."""
+    lines = [format_header("Guided Coach - Played Hand")]
+    lines += _kv_block([
+        ("Profile", result.profile_key),
+        ("Starting cards", format_cards(result.initial_player_cards)),
+        ("Dealer upcard", result.dealer_upcard),
+    ])
+
+    for step in result.coach_steps:
+        lines.append("")
+        lines.append(format_section(f"Step {step.step_id}"))
+        lines += _kv_block([
+            ("Player cards", format_cards(step.player_cards)),
+            ("Dealer upcard", step.dealer_upcard),
+            ("Coach recommends", step.recommended_action.value),
+            ("Why", step.explanation),
+        ])
+
+    lines.append("")
+    lines.append(format_section("Result"))
+    lines += _kv_block([
+        ("Final player cards", format_cards(result.final_player_cards)),
+        ("Final dealer cards", format_cards(result.final_dealer_cards)),
+        ("Final outcome", result.final_outcome),
+        ("Result label", result.result_label),
+        ("Total steps", result.total_steps),
+        ("Split hands", result.split_hands_count),
+    ])
+
+    extra_warnings = [w for w in result.warnings if w != explain_insurance_no()]
+    if extra_warnings:
+        lines.append("")
+        lines.append(format_section("Warnings"))
+        lines.append(format_list(extra_warnings))
+
+    lines.append("")
+    lines.append(SCOPE_FOOTER)
+    return "\n".join(lines)
+
+
+def build_coach_play_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'coach-play' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli coach-play",
+        description=(
+            "Play a full hand where the coach picks and explains every action "
+            "(educational / simulated practice only)."
+        ),
+    )
+    parser.add_argument("--decks", type=int, default=6,
+                        help="Number of decks in the virtual shoe (default: 6).")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Optional seed for a reproducible shuffle.")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
+                        choices=sorted(PROFILES),
+                        help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
+    parser.add_argument("--save-outcome", action="store_true", dest="save_outcome",
+                        help="Save this hand's result to the local outcome history.")
+    parser.add_argument("--outcome-dir", default=None, dest="outcome_dir",
+                        help="Directory for the saved outcome (default: "
+                             "./.blackjack_coach/outcomes).")
+    return parser
+
+
+def _run_coach_play(argv: Sequence[str]) -> int:
+    """Handle the 'coach-play' guided full-hand subcommand."""
+    parser = build_coach_play_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        profile = get_profile(args.profile)
+        # Play once so the same hand backs both the display and any saved outcome.
+        hand = play_training_hand(decks=args.decks, seed=args.seed, profile=profile)
+        result = build_guided_result(hand, profile, args.seed)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_coach_play_output(result))
+
+    if args.save_outcome:
+        record = build_outcome_record(hand, profile.key, seed=args.seed)
+        path = save_outcome_record(record, args.outcome_dir)
+        print("")
+        print(format_kv("Saved outcome", str(path)))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -1445,6 +1600,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli matrix --profile SIX_DECK_H17_DAS_LS --section hard
         python -m app.cli audit --cards A,7 --dealer 9       (decision audit)
         python -m app.cli outcomes --limit 10                (win/loss history)
+        python -m app.cli coach --cards A,7 --dealer 9       (direct advice)
+        python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] in ("--version", "-V"):
@@ -1474,6 +1631,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_audit(args[1:])
     if args and args[0] == "outcomes":
         return _run_outcomes(args[1:])
+    if args and args[0] == "coach":
+        return _run_coach(args[1:])
+    if args and args[0] == "coach-play":
+        return _run_coach_play(args[1:])
     if args and args[0] == "quiz":
         return _run_quiz(args[1:])
     if args and args[0] == "count-quiz":

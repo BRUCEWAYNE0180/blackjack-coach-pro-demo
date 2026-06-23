@@ -136,6 +136,12 @@ As of v0.9 the project enforces these gates on every change:
   sensitive/personal data, and must use no database, network, or cloud. Saved
   records live under the git-ignored `.blackjack_coach/` tree and are never
   committed.
+- **Guided coach mode separates concerns.** The coach mode (v1.9.0:
+  `app/guided_coach.py`) must keep recommendation, explanation, the executed
+  action, and the outcome as distinct pieces. The coach decides and the user
+  receives guidance - the user is not asked to choose the action in guided
+  mode. Guided coaching reads `strategy_engine.recommend` and the simulator and
+  must never change basic strategy.
 
 ## 8. Release Rules
 

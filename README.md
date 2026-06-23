@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.8.0 feature summary
+## v1.9.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -69,6 +69,9 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 - **Outcome / win-loss history** (v1.8.0): optionally save played-hand results
   (wins, losses, pushes, surrenders, busts, and split / re-split outcomes) to a
   local JSON folder and review them with `outcomes`.
+- **Guided coach mode** (v1.9.0): the coach picks and explains the best play -
+  ask for direct advice (`coach`) or let the coach play a full hand
+  automatically, step by step (`coach-play`).
 
 ## Terminal visual polish (v1.1.0)
 
@@ -131,6 +134,8 @@ blackjack-coach matrix --profile SIX_DECK_H17_DAS_LS --section hard
 blackjack-coach audit --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
 blackjack-coach play --decks 6 --seed 428 --profile SIX_DECK_H17_DAS_LS --save-outcome
 blackjack-coach outcomes
+blackjack-coach coach --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS
 ```
 
 Without installing, run it as a module from the repository root:
@@ -638,6 +643,50 @@ cards, actions, result counts) — never money, bankroll, bets, accounts, tokens
 or personal data — and the `.blackjack_coach/` folder is git-ignored, so nothing
 is committed. No database, no network, no cloud.
 
+## Guided coach mode (v1.9.0)
+
+In guided coach mode the **coach decides and explains** - you ask, it teaches.
+You do not pick the action; the coach recommends the correct play, explains why,
+and (for a full hand) executes each decision and shows the result.
+
+Ask for a single best play:
+
+```bash
+blackjack-coach coach --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach --cards 8,8 --dealer 6 --profile SIX_DECK_H17_DAS_LS
+```
+
+```text
+=== Guided Coach ===
+Cards             : A, 7
+Dealer upcard     : 9
+Profile           : SIX_DECK_H17_DAS_LS
+Hand              : Soft 18 vs dealer 9
+Recommended action: HIT
+Raw table action  : HIT
+Fallback applied  : no
+Legal actions     : HIT, STAND, DOUBLE, SURRENDER
+Why             : Soft 18 vs dealer 9 [SIX_DECK_H17_DAS_LS]: HIT. ...
+```
+
+Let the coach play a whole hand, step by step:
+
+```bash
+blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS --save-outcome
+```
+
+Each step shows the player's cards, the dealer upcard, the coach's recommended
+action, and why; the result section then shows the final hands, outcome, result
+label, and step count. Add `--save-outcome` (and optional `--outcome-dir`) to
+store the result in the v1.8.0 outcome history.
+
+How the commands relate: `coach` gives **direct advice** for one hand;
+`coach-play` lets the coach **play a full hand** automatically; `play` is the
+existing auto-simulation; `audit` is the **technical** breakdown; and
+`diagnose` is the **expanded** explanation. The coach never modifies the
+strategy engine - it only reads it.
+
 ## Library usage
 
 ```python
@@ -665,13 +714,12 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.8.0 adds a local outcome / win-loss history (`app/outcome_history.py`, the
-`play --save-outcome` flag, and the `outcomes` command): played-hand results
-(wins, losses, pushes, surrenders, busts, and split / re-split outcomes) can be
-saved locally and summarised, so the coach can start learning from practice
-results. It is a summary only - no money, bankroll, bets, accounts, database,
-or network. No changes to basic strategy, Hi-Lo math, deviations, the
-simulator, the matrix/audit tooling, or scored session history. It is a
+v1.9.0 adds a guided coach mode (`app/guided_coach.py`, the `coach` and
+`coach-play` commands): the coach picks and explains the best play, and can play
+a full simulated hand step by step, optionally saving the outcome. It keeps
+recommendation, explanation, executed action, and outcome separate - the coach
+decides; the user receives guidance. No changes to basic strategy, Hi-Lo math,
+deviations, the simulator, the matrix/audit tooling, or outcome history. It is a
 professional coach for local practice, demo money, video games, recreational
 tournaments, and training.
 

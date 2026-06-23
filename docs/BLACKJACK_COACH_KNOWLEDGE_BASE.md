@@ -66,6 +66,10 @@ tool relies on and the project's evolution.
   `audit_decision`, `legal_actions_for_hand`, `detect_strategy_category`, and
   `detect_table_section`. Reports category, table section, raw vs recommended
   action, fallbacks, and legal actions for one hand.
+- `app/guided_coach.py` — Guided coach mode: `CoachStep`, `GuidedCoachResult`,
+  `build_coach_step`, `explain_next_best_action`, `build_guided_result`, and
+  `play_guided_coach_hand`. The coach picks and explains each action; built on
+  `decision_audit` and the simulator, reusing outcome records for labels.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -92,7 +96,7 @@ tool relies on and the project's evolution.
   `blackjack-coach` command, plus `count`, `simulate`, `play`, `quiz`,
   `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`,
   `deviation-quiz`, `diagnose`, `profiles`, `split-rules`, `matrix`,
-  `audit`, and `outcomes` subcommands).
+  `audit`, `outcomes`, `coach`, and `coach-play` subcommands).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -697,7 +701,7 @@ whether each play is a direct chart action or a legal fallback. Per
 `PROJECT_RULES.md`, any new decision table or matrix change needs a coverage
 audit and cell tests.
 
-### v1.8.0 — Outcome / Win-Loss History (current)
+### v1.8.0 — Outcome / Win-Loss History (done)
 
 Adds a local outcome history so the coach can record and review the results of
 played practice hands, complementing the v1.7.0 decision tooling. Basic
@@ -724,6 +728,32 @@ counts. No money, bankroll, bets, accounts, tokens, screenshots, or sensitive
 data; no database, network, or cloud. Records live under the git-ignored
 `.blackjack_coach/outcomes/` folder. Per `PROJECT_RULES.md`, outcome history
 must remain a local summary and never store sensitive data.
+
+### v1.9.0 — Guided Coach Mode (current)
+
+Lets the coach drive: it picks and explains the best play, and can play a full
+simulated hand step by step. The user asks; the coach decides and teaches. Basic
+strategy is untouched (`strategy_engine.recommend` is not modified).
+
+Delivered:
+
+- **`app/guided_coach.py`**: `CoachStep` and `GuidedCoachResult`, plus
+  `build_coach_step` and `explain_next_best_action` (direct advice via
+  `decision_audit`), `build_guided_result`, and `play_guided_coach_hand` (a full
+  hand played by `play_training_hand`, reconstructed into coach steps; reuses
+  v1.8.0 `build_outcome_record` for result labels and tallies). Supports normal
+  and split / re-split hands.
+- **CLI**: `coach` (direct advice for one hand) and `coach-play` (the coach
+  plays a full hand automatically, step by step, with optional
+  `--save-outcome` / `--outcome-dir`). `diagnose` now points to `coach` and
+  `audit`.
+- **Tests**: `tests/test_guided_coach.py` (coach step matches the engine, split
+  context, full-hand result, determinism, engine unchanged) plus CLI tests.
+
+**Separation of concerns:** recommendation, explanation, the executed action,
+and the outcome stay distinct; the coach decides and the user receives guidance.
+Per `PROJECT_RULES.md`, the user is not asked to choose the action in guided
+mode, and the coach never changes the strategy engine.
 
 ### v2.0 — Possible Web UI (if decided later)
 

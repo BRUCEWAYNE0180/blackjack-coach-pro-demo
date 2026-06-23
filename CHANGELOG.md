@@ -7,6 +7,49 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.9.0] - 2026-06-23
+
+Guided coach mode. The coach now picks and explains the best play - the user
+asks, the coach decides and teaches. A direct-advice command answers "what do I
+do with this hand?", and a guided full-hand command plays a simulated hand where
+the coach chooses every action automatically. Basic strategy is unchanged:
+`strategy_engine.recommend` is never modified.
+
+### Added
+
+- `app/guided_coach.py`: `CoachStep`, `GuidedCoachResult`, `build_coach_step`,
+  `explain_next_best_action`, `build_guided_result`, and
+  `play_guided_coach_hand`. Built on the v1.7.0 `decision_audit` and the
+  simulator; reuses v1.8.0 outcome records for result labels.
+- CLI `coach` command (`--cards`, `--dealer`, `--profile`): the coach's single
+  best play with the raw table action, fallback, legal actions, and a clear
+  why.
+- CLI `coach-play` command (`--decks`, `--seed`, `--profile`,
+  `--save-outcome`, `--outcome-dir`): the coach plays a full hand, showing a
+  step-by-step recommendation for each decision, the final result, and
+  optionally saving the outcome (reusing v1.8.0 outcome history).
+
+### Changed
+
+- `diagnose` now points to `coach` (direct advice) and `audit` (technical
+  breakdown).
+- Bumped the package and `app.__version__` to **1.9.0**.
+
+### Quality
+
+- New deterministic suite `tests/test_guided_coach.py` plus CLI tests for
+  `coach` and `coach-play`. Full suite passing; ruff clean; CI on Python
+  3.9-3.12.
+
+### Safety
+
+- Guided coaching keeps recommendation, explanation, the executed action, and
+  the outcome separate; the coach decides and the user receives guidance. No
+  change to basic strategy, the engine recommendation, deviations, the
+  simulator, the matrix/audit tooling, or outcome history. No casino
+  connectivity, real betting, bankroll, camera/video, scraping, or promise of
+  winnings.
+
 ## [1.8.0] - 2026-06-23
 
 Local outcome (win/loss) history. The coach can now record the results of

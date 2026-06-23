@@ -787,3 +787,63 @@ class TestCliOutcomes:
         assert exit_code == 0
         assert "Total records      : 0" in out
         assert "No saved outcomes yet" in out
+
+
+class TestCliCoach:
+    def test_coach_works(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "A,7", "--dealer", "9",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Guided Coach ===" in out
+        assert "Recommended action" in out
+        assert "Raw table action" in out
+        assert "Legal actions" in out
+        assert "Why" in out
+
+    def test_coach_pair_split(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "8,8", "--dealer", "6",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Recommended action: SPLIT" in out
+
+    def test_coach_invalid_card_errors(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "Z,7", "--dealer", "9"])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err
+
+    def test_coach_play_works(self, capsys):
+        exit_code = cli.main(["coach-play", "--decks", "6", "--seed", "42",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Guided Coach - Played Hand ===" in out
+        assert "Step 1" in out
+        assert "Coach recommends" in out
+        assert "Final outcome" in out
+        assert "Result label" in out
+        assert "Total steps" in out
+
+    def test_coach_play_reproducible(self, capsys):
+        cli.main(["coach-play", "--decks", "6", "--seed", "42"])
+        first = capsys.readouterr().out
+        cli.main(["coach-play", "--decks", "6", "--seed", "42"])
+        second = capsys.readouterr().out
+        assert first == second
+
+    def test_coach_play_save_outcome_creates_file(self, capsys, tmp_path):
+        exit_code = cli.main(["coach-play", "--decks", "6", "--seed", "428",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--save-outcome", "--outcome-dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Saved outcome" in out
+        assert len(list(tmp_path.glob("outcome_*.json"))) == 1
+
+    def test_coach_play_invalid_decks_errors(self, capsys):
+        exit_code = cli.main(["coach-play", "--decks", "0"])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err
