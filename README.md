@@ -1,5 +1,7 @@
 # Blackjack Coach Pro Demo
 
+[![CI](https://github.com/BRUCEWAYNE0180/blackjack-coach-pro-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/BRUCEWAYNE0180/blackjack-coach-pro-demo/actions/workflows/ci.yml)
+
 An **educational / practice** tool for learning blackjack **basic strategy**.
 
 > This project is a study aid, not a gambling product. It does **not** connect
@@ -7,7 +9,7 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
 > any camera/video at a real table, and makes **no** promise of winnings.
 > See [`docs/PROJECT_RULES.md`](docs/PROJECT_RULES.md).
 
-## What it does (v0.8)
+## What it does (v0.9)
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -25,16 +27,45 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
   and the Hi-Lo running count from the terminal.
 - Runs **scored training sessions** (multiple questions) with accuracy and
   weak-spot summaries for both strategy and counting.
-- Ships a simple **command-line trainer**.
+- Ships a simple **command-line trainer**, installable as the
+  `blackjack-coach` command, with CI and modern packaging.
+
+## Quick start
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+python -m pytest
+```
+
+This installs the package (standard-library only at runtime) plus the dev
+tools (`pytest`, `ruff`) and runs the test suite. Lint with:
+
+```bash
+ruff check app tests
+```
 
 ## Requirements
 
-- Python 3.10+
-- `pytest` (tests) and optionally `ruff` (lint) for development.
+- Python 3.9+
+- Dev tooling (`pytest`, `ruff`) via the `dev` extra:
+  `python -m pip install -e ".[dev]"`.
 
 ## Command-line usage
 
-Run the coach from the repository root:
+Once installed (see Quick start), the same trainer is available as the
+`blackjack-coach` command:
+
+```bash
+blackjack-coach --cards A,7 --dealer 9
+blackjack-coach count --cards 2,5,K,A,9 --decks-remaining 5
+blackjack-coach play --decks 6 --seed 42
+blackjack-coach quiz --seed 42 --answer H
+blackjack-coach quiz-session --questions 10 --seed 42 --answers H,S,D,H,R,S,H,D,P,S
+```
+
+Without installing, run it as a module from the repository root:
 
 ```bash
 python -m app.cli --cards A,7 --dealer 9 --profile MULTI_DECK_H17_DAS_LS
@@ -277,16 +308,36 @@ print(rec.warnings)            # list of advisory notes (may be empty)
 ## Development
 
 ```bash
-pytest            # run the test suite
-ruff check app tests   # lint (if ruff is installed)
+python -m pip install -e ".[dev]"   # install package + dev tooling
+python -m pytest                     # run the test suite
+ruff check app tests                 # lint
 ```
+
+Continuous integration runs `ruff check app tests` and `python -m pytest` on
+Python 3.9-3.12 for every push to `main` and every pull request
+(see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 ## Scope and roadmap
 
-v0.8 adds **scored training sessions** (multi-question strategy and count
-drills with accuracy and weak spots) on top of the v0.7 quiz mode and earlier
-features. **Out of scope** for now: saving results/files, databases, login,
+v0.9 focuses on **professional hardening**: modern packaging
+(`pyproject.toml`), a `blackjack-coach` console command, GitHub Actions CI
+across Python 3.9-3.12, and documented quality gates. No new gameplay scope is
+added. **Out of scope** for now: saving results/files, databases, login,
 betting spread, Kelly bet sizing, the Illustrious 18, insurance index plays,
 and a web/UI layer. See
 [`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
 for the full roadmap.
+
+## Safety / Educational Scope
+
+This is a study and practice tool only. It deliberately does **not**, and will
+not:
+
+- connect to any real casino or online gambling platform;
+- place, manage, or automate real-money bets, or model a bankroll;
+- use a camera, video feed, or screen scraping to read a real table;
+- promise winnings or present any "guaranteed" system.
+
+Card counting and the simulator exist purely for **local, simulated**
+education. Please gamble responsibly and follow the laws and venue rules that
+apply to you.

@@ -28,7 +28,7 @@ import argparse
 import sys
 from collections.abc import Sequence
 
-from .counting import CountingState, EDUCATIONAL_NOTE, update_running_count_many
+from .counting import EDUCATIONAL_NOTE, CountingState, update_running_count_many
 from .explanations import explain_insurance_no
 from .quiz import (
     ACTION_PROMPT,

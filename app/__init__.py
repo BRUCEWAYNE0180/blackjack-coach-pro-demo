@@ -22,14 +22,6 @@ from .explanations import (
     explain_state,
 )
 from .hand_evaluator import HandEvaluation, card_value, evaluate_hand, normalize_rank
-from .rules import (
-    DEFAULT_PROFILE,
-    MULTI_DECK_H17_DAS_LS,
-    MULTI_DECK_S17_DAS_LS,
-    PROFILES,
-    RuleProfile,
-    get_profile,
-)
 from .quiz import (
     CountQuizResult,
     QuizQuestion,
@@ -41,6 +33,14 @@ from .quiz import (
     normalize_user_action,
     run_count_session,
     run_strategy_session,
+)
+from .rules import (
+    DEFAULT_PROFILE,
+    MULTI_DECK_H17_DAS_LS,
+    MULTI_DECK_S17_DAS_LS,
+    PROFILES,
+    RuleProfile,
+    get_profile,
 )
 from .shoe import (
     build_shoe,
@@ -73,7 +73,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 __all__ = [
     "ACTION_NOTES",
