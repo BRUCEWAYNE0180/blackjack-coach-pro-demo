@@ -51,6 +51,17 @@ tool relies on and the project's evolution.
   and `explain_decision_factors`, which break a recommended play into plain
   factors (hand shape, dealer strength, available options, rule context, and
   profile-aware split rules).
+- `app/strategy_matrix.py` — Complete strategy-matrix audit: `StrategyCell`,
+  `StrategyMatrix`, `MatrixAuditReport`, the generators
+  (`generate_hard_total_matrix`, `generate_soft_total_matrix`,
+  `generate_pair_matrix`, `generate_strategy_matrix`), plus
+  `audit_strategy_matrix` and `format_strategy_matrix`. Builds 360-cell
+  matrices (hard 5-21, soft 13-21, pairs vs dealer 2-10,A) by calling the engine
+  and audits coverage (missing / fallback / unknown cells).
+- `app/decision_audit.py` — Per-hand decision audit: `DecisionAudit`,
+  `audit_decision`, `legal_actions_for_hand`, `detect_strategy_category`, and
+  `detect_table_section`. Reports category, table section, raw vs recommended
+  action, fallbacks, and legal actions for one hand.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -76,7 +87,8 @@ tool relies on and the project's evolution.
 - `app/cli.py` — Terminal trainer (`python -m app.cli` or the installed
   `blackjack-coach` command, plus `count`, `simulate`, `play`, `quiz`,
   `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`,
-  `deviation-quiz`, `diagnose`, `profiles`, and `split-rules` subcommands).
+  `deviation-quiz`, `diagnose`, `profiles`, `split-rules`, `matrix`, and
+  `audit` subcommands).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -611,7 +623,7 @@ Delivered:
   surface honest warnings; the **play** simulator's full re-split tree arrives
   in v1.6.0 (below).
 
-### v1.6.0 — Full Re-Split Tree Simulator (current)
+### v1.6.0 — Full Re-Split Tree Simulator (done)
 
 Completes the split logic started in v1.5.0: the play simulator now plays a
 real split / re-split tree rather than treating re-splits as a simplified
@@ -648,6 +660,38 @@ Delivered:
 `resplit_allowed`, and `max_split_hands` all drive real play in the play
 simulator's re-split tree. Per `PROJECT_RULES.md`, all re-split logic must be
 covered by deterministic tests.
+
+### v1.7.0 — Complete Strategy Matrix & Decision Audit (current)
+
+Makes the coach more confident and transparent about its decisions without
+changing basic strategy. Two new read-only layers sit on top of
+`strategy_engine.recommend`.
+
+Delivered:
+
+- **`app/strategy_matrix.py`**: generates full decision matrices for a profile
+  (hard 5-21, soft 13-21, pairs A,A and 2,2..10,10 vs dealer 2-10,A = 360
+  cells) and audits coverage. `StrategyCell` records the recommended action,
+  the raw chart action, and whether a legal fallback applied; `StrategyMatrix`
+  and `MatrixAuditReport` summarise total / missing / fallback cells and
+  warnings; `format_strategy_matrix` renders a compact table (uppercase = direct
+  play, lowercase = legal fallback).
+- **`app/decision_audit.py`**: `audit_decision` reports, for one hand, the
+  category, table section, raw vs recommended action, fallback (with reason),
+  legal actions, and a plain explanation. Helpers `detect_strategy_category`,
+  `detect_table_section`, and `legal_actions_for_hand` back it.
+- **CLI**: a `matrix` command (`--profile`, `--section`, `--audit`) and an
+  `audit` command (`--cards`, `--dealer`, `--profile`). `diagnose` now embeds a
+  compact audit summary.
+- **Tests**: `tests/test_strategy_matrix.py` and `tests/test_decision_audit.py`
+  prove full coverage (no missing cells, valid actions, fallback detection for
+  restrictive profiles) plus CLI behaviour.
+
+**Coverage focus:** this version improves decision coverage across hard totals,
+soft totals, pairs, every dealer upcard, and every rule profile, and explains
+whether each play is a direct chart action or a legal fallback. Per
+`PROJECT_RULES.md`, any new decision table or matrix change needs a coverage
+audit and cell tests.
 
 ### v2.0 — Possible Web UI (if decided later)
 

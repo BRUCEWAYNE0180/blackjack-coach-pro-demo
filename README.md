@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.6.0 feature summary
+## v1.7.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -62,6 +62,10 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 - **Full re-split tree simulator** (v1.6.0): the play simulator now plays a real
   split / re-split tree up to `max_split_hands`, honouring `resplit_allowed`,
   `hit_split_aces`, and `double_after_split`.
+- **Complete strategy matrix + decision audit** (v1.7.0): print a full
+  basic-strategy decision matrix for any profile and audit its coverage
+  (`matrix`), and audit how any single hand's recommendation is reached
+  (`audit`) - direct table play or a legal fallback.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -120,6 +124,8 @@ blackjack-coach play --decks 6 --seed 42
 blackjack-coach quiz --seed 42 --answer H
 blackjack-coach quiz-session --questions 10 --seed 42 --answers H,S,D,H,R,S,H,D,P,S
 blackjack-coach deviations --cards 10,6 --dealer 10 --true-count 1
+blackjack-coach matrix --profile SIX_DECK_H17_DAS_LS --section hard
+blackjack-coach audit --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
 ```
 
 Without installing, run it as a module from the repository root:
@@ -515,6 +521,75 @@ Outcome: DEALER_BUST
 There is still no money, bankroll, betting units, or payout modelling — this is
 local, simulated practice only.
 
+## Complete strategy matrix (v1.7.0)
+
+Print the full basic-strategy decision matrix for any profile and audit its
+coverage. The matrix covers **hard totals 5-21**, **soft totals 13-21**, and
+**pairs** (A,A and 2,2..10,10) against every dealer upcard (**2-10 and A**) —
+360 decisions per profile — so the coach can prove it has an answer everywhere.
+
+```bash
+blackjack-coach matrix --profile SIX_DECK_H17_DAS_LS --section hard
+blackjack-coach matrix --profile SIX_DECK_H17_DAS_LS --section pairs --audit
+```
+
+```text
+=== Strategy Matrix ===
+Profile: SIX_DECK_H17_DAS_LS
+Section: hard
+
+Strategy Matrix [SIX_DECK_H17_DAS_LS]
+Codes: H hit, S stand, D double, P split, R surrender (lowercase = legal fallback)
+
+-- Hard Totals --
+            2   3   4   5   6   7   8   9  10   A
+...
+Hard 16     S   S   S   S   S   H   H   R   R   R
+...
+
+-- Coverage summary --
+Total cells   : 360
+Fallback cells: 0
+Missing cells : 0
+```
+
+`--section` selects `hard`, `soft`, `pairs`, or `all` (default). Action codes
+are shown in **uppercase for a direct chart play** and **lowercase when a legal
+fallback was applied** (for example, surrender falling back to hit when the
+profile has no surrender). Add `--audit` to list the fallback cells, any missing
+cells, and the fallback notes — a quick coverage check when a profile's rules
+change which plays are legal.
+
+## Decision audit (v1.7.0)
+
+`audit` reports the mechanics behind a single hand's recommendation: which
+category it is, which strategy table is consulted, the raw chart action vs the
+recommended action, whether a legal fallback was applied, and which actions are
+legal under the profile.
+
+```bash
+blackjack-coach audit --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
+```
+
+```text
+=== Decision Audit ===
+Cards             : A, 7
+Dealer            : 9
+Profile           : SIX_DECK_H17_DAS_LS
+Hand              : Soft 18 vs dealer 9
+Category          : soft
+Table section     : soft
+Recommended action: HIT
+Raw table action  : HIT
+Fallback applied  : no
+Legal actions     : HIT, STAND, DOUBLE, SURRENDER
+Explanation       : Soft 18 vs dealer 9 is read from the soft-totals table. ...
+```
+
+Where `diagnose` explains a decision in plain language (and now shows a compact
+audit summary too), `audit` reports the underlying mechanics. Both read the
+stable strategy engine and never modify it.
+
 ## Library usage
 
 ```python
@@ -542,12 +617,14 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.6.0 completes the split logic: the **play** simulator now plays a full
-split / re-split tree (up to `max_split_hands`, honouring `resplit_allowed`,
-`hit_split_aces`, and `double_after_split`), building on the profile-aware split
-rules introduced in v1.5.0. No changes to basic strategy, Hi-Lo math,
-deviations, or session history. It is a professional coach for local practice,
-demo money, video games, recreational tournaments, and training.
+v1.7.0 adds a complete strategy-matrix audit and a per-hand decision audit
+(`app/strategy_matrix.py`, `app/decision_audit.py`, and the `matrix` / `audit`
+commands), so the coach can prove full decision coverage across hard totals,
+soft totals, pairs, dealer upcards, and profiles, and explain whether each play
+is a direct chart action or a legal fallback. No changes to basic strategy,
+Hi-Lo math, deviations, the simulator, or session history. It is a professional
+coach for local practice, demo money, video games, recreational tournaments,
+and training.
 
 Planned next (educational/local only): a possible v2.0 web UI if decided later.
 See

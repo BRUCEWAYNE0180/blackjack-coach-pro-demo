@@ -621,3 +621,100 @@ class TestCliSplitRules:
         assert exit_code == 0
         assert "Split rules:" in out
         assert "Split aces:" in out
+
+    def test_diagnose_includes_audit_summary(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "A,7", "--dealer", "9",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Audit summary" in out
+        assert "Table section" in out
+        assert "Raw table action" in out
+        assert "Legal actions" in out
+        assert "Profile rules" in out
+
+
+class TestCliMatrix:
+    def test_matrix_hard_section(self, capsys):
+        exit_code = cli.main(["matrix", "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--section", "hard"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Strategy Matrix ===" in out
+        assert "Hard Totals" in out
+        assert "Soft Totals" not in out
+        assert "Hard 16" in out
+        assert "Total cells   : 360" in out
+
+    def test_matrix_soft_section(self, capsys):
+        exit_code = cli.main(["matrix", "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--section", "soft"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Soft Totals" in out
+        assert "Soft 18" in out
+
+    def test_matrix_pairs_section(self, capsys):
+        exit_code = cli.main(["matrix", "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--section", "pairs"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Pairs" in out
+        assert "Pair As" in out
+
+    def test_matrix_default_section_is_all(self, capsys):
+        exit_code = cli.main(["matrix", "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Hard Totals" in out
+        assert "Soft Totals" in out
+        assert "Pairs" in out
+
+    def test_matrix_audit_shows_summary(self, capsys):
+        exit_code = cli.main(["matrix", "--profile", "SINGLE_DECK_H17_NDAS_NS",
+                              "--section", "pairs", "--audit"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Coverage summary" in out
+        assert "Total cells" in out
+        assert "Fallback cells" in out
+        assert "Missing cells" in out
+        assert "Audit detail" in out
+
+    def test_matrix_invalid_section_rejected(self):
+        with pytest.raises(SystemExit):
+            cli.main(["matrix", "--section", "bogus"])
+
+    def test_matrix_invalid_profile_rejected(self):
+        with pytest.raises(SystemExit):
+            cli.main(["matrix", "--profile", "BOGUS"])
+
+
+class TestCliAudit:
+    def test_audit_works(self, capsys):
+        exit_code = cli.main(["audit", "--cards", "A,7", "--dealer", "9",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Decision Audit ===" in out
+        assert "Table section" in out
+        assert "Recommended action" in out
+        assert "Raw table action" in out
+        assert "Fallback applied" in out
+        assert "Legal actions" in out
+        assert "Explanation" in out
+
+    def test_audit_detects_fallback(self, capsys):
+        # Hard 16 vs 10 under a no-surrender profile falls back.
+        exit_code = cli.main(["audit", "--cards", "10,6", "--dealer", "10",
+                              "--profile", "SINGLE_DECK_H17_NDAS_NS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Fallback applied  : yes" in out
+        assert "Raw table action  : SURRENDER" in out
+
+    def test_audit_invalid_card_errors(self, capsys):
+        exit_code = cli.main(["audit", "--cards", "Z,7", "--dealer", "9"])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err

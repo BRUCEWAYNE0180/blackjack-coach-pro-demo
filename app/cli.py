@@ -30,6 +30,7 @@ from collections.abc import Sequence
 
 from . import __version__
 from .counting import EDUCATIONAL_NOTE, CountingState, update_running_count_many
+from .decision_audit import audit_decision
 from .decision_diagnostics import explain_decision_factors
 from .deviations import (
     DEFAULT_DEVIATION_RULES,
@@ -80,6 +81,11 @@ from .simulator import (
 )
 from .split_rules import explain_split_rules
 from .strategy_engine import Recommendation, recommend
+from .strategy_matrix import (
+    audit_strategy_matrix,
+    format_strategy_matrix,
+    generate_strategy_matrix,
+)
 
 # Name of the installed console command (see [project.scripts] in
 # pyproject.toml). Used for argparse program names and the --version output.
@@ -896,6 +902,24 @@ def build_diagnose_output(diag, profile) -> str:
         lines.append(format_section("Warnings"))
         lines.append(format_list(extra_warnings))
 
+    # Compact technical audit summary (the 'audit' command goes deeper).
+    audit = audit_decision(diag.player_cards, diag.dealer_upcard, profile)
+    restrictions = (
+        f"double {'yes' if profile.double_allowed else 'no'}, "
+        f"surrender {'yes' if profile.late_surrender else 'no'}, "
+        f"split {'yes' if profile.split_allowed else 'no'}, "
+        f"DAS {'yes' if profile.double_after_split else 'no'}"
+    )
+    lines.append("")
+    lines.append(format_section("Audit summary"))
+    lines += _kv_block([
+        ("Table section", audit.table_section),
+        ("Raw table action", audit.raw_table_action.value),
+        ("Fallback applied", "yes" if audit.fallback_applied else "no"),
+        ("Legal actions", format_cards([a.value for a in audit.legal_actions])),
+        ("Profile rules", restrictions),
+    ])
+
     lines.append("")
     lines.append(format_kv("Why", diag.basic_reason))
     lines.append(format_kv("Confidence", diag.confidence_note))
@@ -1159,6 +1183,151 @@ def _run_deviation_quiz(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_matrix_output(matrix, section: str, show_audit: bool) -> str:
+    """Render a strategy matrix (and optional audit summary) for the terminal."""
+    lines = [format_header("Strategy Matrix")]
+    lines += _kv_block([
+        ("Profile", matrix.profile_key),
+        ("Section", section),
+    ])
+    lines.append("")
+    lines.append(format_strategy_matrix(matrix, section))
+
+    report = audit_strategy_matrix(matrix)
+    lines.append("")
+    lines.append(format_section("Coverage summary"))
+    lines += _kv_block([
+        ("Total cells", report.total_cells),
+        ("Fallback cells", len(report.fallback_cells)),
+        ("Missing cells", len(report.missing_cells)),
+        ("Warnings", len(report.warnings)),
+        ("Complete", "yes" if report.is_complete else "no"),
+    ])
+
+    if show_audit:
+        lines.append("")
+        lines.append(format_section("Audit detail"))
+        lines.append(format_kv("Fallback cells", format_cards(report.fallback_cells)
+                               if report.fallback_cells else "(none)"))
+        lines.append(format_kv("Missing cells", format_cards(report.missing_cells)
+                               if report.missing_cells else "(none)"))
+        if report.unknown_action_cells:
+            lines.append(format_kv("Unknown actions",
+                                   format_cards(report.unknown_action_cells)))
+        if report.warnings:
+            lines.append(format_section("Fallback notes"))
+            lines.append(format_list(report.warnings))
+
+    lines.append("")
+    lines.append(SCOPE_FOOTER)
+    return "\n".join(lines)
+
+
+def build_matrix_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'matrix' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli matrix",
+        description=(
+            "Print the complete basic-strategy decision matrix for a profile "
+            "and audit its coverage (educational / local practice only)."
+        ),
+    )
+    parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
+                        choices=sorted(PROFILES),
+                        help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
+    parser.add_argument("--section", default="all",
+                        choices=("hard", "soft", "pairs", "all"),
+                        help="Which section to show (default: all).")
+    parser.add_argument("--audit", action="store_true",
+                        help="Show the detailed coverage audit (fallback / "
+                             "missing cells).")
+    return parser
+
+
+def _run_matrix(argv: Sequence[str]) -> int:
+    """Handle the 'matrix' strategy-matrix subcommand."""
+    parser = build_matrix_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        profile = get_profile(args.profile)
+        matrix = generate_strategy_matrix(profile)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_matrix_output(matrix, args.section, args.audit))
+    return 0
+
+
+def build_audit_output(audit) -> str:
+    """Render a per-hand decision audit for the terminal."""
+    lines = [format_header("Decision Audit")]
+    lines += _kv_block([
+        ("Cards", format_cards(audit.player_cards)),
+        ("Dealer", audit.dealer_upcard),
+        ("Profile", audit.profile_key),
+        ("Hand", audit.hand_description),
+        ("Category", audit.category),
+        ("Table section", audit.table_section),
+        ("Recommended action", audit.recommended_action.value),
+        ("Raw table action", audit.raw_table_action.value),
+        ("Fallback applied", "yes" if audit.fallback_applied else "no"),
+        ("Legal actions", format_cards([a.value for a in audit.legal_actions])),
+    ])
+    if audit.fallback_applied and audit.fallback_reason:
+        lines.append(format_kv("Fallback reason", audit.fallback_reason))
+
+    extra_warnings = [w for w in audit.warnings if w != explain_insurance_no()]
+    if extra_warnings:
+        lines.append("")
+        lines.append(format_section("Warnings"))
+        lines.append(format_list(extra_warnings))
+
+    lines.append("")
+    lines.append(format_kv("Explanation", audit.explanation))
+    lines.append("")
+    lines.append(SCOPE_FOOTER)
+    return "\n".join(lines)
+
+
+def build_audit_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'audit' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli audit",
+        description=(
+            "Audit how the engine reaches its recommendation for one hand: "
+            "category, table section, raw vs recommended action, fallbacks, "
+            "and legal actions (educational / local practice only)."
+        ),
+    )
+    parser.add_argument("--cards", required=True,
+                        help="Player cards, comma-separated, e.g. 'A,7'.")
+    parser.add_argument("--dealer", required=True,
+                        help="Dealer upcard, e.g. '9', '10', or 'A'.")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
+                        choices=sorted(PROFILES),
+                        help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
+    return parser
+
+
+def _run_audit(argv: Sequence[str]) -> int:
+    """Handle the 'audit' per-hand decision-audit subcommand."""
+    parser = build_audit_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        cards = _parse_cards(args.cards)
+        profile = get_profile(args.profile)
+        audit = audit_decision(cards, args.dealer, profile)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_audit_output(audit))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -1178,6 +1347,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli diagnose --cards A,7 --dealer 9   (decision factors)
         python -m app.cli profiles --list                   (rule profiles)
         python -m app.cli split-rules --cards A,A            (split options)
+        python -m app.cli matrix --profile SIX_DECK_H17_DAS_LS --section hard
+        python -m app.cli audit --cards A,7 --dealer 9       (decision audit)
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] in ("--version", "-V"):
@@ -1201,6 +1372,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_profiles(args[1:])
     if args and args[0] == "split-rules":
         return _run_split_rules(args[1:])
+    if args and args[0] == "matrix":
+        return _run_matrix(args[1:])
+    if args and args[0] == "audit":
+        return _run_audit(args[1:])
     if args and args[0] == "quiz":
         return _run_quiz(args[1:])
     if args and args[0] == "count-quiz":
