@@ -225,6 +225,16 @@ As of v0.9 the project enforces these gates on every change:
   `.blackjack_coach/ev_snapshots` directory (unless the user passes `--ev-dir`)
   and are never committed. It must stay dependency-free with no large/slow
   simulations.
+- **Strategy-vs-EV explanations must keep the layers separate.** The
+  Strategy-vs-EV explanation engine (v1.18.0: `app/ev_explainer.py`) must always
+  separate the recommended action, the advisory EV action, the size of the EV
+  gap, the limitations of the EV model, and the final decision. It must never
+  convert the advisory EV into an automatic override of the main strategy: when
+  they differ it only reports and explains the difference, and the coach
+  recommendation stands. It must never change `strategy_engine.recommend`, the
+  Hi-Lo counting math, the probability / EV advisor, adaptive learning, guided
+  coaching, outcome history, session history, or the EV-snapshot history, and it
+  must stay dependency-free with no network, cloud, database, or sensitive data.
 
 ## 8. Release Rules
 

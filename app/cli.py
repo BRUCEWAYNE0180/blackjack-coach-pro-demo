@@ -44,6 +44,12 @@ from .deviations import (
     normalize_true_count,
     recommend_with_deviation,
 )
+from .ev_explainer import (
+    GAP_LARGE,
+    GAP_MEDIUM,
+    explain_ev_snapshot_record,
+    explain_strategy_vs_ev,
+)
 from .ev_history import (
     build_ev_snapshot_record,
     list_ev_snapshot_records,
@@ -1626,6 +1632,10 @@ def build_coach_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ev-dir", default=None, dest="ev_dir",
                         help="Directory for the saved EV snapshot (default: "
                              "./.blackjack_coach/ev_snapshots).")
+    parser.add_argument("--explain-ev", action="store_true", dest="explain_ev",
+                        help="Append a clear Strategy-vs-EV explanation block. "
+                             "Requires --show-odds; advisory only and never "
+                             "overrides the recommendation.")
     return parser
 
 
@@ -1636,6 +1646,9 @@ def _run_coach(argv: Sequence[str]) -> int:
 
     if args.save_ev_snapshot and not args.show_odds:
         print("Error: --save-ev-snapshot requires --show-odds", file=sys.stderr)
+        return 2
+    if args.explain_ev and not args.show_odds:
+        print("Error: --explain-ev requires --show-odds", file=sys.stderr)
         return 2
 
     try:
@@ -1677,6 +1690,10 @@ def _run_coach(argv: Sequence[str]) -> int:
         odds=odds,
         history_ctx=history_ctx,
     ))
+
+    if args.explain_ev and odds is not None:
+        disagreement = explain_strategy_vs_ev(odds, true_count=args.true_count)
+        print("\n".join(_strategy_vs_ev_lines(disagreement)))
 
     if args.save_ev_snapshot and odds is not None:
         record = build_ev_snapshot_record(
@@ -2004,6 +2021,22 @@ def build_odds_output(advice, player_display=None, dealer_display=None,
     return "\n".join(lines)
 
 
+def _strategy_vs_ev_lines(disagreement) -> list[str]:
+    """Render the v1.18.0 Strategy-vs-EV explanation block."""
+    d = disagreement
+    lines = ["", format_section("Strategy vs EV explanation")]
+    lines += _kv_block([
+        ("Coach recommendation", d.recommended_action),
+        ("Best EV action", d.best_ev_action or "(n/a)"),
+        ("EV gap", "n/a" if d.ev_gap is None else f"{d.ev_gap:+.3f}"),
+        ("Gap label", d.gap_label),
+        ("Agreement", d.agreement_status),
+    ])
+    lines.append(format_kv("Explanation", d.explanation))
+    lines.append(format_kv("Advisory note", d.recommendation_note))
+    return lines
+
+
 def build_odds_parser() -> argparse.ArgumentParser:
     """Construct the argument parser for the 'odds' subcommand."""
     parser = argparse.ArgumentParser(
@@ -2042,6 +2075,10 @@ def build_odds_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ev-dir", default=None, dest="ev_dir",
                         help="Directory for the saved EV snapshot (default: "
                              "./.blackjack_coach/ev_snapshots).")
+    parser.add_argument("--explain-ev", action="store_true", dest="explain_ev",
+                        help="Append a clear Strategy-vs-EV explanation block "
+                             "(advisory only; never overrides the "
+                             "recommendation).")
     return parser
 
 
@@ -2084,6 +2121,10 @@ def _run_odds(argv: Sequence[str]) -> int:
         dealer_display=_render_cards([dealer_card]),
         show_composition=args.show_composition,
     ))
+
+    if args.explain_ev:
+        disagreement = explain_strategy_vs_ev(advice, true_count=args.true_count)
+        print("\n".join(_strategy_vs_ev_lines(disagreement)))
 
     if args.save_ev_snapshot:
         record = build_ev_snapshot_record(
@@ -2318,7 +2359,54 @@ def build_ev_review_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-gap", type=float, default=None, dest="min_gap",
                         help="Only count disagreements whose EV gap is at least "
                              "this size when detecting gaps / spots.")
+    parser.add_argument("--explain", action="store_true",
+                        help="Append clear Strategy-vs-EV explanations for the "
+                             "top disagreement spots (advisory only).")
+    parser.add_argument("--large-gaps-only", action="store_true",
+                        dest="large_gaps_only",
+                        help="Only review snapshots whose EV gap is LARGE (or "
+                             "MEDIUM when there is no LARGE gap).")
     return parser
+
+
+def _ev_review_explanation_lines(records, limit: int = 5) -> list[str]:
+    """Render Strategy-vs-EV explanations for the top disagreement records."""
+    disagreements = [
+        explain_ev_snapshot_record(r) for r in records
+        if not r.agrees_with_strategy
+    ]
+    # Order by EV gap (largest first); records with no gap go last.
+    disagreements.sort(
+        key=lambda d: (d.ev_gap is not None, abs(d.ev_gap) if d.ev_gap else 0.0),
+        reverse=True,
+    )
+    lines = ["", format_section("Strategy vs EV explanations (top disagreements)")]
+    if not disagreements:
+        lines.append("All reviewed snapshots agree with the advisory best-EV "
+                     "action; nothing to explain.")
+        return lines
+    for d in disagreements[:limit]:
+        cards = ", ".join(d.player_cards) if d.player_cards else "?"
+        lines.append("")
+        lines.append(format_section(
+            f"{cards} vs {d.dealer_upcard} [{d.gap_label}]"))
+        lines += _kv_block([
+            ("Coach recommendation", d.recommended_action),
+            ("Best EV action", d.best_ev_action or "(n/a)"),
+            ("EV gap", "n/a" if d.ev_gap is None else f"{d.ev_gap:+.3f}"),
+        ])
+        lines.append(format_kv("Explanation", d.explanation))
+    return lines
+
+
+def _filter_large_gap_records(records):
+    """Keep only LARGE-gap snapshots, or MEDIUM-gap when there is no LARGE one."""
+    large = [r for r in records
+             if explain_ev_snapshot_record(r).gap_label == GAP_LARGE]
+    if large:
+        return large
+    return [r for r in records
+            if explain_ev_snapshot_record(r).gap_label == GAP_MEDIUM]
 
 
 def _run_ev_review(argv: Sequence[str]) -> int:
@@ -2336,8 +2424,13 @@ def _run_ev_review(argv: Sequence[str]) -> int:
         profile_key=args.profile,
         disagreements_only=args.disagreements_only,
     )
+    if args.large_gaps_only:
+        records = _filter_large_gap_records(records)
     summary = summarize_ev_snapshots(records, min_gap=args.min_gap)
     print(build_ev_review_output(summary))
+
+    if args.explain and records:
+        print("\n".join(_ev_review_explanation_lines(records)))
     return 0
 
 
