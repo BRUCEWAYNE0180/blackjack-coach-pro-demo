@@ -19,9 +19,10 @@ Educational/practice tool only. See docs/PROJECT_RULES.md.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 
+from . import explanations
 from .hand_evaluator import HandEvaluation, card_value, evaluate_hand
 from .rules import DEFAULT_PROFILE, RuleProfile
 
@@ -42,13 +43,21 @@ class Recommendation:
 
     Attributes:
         action: The recommended :class:`Action`.
-        take_insurance: Always ``False`` in v0.1.
-        reason: Short human-readable explanation.
+        take_insurance: Always ``False`` (basic strategy never insures).
+        reason: Short human-readable explanation (includes an educational note).
+        hand_description: Human-readable description of the hand and upcard
+            (e.g. ``"Soft 18 vs dealer 9"``).
+        profile_key: The key of the rule profile used.
+        warnings: Optional list of advisory messages (e.g. the insurance note
+            when the dealer shows an Ace, or fallback notices).
     """
 
     action: Action
     take_insurance: bool
     reason: str
+    hand_description: str = ""
+    profile_key: str = ""
+    warnings: list[str] = field(default_factory=list)
 
 
 
@@ -253,6 +262,34 @@ def _describe(ev: HandEvaluation, up: int) -> str:
     return f"Hard {ev.total} vs dealer {up_label}"
 
 
+def _fallback_warnings(
+    code: str,
+    action: Action,
+    can_double: bool,
+    can_surrender: bool,
+    can_split: bool,
+    das: bool,
+) -> list[str]:
+    """Build advisory messages when the chart's ideal play was not available."""
+    notes: list[str] = []
+    if code in ("D", "Ds") and not can_double:
+        notes.append(
+            f"Chart prefers DOUBLE, but doubling is not available here, "
+            f"so {action.value} is the best legal play."
+        )
+    if code in ("Rh", "Rs", "Rp") and not can_surrender:
+        notes.append(
+            f"Chart prefers SURRENDER, but surrender is not available here, "
+            f"so {action.value} is the best legal play."
+        )
+    if (code == "P" and not can_split) or (code == "Pd" and not (can_split and das)):
+        notes.append(
+            f"Chart prefers SPLIT, but splitting is not available here, "
+            f"so {action.value} is the best legal play."
+        )
+    return notes
+
+
 def recommend(
     player_cards: list[str] | tuple[str, ...],
     dealer_upcard: str,
@@ -290,31 +327,60 @@ def recommend(
         can_split = profile.split_allowed and ev.is_pair
 
     insurance = should_take_insurance(profile)
+    description = _describe(ev, up)
+    warnings: list[str] = []
+    if up == 11:  # dealer shows an Ace -> insurance may be offered
+        warnings.append(explanations.explain_insurance_no())
 
     if ev.is_blackjack:
-        return Recommendation(Action.STAND, insurance, "Natural blackjack: stand.")
+        return Recommendation(
+            action=Action.STAND,
+            take_insurance=insurance,
+            reason=explanations.explain_action(explanations.BLACKJACK),
+            hand_description=description,
+            profile_key=profile.key,
+            warnings=warnings,
+        )
     if ev.is_bust:
-        return Recommendation(Action.STAND, insurance, f"Hand busted ({ev.total}).")
+        return Recommendation(
+            action=Action.STAND,
+            take_insurance=insurance,
+            reason=explanations.explain_action(explanations.BUST),
+            hand_description=description,
+            profile_key=profile.key,
+            warnings=warnings,
+        )
 
     h17 = profile.dealer_hits_soft_17
     das = profile.double_after_split
 
     if ev.is_pair and ev.pair_value in _PAIRS_H17:
         code = _pair_code(ev.pair_value, up, h17=h17)
-        action = _resolve_code(
-            code,
-            can_double=can_double,
-            can_surrender=can_surrender,
-            can_split=can_split,
-            das=das,
-            fallback_nonpair=lambda: _nonpair_action(
-                ev, up, h17=h17, can_double=can_double, can_surrender=can_surrender
-            ),
-        )
+    elif ev.is_soft and ev.total in _SOFT_H17:
+        code = _soft_code(ev.total, up, h17=h17)
     else:
-        action = _nonpair_action(
-            ev, up, h17=h17, can_double=can_double, can_surrender=can_surrender
-        )
+        code = _hard_code(ev.total, up, h17=h17)
 
-    reason = f"{_describe(ev, up)} [{profile.key}]: {action.value}."
-    return Recommendation(action, insurance, reason)
+    action = _resolve_code(
+        code,
+        can_double=can_double,
+        can_surrender=can_surrender,
+        can_split=can_split,
+        das=das,
+        fallback_nonpair=lambda: _nonpair_action(
+            ev, up, h17=h17, can_double=can_double, can_surrender=can_surrender
+        ),
+    )
+
+    warnings.extend(_fallback_warnings(code, action, can_double, can_surrender, can_split, das))
+
+    note = explanations.explain_action(action)
+    reason = f"{description} [{profile.key}]: {action.value}. {note}"
+    return Recommendation(
+        action=action,
+        take_insurance=insurance,
+        reason=reason,
+        hand_description=description,
+        profile_key=profile.key,
+        warnings=warnings,
+    )
