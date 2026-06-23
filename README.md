@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.26.0 feature summary
+## v1.27.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -147,6 +147,11 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   low-accuracy, and skipped), with a starter educational set when there is no
   missed history. Reproducible with `--seed`, exportable to Markdown. Local and
   read-only; it never changes the correct answers or the recommendation.
+- **Repeat pack completion history** (v1.27.0): `repeat-pack --complete` saves
+  which missed spots you corrected vs still miss (repeat accuracy, repeat
+  streaks), and `repeat-pack --progress` summarises correction progress and
+  flags persistent misses. Local and read-only; it never changes the correct
+  answers or the recommendation.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -430,6 +435,32 @@ and `--export` (with optional `--output`) saves it under
 educational pack and says so. After repeating, record results with
 `practice-pack --complete --correct-spots ... --missed-spots ...`.
 
+## Repeat Pack Completion History (v1.27.0)
+
+Record whether your repeat packs actually fixed the spots you kept missing.
+`repeat-pack --complete` saves a local completion record (corrected vs still
+missed, completion rate, repeat accuracy), and `repeat-pack --progress`
+summarises correction progress, repeat **streaks**, and which spots are still
+**persistent misses**. It is built on the v1.26.0 repeat-pack generator and never
+changes the correct answers or the recommendation.
+
+```bash
+blackjack-coach repeat-pack --complete
+blackjack-coach repeat-pack --complete --corrected-spots hard_16_vs_10,soft_18_vs_9 --still-missed-spots pair_8_vs_6
+blackjack-coach repeat-pack --progress
+blackjack-coach repeat-pack --progress --profile SIX_DECK_H17_DAS_LS
+```
+
+`--complete` marks the generated repeat pack practised (whole pack complete with
+no accuracy unless you pass detail); add `--corrected-spots`,
+`--still-missed-spots`, and `--skipped-spots` (comma-separated spot ids) to
+record repeat accuracy. `--repeat-dir` chooses where completions are stored
+(default `./.blackjack_coach/repeat_packs`). `--progress` shows the correction
+summary (optionally scoped with `--profile`); with no saved completions it says
+so clearly. Per-spot statuses: NEW, IMPROVING, CORRECTED, PERSISTENT_MISS.
+Completion records are a local summary only - no money, accounts, or sensitive
+data - and are never committed.
+
 ## Terminal visual polish (v1.1.0)
 
 v1.1.0 makes the CLI clearer and more pleasant to practise with. Output now has
@@ -535,6 +566,8 @@ blackjack-coach practice-pack --complete
 blackjack-coach practice-pack --progress
 blackjack-coach repeat-pack
 blackjack-coach repeat-pack --markdown
+blackjack-coach repeat-pack --complete
+blackjack-coach repeat-pack --progress
 ```
 
 Without installing, run it as a module from the repository root:

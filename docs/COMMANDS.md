@@ -986,6 +986,35 @@ stores no sensitive data, never changes the correct answers or the strategy
 recommendation, and is never committed. After repeating, record results with
 `practice-pack --complete --correct-spots ... --missed-spots ...`.
 
+### repeat-pack --complete / --progress (v1.27.0)
+
+```bash
+blackjack-coach repeat-pack --complete
+blackjack-coach repeat-pack --complete --corrected-spots hard_16_vs_10,soft_18_vs_9 --still-missed-spots pair_8_vs_6
+blackjack-coach repeat-pack --progress
+blackjack-coach repeat-pack --progress --profile SIX_DECK_H17_DAS_LS
+```
+
+v1.27.0 adds a local completion history for repeat packs (correction progress):
+
+- `--complete` (with `--repeat-dir <path>`): generate a repeat pack and save a
+  completion record. With no per-spot detail the whole pack is marked complete
+  (no accuracy). Combine with `--corrected-spots`, `--still-missed-spots`,
+  `--skipped-spots`, or `--completed-spots` (comma-separated spot ids) to record
+  counts and repeat accuracy. It also works alongside `--export`. Completions
+  are stored under `./.blackjack_coach/repeat_packs` by default.
+- `--progress`: show the correction summary instead of generating a pack - total
+  repeat packs, completed vs partial, completion rate, repeat accuracy, current
+  / longest repeat streak, last repeat date, corrected spots, persistent missed
+  spots, skipped spots, and recommendations. Scope it with `--profile`. With no
+  saved completions it prints "No saved repeat pack completions yet. Use
+  repeat-pack --complete first."
+
+Per-spot statuses: NEW (< 2 attempts), IMPROVING (>= 50%), CORRECTED (>= 2
+corrected and >= 80%), PERSISTENT_MISS (< 50%). The completion history is local
+practice training only - it stores no sensitive data, never changes the correct
+answers or the strategy recommendation, and is never committed.
+
 
 
 

@@ -7,6 +7,65 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.27.0] - 2026-06-23
+
+Local repeat-pack completion history. The v1.26.0 repeat pack can now be marked
+**done**: `repeat-pack --complete` saves which previously-missed spots were
+corrected vs still missed (repeat accuracy, repeat streaks), and `repeat-pack
+--progress` summarises correction progress per spot. It never changes the
+correct answers, `strategy_engine.recommend`, or the Hi-Lo math.
+
+### Added
+
+- `app/repeat_pack_history.py`: dataclasses `RepeatPackCompletionRecord`,
+  `RepeatSpotProgress`, and `RepeatPackProgressSummary`, plus
+  `default_repeat_pack_history_dir`, `ensure_repeat_pack_history_dir`,
+  `build_repeat_pack_completion_record` (whole-pack completion or counts /
+  completion rate / repeat accuracy from corrected / still-missed / skipped spot
+  ids), `save_repeat_pack_completion_record`,
+  `load_repeat_pack_completion_record`, `list_repeat_pack_completion_records`
+  (with `limit` / `profile_key`), `build_repeat_spot_progress` (per-spot status
+  NEW / IMPROVING / CORRECTED / PERSISTENT_MISS), `summarize_repeat_pack_history`
+  (completed vs partial packs, overall completion rate / repeat accuracy,
+  streaks, corrected / persistent-missed / skipped spots, recommendations), and
+  `render_repeat_pack_progress_summary`.
+- CLI `repeat-pack` flags `--complete`, `--completed-spots`, `--corrected-spots`,
+  `--still-missed-spots`, `--skipped-spots`, `--repeat-dir`, and `--progress`.
+  `--complete` saves a completion record (and works alongside `--export`);
+  `--progress` shows the correction summary; with no data it prints a clear
+  message.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.27.0**.
+
+### Quality
+
+- New suite `tests/test_repeat_pack_history.py` (complete-all with no detail;
+  counts / completion rate / repeat accuracy from detail; save/load roundtrip;
+  list `limit` / `profile_key`; per-spot grouping; statuses NEW / CORRECTED /
+  PERSISTENT_MISS; empty + completed/partial summaries; consecutive-day streak;
+  persistent-missed and corrected detection; renderer; no sensitive field names;
+  serialized JSON has no sensitive keys; and that building a record never changes
+  `recommend()`) plus `TestCliRepeatPackHistory` in `tests/test_cli.py`
+  (`--complete` saves a file, detail accuracy, `--progress` no-data + with data,
+  `--progress --profile`, `--complete --export`, and `--version` = 1.27.0). Full
+  suite passing; ruff clean.
+
+### Safety
+
+- Repeat-pack completion history is **local practice training** only. It never
+  changes the correct answers, `strategy_engine.recommend`, the Hi-Lo math,
+  adaptive learning, guided coaching, outcome / session history, the EV-snapshot
+  history, the Strategy-vs-EV engine, reporting, the dashboard, the drill
+  generator, the drill history, the review scheduler, the practice-pack
+  generator, the practice-pack completion history, or the repeat-pack generator.
+  Records store no money, bankroll, real bets, accounts, tokens, screenshots, or
+  any sensitive/personal data, record practice without promising results, and
+  use no external dependencies, network, cloud, or database. Saved files live
+  under the git-ignored `.blackjack_coach/repeat_packs` tree (unless a
+  `--repeat-dir` is given) and are never committed.
+
 ## [1.26.0] - 2026-06-23
 
 Local repeat pack for missed spots. Using the practice-pack completion history

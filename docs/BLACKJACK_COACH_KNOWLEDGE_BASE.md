@@ -145,6 +145,13 @@ tool relies on and the project's evolution.
   practice-pack completion history (missed / skipped / low-accuracy spots) with
   the review queue and an educational fallback; the correct play comes from the
   strategy engine, so it never duplicates rules or changes the recommendation.
+- `app/repeat_pack_history.py` — Local repeat-pack completion history:
+  `RepeatPackCompletionRecord`, `RepeatSpotProgress`,
+  `RepeatPackProgressSummary`, plus `build_repeat_pack_completion_record`,
+  save/load/list, `build_repeat_spot_progress` (per-spot correction status),
+  `summarize_repeat_pack_history`, and `render_repeat_pack_progress_summary`.
+  Records which missed spots were corrected vs still missed; never changes the
+  correct answers or the recommendation.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -174,7 +181,8 @@ tool relies on and the project's evolution.
   `audit`, `outcomes`, `coach`, `coach-play`, `odds`, `learn`, `ev-review`,
   `report`, and `dashboard` subcommands, plus `drill` (with `--save` /
   `--review`) and `review-queue` and `practice-pack` (with `--complete` /
-  `--progress`) and `repeat-pack`; `odds`/`coach --show-odds` accept
+  `--progress`) and `repeat-pack` (with `--complete` / `--progress`);
+  `odds`/`coach --show-odds` accept
   `--explain-ev` and `ev-review` accepts `--explain` / `--large-gaps-only`).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
@@ -1412,7 +1420,7 @@ stores no sensitive data, keeps files under the git-ignored
 `.blackjack_coach/practice_packs` tree (unless a `--pack-dir` is given), and uses
 no external dependencies, network, cloud, or database.
 
-### v1.26.0 — Repeat Pack for Missed Spots (current)
+### v1.26.0 — Repeat Pack for Missed Spots (done)
 
 Builds on the v1.25.0 completion history. The history could summarise progress
 but did not turn missed spots back into practice; v1.26.0 adds a `repeat-pack`
@@ -1446,6 +1454,45 @@ Per `PROJECT_RULES.md` it stores no sensitive data, suggests practice without
 promising results, keeps exported files under the git-ignored
 `.blackjack_coach/reports` tree (unless an `--output` path is given), and uses no
 external dependencies, network, cloud, or database.
+
+### v1.27.0 — Repeat Pack Completion History (current)
+
+Builds on the v1.26.0 repeat-pack generator. The generator could rebuild
+missed-spot practice but not record whether those errors were actually fixed;
+v1.27.0 adds a local completion history (corrected vs still-missed, repeat
+accuracy, repeat streaks) and a per-spot correction status. It never changes the
+correct answers or the strategy engine.
+
+Delivered:
+
+- **`app/repeat_pack_history.py`**: `RepeatPackCompletionRecord` (repeat pack id
+  / date, profile, totals, completion rate, repeat accuracy, corrected /
+  still-missed / skipped spot ids, source summary), `RepeatSpotProgress`
+  (per-spot attempts / corrected / still-missed / status / next-action hint),
+  and `RepeatPackProgressSummary` (completed vs partial packs, overall completion
+  rate / repeat accuracy, repeat streaks, corrected / persistent-missed /
+  skipped spots, recommendations). Functions:
+  `default_repeat_pack_history_dir`, `ensure_repeat_pack_history_dir`,
+  `build_repeat_pack_completion_record`, save/load/list,
+  `build_repeat_spot_progress` (status NEW / IMPROVING / CORRECTED /
+  PERSISTENT_MISS), `summarize_repeat_pack_history`, and
+  `render_repeat_pack_progress_summary`.
+- **CLI**: `repeat-pack` gains `--complete`, `--completed-spots`,
+  `--corrected-spots`, `--still-missed-spots`, `--skipped-spots`, `--repeat-dir`,
+  and `--progress` (kept inside `repeat-pack` rather than a new command).
+- **Tests**: new `tests/test_repeat_pack_history.py` and
+  `TestCliRepeatPackHistory` in `tests/test_cli.py`.
+
+**Limits / honesty:** the repeat-pack completion history is local practice
+training. It records practice without promising results and never changes the
+correct answers, `strategy_engine.recommend`, the Hi-Lo math, adaptive learning,
+guided coaching, outcome / session history, the EV-snapshot history, the
+Strategy-vs-EV engine, reporting, the dashboard, the drill generator, the drill
+history, the review scheduler, the practice-pack generator, the practice-pack
+completion history, or the repeat-pack generator. Per `PROJECT_RULES.md` it
+stores no sensitive data, keeps files under the git-ignored
+`.blackjack_coach/repeat_packs` tree (unless a `--repeat-dir` is given), and uses
+no external dependencies, network, cloud, or database.
 
 ### v2.0 — Possible Web UI (if decided later)
 
