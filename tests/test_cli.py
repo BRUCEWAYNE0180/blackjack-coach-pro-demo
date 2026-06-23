@@ -1406,11 +1406,11 @@ class TestCliEVSnapshotHistory:
         assert exit_code == 0
         assert "No saved EV snapshots yet" in out
 
-    def test_version_prints_1_19_0(self, capsys):
+    def test_version_prints_1_20_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.19.0"
+        assert out.strip() == "blackjack-coach 1.20.0"
 
 
 
@@ -1616,3 +1616,125 @@ class TestCliReport:
         assert exit_code == 0
         assert "Sessions: 1" in out
         assert "Outcomes: 1" in out
+
+
+
+class TestCliDashboard:
+    """v1.20.0 profile dashboard & trends."""
+
+    def _seed(self, tmp_path):
+        session_dir = tmp_path / "history"
+        outcome_dir = tmp_path / "outcomes"
+        ev_dir = tmp_path / "ev"
+        cli.main([
+            "quiz-session", "--questions", "3", "--seed", "1",
+            "--answers", "H,S,D", "--save", "--history-dir", str(session_dir),
+        ])
+        cli.main([
+            "coach-play", "--decks", "6", "--seed", "5",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--save-outcome",
+            "--outcome-dir", str(outcome_dir),
+        ])
+        cli.main([
+            "odds", "--cards", "2\u2660,9\u2665", "--dealer", "A\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--composition-aware",
+            "--save-ev-snapshot", "--ev-dir", str(ev_dir),
+        ])
+        return session_dir, outcome_dir, ev_dir
+
+    def test_dashboard_no_data_shows_clear_message(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "dashboard",
+            "--session-dir", str(tmp_path / "s"),
+            "--outcome-dir", str(tmp_path / "o"),
+            "--ev-dir", str(tmp_path / "e"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Dashboard overview ===" in out
+        assert "No saved local history yet" in out
+
+    def test_dashboard_with_data_shows_overview(self, capsys, tmp_path):
+        session_dir, outcome_dir, ev_dir = self._seed(tmp_path)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "dashboard", "--session-dir", str(session_dir),
+            "--outcome-dir", str(outcome_dir), "--ev-dir", str(ev_dir),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Dashboard overview ===" in out
+        assert "Total outcomes    : 1" in out
+        assert "Next practice plan" in out
+
+    def test_dashboard_profile_filter(self, capsys, tmp_path):
+        session_dir, outcome_dir, ev_dir = self._seed(tmp_path)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "dashboard", "--profile", "SIX_DECK_H17_DAS_LS",
+            "--session-dir", str(session_dir),
+            "--outcome-dir", str(outcome_dir), "--ev-dir", str(ev_dir),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Selected profile: SIX_DECK_H17_DAS_LS" in out
+
+    def test_dashboard_limit(self, capsys, tmp_path):
+        session_dir, outcome_dir, ev_dir = self._seed(tmp_path)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "dashboard", "--limit", "20",
+            "--session-dir", str(session_dir),
+            "--outcome-dir", str(outcome_dir), "--ev-dir", str(ev_dir),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Dashboard overview ===" in out
+
+    def test_dashboard_markdown_prints_headings(self, capsys, tmp_path):
+        session_dir, outcome_dir, ev_dir = self._seed(tmp_path)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "dashboard", "--markdown",
+            "--session-dir", str(session_dir),
+            "--outcome-dir", str(outcome_dir), "--ev-dir", str(ev_dir),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "# Blackjack Coach Pro Demo - Profile Dashboard" in out
+        assert "## Dashboard overview" in out
+
+    def test_dashboard_export_creates_file(self, capsys, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        session_dir, outcome_dir, ev_dir = self._seed(tmp_path)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "dashboard", "--export",
+            "--session-dir", str(session_dir),
+            "--outcome-dir", str(outcome_dir), "--ev-dir", str(ev_dir),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Saved dashboard" in out
+        reports = list((tmp_path / ".blackjack_coach" / "reports").glob("dashboard_*.md"))
+        assert len(reports) == 1
+
+    def test_dashboard_output_path(self, capsys, tmp_path):
+        session_dir, outcome_dir, ev_dir = self._seed(tmp_path)
+        out_file = tmp_path / "dashboard.md"
+        capsys.readouterr()
+        exit_code = cli.main([
+            "dashboard", "--output", str(out_file),
+            "--session-dir", str(session_dir),
+            "--outcome-dir", str(outcome_dir), "--ev-dir", str(ev_dir),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert out_file.exists()
+        assert str(out_file) in out
+
+    def test_version_prints_1_20_0(self, capsys):
+        exit_code = cli.main(["--version"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert out.strip() == "blackjack-coach 1.20.0"

@@ -38,6 +38,12 @@ from .adaptive_learning import (
     classify_hand_spot,
 )
 from .counting import EDUCATIONAL_NOTE, CountingState, update_running_count_many
+from .dashboard import (
+    build_profile_dashboard,
+    export_dashboard,
+    render_dashboard_markdown,
+    render_dashboard_text,
+)
 from .decision_audit import audit_decision
 from .decision_diagnostics import explain_decision_factors
 from .deviations import (
@@ -2509,6 +2515,79 @@ def _run_report(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_dashboard_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'dashboard' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli dashboard",
+        description=(
+            "Show a local per-profile training dashboard: trends, weak spots, "
+            "Strategy-vs-EV disagreements, and a next-practice plan grouped by "
+            "rule profile (educational / local only). Never changes the "
+            "recommendation; exports no sensitive data."
+        ),
+    )
+    parser.add_argument("--profile", default=None, choices=sorted(PROFILES),
+                        help="Scope outcomes / EV snapshots to one rule profile.")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Only use the most recent N records per area.")
+    parser.add_argument("--session-dir", default=None, dest="session_dir",
+                        help="Session history directory (default: "
+                             "./.blackjack_coach/history).")
+    parser.add_argument("--outcome-dir", default=None, dest="outcome_dir",
+                        help="Outcome history directory (default: "
+                             "./.blackjack_coach/outcomes).")
+    parser.add_argument("--ev-dir", default=None, dest="ev_dir",
+                        help="EV snapshot directory (default: "
+                             "./.blackjack_coach/ev_snapshots).")
+    parser.add_argument("--markdown", action="store_true",
+                        help="Print the dashboard as Markdown instead of "
+                             "compact text.")
+    parser.add_argument("--export", action="store_true",
+                        help="Save the dashboard as a local Markdown file and "
+                             "print the saved path.")
+    parser.add_argument("--output", default=None,
+                        help="Exact output file path for --export (default: a "
+                             "timestamped file under ./.blackjack_coach/reports).")
+    return parser
+
+
+def _run_dashboard(argv: Sequence[str]) -> int:
+    """Handle the 'dashboard' profile-dashboard subcommand."""
+    parser = build_dashboard_parser()
+    args = parser.parse_args(argv)
+
+    if args.limit is not None and args.limit < 0:
+        print("Error: --limit must be >= 0.", file=sys.stderr)
+        return 2
+
+    try:
+        dashboard = build_profile_dashboard(
+            profile_key=args.profile,
+            session_dir=args.session_dir,
+            outcome_dir=args.outcome_dir,
+            ev_dir=args.ev_dir,
+            limit=args.limit,
+        )
+    except (ValueError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    if args.markdown:
+        print(render_dashboard_markdown(dashboard))
+    else:
+        print(render_dashboard_text(dashboard))
+
+    if args.export or args.output:
+        try:
+            path = export_dashboard(dashboard, output_path=args.output)
+        except OSError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print("")
+        print(format_kv("Saved dashboard", str(path)))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -2534,6 +2613,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli learn --profile SIX_DECK_H17_DAS_LS (adaptive learning)
         python -m app.cli ev-review --limit 20               (Strategy-vs-EV review)
         python -m app.cli report --format markdown --print   (exportable report)
+        python -m app.cli dashboard --profile SIX_DECK_H17_DAS_LS (profile dashboard)
         python -m app.cli coach --cards A,7 --dealer 9       (direct advice)
         python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
         python -m app.cli odds --cards 10,6 --dealer 10      (probability advisor)
@@ -2596,6 +2676,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_ev_review(args[1:])
     if args and args[0] == "report":
         return _run_report(args[1:])
+    if args and args[0] == "dashboard":
+        return _run_dashboard(args[1:])
     if args and args[0] == "coach":
         return _run_coach(args[1:])
     if args and args[0] == "coach-play":

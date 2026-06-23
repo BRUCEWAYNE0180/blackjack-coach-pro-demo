@@ -24,6 +24,17 @@ from .counting import (
     update_running_count,
     update_running_count_many,
 )
+from .dashboard import (
+    DashboardProfileSummary,
+    DashboardSummary,
+    DashboardTrendPoint,
+    build_dashboard_trends,
+    build_profile_dashboard,
+    export_dashboard,
+    recommend_next_practice_plan,
+    render_dashboard_markdown,
+    render_dashboard_text,
+)
 from .decision_diagnostics import DecisionDiagnostic, explain_decision_factors
 from .deviations import (
     DEFAULT_DEVIATION_RULES,
@@ -171,7 +182,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.19.0"
+__version__ = "1.20.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -195,6 +206,9 @@ __all__ = [
     "DisagreementExplanationSummary",
     "ExportedReport",
     "ReportSummary",
+    "DashboardProfileSummary",
+    "DashboardSummary",
+    "DashboardTrendPoint",
     "FOUR_DECK_H17_DAS_LS",
     "HandEvaluation",
     "HandOutcome",
@@ -236,6 +250,12 @@ __all__ = [
     "render_report_json",
     "render_report_markdown",
     "save_report",
+    "build_profile_dashboard",
+    "build_dashboard_trends",
+    "recommend_next_practice_plan",
+    "render_dashboard_text",
+    "render_dashboard_markdown",
+    "export_dashboard",
     "can_double_after_split",
     "can_hit_split_aces",
     "can_resplit",

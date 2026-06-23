@@ -7,6 +7,64 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.20.0] - 2026-06-23
+
+Local per-profile training dashboard & trends. A new `dashboard` command turns
+the v1.19.0 reports into a more useful decision-making view: it groups the local
+session history, outcomes, EV snapshots, Strategy-vs-EV disagreements, weak
+spots, and practice recommendations by rule profile, adds a simple
+recent-sample trend, and prints a concrete next-practice plan. Everything stays
+local and read-only; it never changes the strategy recommendation or the Hi-Lo
+math and stores / exports no sensitive data.
+
+### Added
+
+- `app/dashboard.py`: dataclasses `DashboardProfileSummary`,
+  `DashboardTrendPoint`, and `DashboardSummary`, plus `build_profile_dashboard`
+  (groups outcomes / EV snapshots by profile and combines `summarize_history`,
+  `summarize_outcomes`, `summarize_ev_snapshots`, `build_learning_summary`, and
+  `summarize_disagreement_explanations`), `build_dashboard_trends` (simple
+  recent-sample buckets `recent_1..3`; no date parsing required),
+  `recommend_next_practice_plan` (weak spots, low accuracy, high EV
+  disagreement, high loss rate), `render_dashboard_text`,
+  `render_dashboard_markdown`, and `export_dashboard` (defaults to a timestamped
+  file under `./.blackjack_coach/reports`).
+- CLI `dashboard` command with `--profile`, `--limit`, `--session-dir`,
+  `--outcome-dir`, `--ev-dir`, `--markdown`, `--export`, and `--output`. Prints
+  compact text by default; with no saved history it prints a clear message.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.20.0**.
+- `report` Markdown now points to `dashboard` for an interactive-style CLI
+  summary (no behaviour change to the report data).
+
+### Quality
+
+- New suite `tests/test_dashboard.py` (empty history -> zeros and a clear note;
+  totals counted; profile filter; most-practiced detection; next-practice plan
+  generation; trends return a list even with little data; plan uses weak spots;
+  text / Markdown renderers; export saves a file; no sensitive field names; and
+  building the dashboard never changes `recommend()`) plus `TestCliDashboard` in
+  `tests/test_cli.py` for the `dashboard` command (no-data message, overview
+  with data, `--profile`, `--limit`, `--markdown`, `--export`, custom
+  `--output`, and `--version` = 1.20.0). Full suite passing; ruff clean.
+
+### Safety
+
+- The dashboard is a **local, read-only practice aid** only: it stores / exports
+  no money, bankroll, real bets, accounts, tokens, screenshots, or any
+  sensitive/personal data, and no private filesystem paths beyond its own output
+  location. It keeps training, outcomes, EV advisory, disagreements, and
+  practice recommendations in clearly separated sections, uses no external chart
+  libraries (trends are plain text / Markdown tables), and never changes
+  `strategy_engine.recommend`, the Hi-Lo math, adaptive learning, guided
+  coaching, outcome / session history, the EV-snapshot history, the
+  Strategy-vs-EV explanation engine, or the reporting module. Dashboard files
+  live under the git-ignored `.blackjack_coach/reports` tree (unless an explicit
+  `--output` path is given) and are never committed. No external dependencies,
+  no network / cloud / database.
+
 ## [1.19.0] - 2026-06-23
 
 Exportable local-learning reports. A new `report` command combines the local

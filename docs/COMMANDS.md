@@ -731,6 +731,46 @@ Reports are a local, read-only summary only - no money, bankroll, bets,
 accounts, tokens, or personal data - and live under the git-ignored
 `.blackjack_coach/reports` tree (unless `--output` is given), never committed.
 
+## Profile dashboard & trends (v1.20.0)
+
+### dashboard
+
+```bash
+blackjack-coach dashboard
+blackjack-coach dashboard --profile SIX_DECK_H17_DAS_LS
+blackjack-coach dashboard --limit 20
+blackjack-coach dashboard --markdown
+blackjack-coach dashboard --export
+blackjack-coach dashboard --profile SIX_DECK_H17_DAS_LS --export --output dashboard.md
+```
+
+Shows a local per-profile training dashboard that answers: which profile am I
+practising most, where am I failing, which spots have the most Strategy-vs-EV
+disagreements, and what should I drill next. It groups outcomes and EV snapshots
+by rule profile (sessions are not profile-scoped and are shown globally),
+combines the existing summarisers, adds a simple recent-sample trend, and prints
+a concrete next-practice plan. The text view has these sections: Dashboard
+overview, Profiles, Selected profile (with `--profile`), Trends, Weak spots, EV
+disagreements, Next practice plan, and Data quality.
+
+Flags:
+
+- `--profile <KEY>` - scope outcomes / EV snapshots to one rule profile.
+- `--limit N` - use only the most recent N records per area.
+- `--session-dir` / `--outcome-dir` / `--ev-dir` - read from custom history
+  folders.
+- `--markdown` - print the dashboard as Markdown (for Notion / GitHub) instead
+  of compact text.
+- `--export` - save a Markdown file under `./.blackjack_coach/reports` and print
+  the path.
+- `--output <path>` - save to an exact file path.
+
+With no saved history it prints "No saved local history yet. Use
+quiz-session/play/coach-play/odds with save flags first."; with little data it
+flags a **LOW sample / limited data** note. The dashboard uses no external chart
+libraries (trends are plain text / Markdown tables), exports no sensitive data,
+and never changes the strategy recommendation - it only suggests practice.
+
 
 
 
