@@ -52,11 +52,14 @@ through v0.6.
   `QuizSessionResult`, `generate_strategy_question`, `grade_strategy_answer`,
   `normalize_user_action`, `build_strategy_questions`, `run_strategy_session`,
   `run_count_session`).
-- `app/cli.py` — Terminal trainer (`python -m app.cli`, plus `count`,
-  `simulate`, `play`, `quiz`, `count-quiz`, `quiz-session`, and
-  `count-session` subcommands).
+- `app/cli.py` — Terminal trainer (`python -m app.cli` or the installed
+  `blackjack-coach` command, plus `count`, `simulate`, `play`, `quiz`,
+  `count-quiz`, `quiz-session`, and `count-session` subcommands).
+- `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
+  script, the `dev` extra, and `pytest`/`ruff` configuration.
+- `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
 - `tests/` — Behavioural tests for the evaluator, engine, explanations,
-  counting, shoe, simulator, quiz, and CLI.
+  counting, shoe, simulator, quiz, CLI, and packaging.
 
 ## Roadmap
 
@@ -345,7 +348,7 @@ Delivered (educational practice only):
 - Never for real tables: no casino connectivity, no real-money betting, no
   camera/video, no screen scraping, and no promise of winnings.
 
-### v0.8 — Scored Training Sessions (current)
+### v0.8 — Scored Training Sessions (done)
 
 Delivered (educational practice only):
 
@@ -386,13 +389,45 @@ Delivered (educational practice only):
 - Never for real tables: no casino connectivity, no real-money betting, no
   camera/video, no screen scraping, and no promise of winnings.
 
-### v0.9 — Visual / UI Layer
+### v0.9 — Professional Hardening (current)
+
+Delivered (no new gameplay scope; tooling and quality only):
+
+- **Packaging** — a `pyproject.toml` (setuptools build backend) declares the
+  project metadata, `requires-python = ">=3.9"`, an empty runtime dependency
+  list (standard library only), and a `dev` extra (`pytest`, `ruff`).
+- **Console command** — a `blackjack-coach` entry point maps to
+  `app.cli:main`, so all subcommands work as `blackjack-coach ...` once
+  installed with `python -m pip install -e ".[dev]"`.
+- **Continuous integration** — `.github/workflows/ci.yml` runs `ruff check
+  app tests` and `python -m pytest` on Python 3.9, 3.10, 3.11, and 3.12 for
+  every push to `main` and every pull request.
+- **Quality gates** — documented in `PROJECT_RULES.md`: every PR must pass
+  tests and lint, new features need tests, new functions must preserve the
+  educational/simulated scope, and no secrets/`.env`/tokens/private files are
+  ever committed.
+- **Tooling config** — `[tool.pytest.ini_options]` and `[tool.ruff]`
+  (line length, target version, and `E/F/W/I` lint rules) live in
+  `pyproject.toml`; a convenience `requirements-dev.txt` installs `-e .[dev]`
+  without duplicating version pins.
+- **Tests** — assert `app.__version__ == "0.9.0"` and that every existing CLI
+  subcommand still works (backward compatibility); all earlier tests remain
+  green.
+
+**Limitations / out of scope for v0.9**
+
+- No new gameplay features (no betting spread, Kelly, Illustrious 18, insurance
+  index, or web app).
+- Still local/simulated only: no casino connectivity, no real-money betting or
+  bankroll, no camera/video, no screen scraping, and no promise of winnings.
+
+### v1.0 — Visual / UI Layer
 
 - Interactive strategy charts and quiz/flashcard UX.
 - Progress tracking and accuracy stats per hand category.
 - Groundwork for a web app front end.
 
-### v1.0 — Web App & Polish
+### v1.1 — Web App & Polish
 
 - Browser-based practice app over the existing engine and simulator.
 - Profile selection, drill history, and shareable practice sessions.

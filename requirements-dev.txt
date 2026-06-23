@@ -1,0 +1,8 @@
+# Development dependencies.
+#
+# The canonical source of truth is pyproject.toml under
+# [project.optional-dependencies] -> dev. This file is a convenience that
+# installs the package in editable mode together with those dev extras, so a
+# plain `pip install -r requirements-dev.txt` sets up a full dev environment
+# without duplicating version constraints.
+-e .[dev]

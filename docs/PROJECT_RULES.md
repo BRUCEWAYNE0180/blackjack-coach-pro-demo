@@ -68,7 +68,25 @@ Profiles are defined in `app/rules.py`. v0.1 ships two:
   source of truth and validated against well-known basic-strategy charts.
 - Changes land via pull request; no direct commits to `main`.
 
-## 7. Responsible-Use Notice
+## 7. Professional Quality Gates
+
+As of v0.9 the project enforces these gates on every change:
+
+- **Tests must pass.** Every pull request must pass `python -m pytest` (run
+  locally and in CI on Python 3.9-3.12).
+- **Lint must pass.** Every pull request must pass `ruff check app tests`.
+- **New features require tests.** Any new feature or bug fix must add or update
+  tests that cover the new behaviour.
+- **Scope is preserved.** Every new function must keep the educational /
+  simulated scope: no real casino connectivity, no real-money betting or
+  bankroll, no camera/video, no screen scraping, and no promise of winnings.
+- **No secrets in the repository.** Never commit secrets, `.env` files, API
+  tokens, credentials, private PDFs, or sensitive screenshots. CI must not
+  depend on any private secret to run the tests or lint.
+- **Changes land via pull request.** No direct commits to `main`; CI must be
+  green before merge.
+
+## 8. Responsible-Use Notice
 
 This tool is for learning and entertainment. Gambling involves financial risk
 and can be addictive. Users are responsible for complying with all applicable
