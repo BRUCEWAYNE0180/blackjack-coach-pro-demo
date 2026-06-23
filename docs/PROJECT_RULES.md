@@ -149,6 +149,13 @@ As of v0.9 the project enforces these gates on every change:
   with plain ranks. Colour/suit display is presentation only and must degrade to
   plain text when colour is unsupported or disabled (`--no-color` /
   `--plain-cards`).
+- **Count-aware coaching must separate the actions.** When the coach is given a
+  true count (v1.11.0), it must keep `basic_action`, `count_adjusted_action`,
+  and `final_recommended_action` distinct, and must explain when a deviation
+  changes the play. Deviation study must not be silently mixed into the base
+  engine: `strategy_engine.recommend` stays unchanged, and the insurance study
+  rule is never the coach's final action (insurance advice stays NO). Without a
+  true count the coach uses basic strategy.
 
 ## 8. Release Rules
 

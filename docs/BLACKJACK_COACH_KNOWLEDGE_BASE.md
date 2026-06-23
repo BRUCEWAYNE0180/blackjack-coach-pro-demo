@@ -760,7 +760,7 @@ and the outcome stay distinct; the coach decides and the user receives guidance.
 Per `PROJECT_RULES.md`, the user is not asked to choose the action in guided
 mode, and the coach never changes the strategy engine.
 
-### v1.10.0 — Professional Card Renderer (current)
+### v1.10.0 — Professional Card Renderer (done)
 
 Makes cards look and read like a real blackjack calculator: figures, suits, and
 colour for input and output. Strategy is untouched - this is a presentation /
@@ -785,6 +785,35 @@ Delivered:
 scoring. Card input accepts `A♠`, `AS`, `A spades`, `10H`, `Q clubs`, `Kd`, and
 suitless `A,7`; the engine always receives plain ranks (`cards_to_ranks`). Per
 `PROJECT_RULES.md`, the card display layer must preserve ranks for the engine.
+
+### v1.11.0 — Count-Aware Coach Advisor (current)
+
+Connects the educational true-count deviation study to the guided coach. The
+user can supply an optional true count and the coach compares basic strategy
+with the count-adjusted play and chooses a final recommendation. Basic strategy
+is untouched (`strategy_engine.recommend` is not modified).
+
+Delivered:
+
+- **`app/guided_coach.py`**: count-aware fields on `CoachStep`
+  (`basic_action`, `count_adjusted_action`, `true_count`, `deviation_applied`,
+  `deviation_rule_id`, `deviation_title`, `final_recommended_action`,
+  `count_note`) and `true_count` on `GuidedCoachResult`. `build_coach_step` /
+  `explain_next_best_action` accept `true_count` and consult
+  `deviations.recommend_with_deviation`; `play_guided_coach_hand` passes a true
+  count as advisory context only.
+- **CLI**: `coach --true-count <n>` (basic vs count-adjusted vs final action,
+  with the deviation rule) and `coach-play --true-count <n>` (advisory true
+  count per step; the hand is played with basic strategy).
+- **Tests**: count-aware cases in `tests/test_guided_coach.py` (deviation
+  applies / does not by true count; hard 15/16/10; insurance never final;
+  engine unchanged) plus CLI tests.
+
+**Separation:** the coach keeps basic action, count-adjusted action, and final
+recommended action distinct and explains any deviation. The deviation study is
+study-only - the insurance rule never becomes a final action, and without a
+true count the coach uses basic strategy. Per `PROJECT_RULES.md`, deviation
+study must not be silently mixed into the base engine.
 
 ### v2.0 — Possible Web UI (if decided later)
 

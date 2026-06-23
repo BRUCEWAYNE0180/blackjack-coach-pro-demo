@@ -82,8 +82,68 @@ class TestEngineUnchanged:
     def test_does_not_modify_recommend(self):
         before = recommend(["A", "7"], "9", P6)
         build_coach_step(["A", "7"], "9", P6)
+        build_coach_step(["10", "6"], "10", P6, true_count=3)
         play_guided_coach_hand(decks=6, seed=42, profile=P6)
         after = recommend(["A", "7"], "9", P6)
         assert before.action == after.action
         assert before.reason == after.reason
         assert before.warnings == after.warnings
+
+
+class TestCountAwareCoach:
+    def test_no_true_count_keeps_basic_behaviour(self):
+        step = build_coach_step(["A", "7"], "9", P6)
+        assert step.true_count is None
+        assert step.deviation_applied is False
+        assert step.final_recommended_action == step.recommended_action
+        assert step.count_adjusted_action is None
+
+    def test_hard_16_vs_10_deviation_applies_at_tc_1(self):
+        step = build_coach_step(["10", "6"], "10", P6, true_count=1)
+        assert step.true_count == 1
+        assert step.deviation_applied is True
+        assert step.deviation_rule_id == "hard_16_vs_10"
+        assert step.count_adjusted_action == Action.STAND
+        assert step.final_recommended_action == Action.STAND
+        # The basic engine action is preserved separately.
+        assert step.basic_action == step.recommended_action
+
+    def test_hard_16_vs_10_no_deviation_at_negative_tc(self):
+        step = build_coach_step(["10", "6"], "10", P6, true_count=-1)
+        assert step.deviation_applied is False
+        assert step.final_recommended_action == step.basic_action
+        assert "No studied deviation" in step.count_note
+
+    def test_hard_15_vs_10_deviation_at_tc_4(self):
+        step = build_coach_step(["10", "5"], "10", P6, true_count=4)
+        assert step.deviation_applied is True
+        assert step.deviation_rule_id == "hard_15_vs_10"
+        assert step.final_recommended_action == Action.STAND
+
+    def test_hard_10_vs_10_doubles_at_tc_4(self):
+        # A hard total of 10 (not a pair of tens) vs dealer 10.
+        step = build_coach_step(["7", "3"], "10", P6, true_count=4)
+        assert step.deviation_applied is True
+        assert step.deviation_rule_id == "hard_10_vs_10"
+        assert step.count_adjusted_action == Action.DOUBLE
+        assert step.final_recommended_action == Action.DOUBLE
+
+    def test_a7_vs_9_with_true_count_no_deviation(self):
+        step = build_coach_step(["A", "7"], "9", P6, true_count=3)
+        assert step.deviation_applied is False
+        assert step.final_recommended_action == step.basic_action
+
+    def test_insurance_study_only_never_final_action(self):
+        # Hand vs an Ace at a high count: the insurance study rule must never
+        # become the coach's final action (no playing deviation for 16 vs A).
+        step = build_coach_step(["10", "6"], "A", P6, true_count=5)
+        assert step.deviation_applied is False
+        assert step.final_recommended_action == step.basic_action
+
+    def test_coach_play_true_count_is_advisory(self):
+        result = play_guided_coach_hand(decks=6, seed=42, profile=P6, true_count=2)
+        assert result.true_count == 2
+        for step in result.coach_steps:
+            assert step.true_count == 2
+            # Advisory only: the played actions are basic strategy, no override.
+            assert step.deviation_applied is False

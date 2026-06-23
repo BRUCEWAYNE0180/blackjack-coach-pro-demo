@@ -906,3 +906,46 @@ class TestCliCardDisplay:
         assert exit_code == 0
         assert "=== Played Hand ===" in out
         assert "Final player cards" in out
+
+
+class TestCliCountAwareCoach:
+    def test_coach_true_count_deviation(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666", "--true-count", "1",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "True count" in out
+        assert "Basic action" in out
+        assert "Final recommended action" in out
+        assert "Deviation applied" in out
+        assert "Deviation rule" in out
+        assert "Hard 16 vs 10" in out
+        assert "Final recommended action: STAND" in out
+
+    def test_coach_true_count_no_deviation(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "A,7", "--dealer", "9",
+                              "--true-count", "1",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Deviation applied" in out
+        assert "Deviation rule" not in out
+        assert "Final recommended action: HIT" in out
+
+    def test_coach_without_true_count_has_no_count_block(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "A,7", "--dealer", "9",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Count-aware advisory" not in out
+        assert "Recommended action" in out
+
+    def test_coach_play_true_count_advisory(self, capsys):
+        exit_code = cli.main(["coach-play", "--decks", "6", "--seed", "42",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--true-count", "1"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "True count (advisory): 1" in out
+        assert "True count" in out

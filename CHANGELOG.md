@@ -7,6 +7,51 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.11.0] - 2026-06-23
+
+Count-aware coach advice. The guided coach can now fold in the educational
+true-count deviation study: enter your cards, the dealer upcard, a profile, and
+optionally a `--true-count`, and the coach compares basic strategy with the
+count-adjusted play and picks a final recommendation. Without a true count the
+coach behaves exactly as in v1.10.0. Basic strategy is unchanged
+(`strategy_engine.recommend` is never modified) and the insurance study rule is
+never the coach's final action.
+
+### Added
+
+- `app/guided_coach.py`: count-aware fields on `CoachStep` (`basic_action`,
+  `count_adjusted_action`, `true_count`, `deviation_applied`,
+  `deviation_rule_id`, `deviation_title`, `final_recommended_action`,
+  `count_note`) and an optional `true_count` on `GuidedCoachResult`.
+  `build_coach_step` / `explain_next_best_action` accept `true_count` and
+  consult `deviations.recommend_with_deviation`.
+- CLI `coach --true-count <n>`: shows the true count, basic action,
+  count-adjusted action (when a deviation applies), whether a deviation was
+  applied, the deviation rule, and the final recommended action.
+- CLI `coach-play --true-count <n>`: shows the true count as advisory context
+  per step (the hand is still played with basic strategy).
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.11.0**.
+
+### Quality
+
+- New count-aware tests in `tests/test_guided_coach.py` (deviation applies /
+  does not apply by true count, hard 15/16/10 cases, insurance never final,
+  engine unchanged) plus CLI tests for `coach --true-count` and
+  `coach-play --true-count`. Full suite passing; ruff clean; CI on Python
+  3.9-3.12.
+
+### Safety
+
+- The coach keeps basic action, count-adjusted action, and final recommended
+  action separate, and always explains when a deviation changes the play. The
+  deviation study stays study-only (insurance never becomes a final action);
+  `strategy_engine.recommend`, Hi-Lo counting math, the simulator, outcome
+  history, and session history are unchanged. No casino connectivity, real
+  betting, bankroll, bet spread, camera/video, or promise of winnings.
+
 ## [1.10.0] - 2026-06-23
 
 Professional card display. Cards can now be entered and shown with figures,

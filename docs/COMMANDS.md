@@ -315,6 +315,19 @@ chart action, whether a fallback was applied, the legal actions, and a
 plain-language why. The user does not pick the action - the coach decides and
 explains.
 
+Add `--true-count <n>` to fold in the educational deviation study (v1.11.0):
+
+```bash
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --true-count 1
+blackjack-coach coach --cards 10♠,5♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --true-count 4
+```
+
+With a true count, the output adds a count-aware advisory: the true count, basic
+action, count-adjusted action (when a deviation applies), whether a deviation
+was applied, the deviation rule, and the final recommended action. Without
+`--true-count`, the coach uses basic strategy only. The insurance deviation is
+study-only and never becomes the final action.
+
 ### coach-play
 
 ```bash
@@ -326,7 +339,9 @@ The coach plays a full simulated hand, choosing every action automatically. It
 shows a step-by-step recommendation (player cards, dealer upcard, recommended
 action, why) for each decision, then the final hands, outcome, result label, and
 step count. `--save-outcome` (with optional `--outcome-dir`) stores the result
-in the local outcome history (v1.8.0).
+in the local outcome history (v1.8.0). `--true-count <n>` (v1.11.0) shows the
+true count as advisory context per step; the hand is still played with basic
+strategy.
 
 How the decision commands relate: `coach` is direct advice; `coach-play` lets
 the coach play a hand; `play` is the existing auto-simulation; `audit` is the
