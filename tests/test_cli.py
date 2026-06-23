@@ -1304,3 +1304,110 @@ class TestCliLearn:
         hist_action = [line for line in with_history.splitlines()
                        if line.startswith("Recommended action")][0]
         assert base_action == hist_action
+
+
+
+class TestCliEVSnapshotHistory:
+    """v1.17.0 EV snapshot history & Strategy-vs-EV review."""
+
+    def test_odds_save_ev_snapshot_creates_file(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "odds", "--cards", "10\u2660,6\u2665", "--dealer", "10\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--composition-aware",
+            "--save-ev-snapshot", "--ev-dir", str(tmp_path),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Saved EV snapshot" in out
+        assert len(list(tmp_path.glob("ev_snapshot_*.json"))) == 1
+
+    def test_coach_show_odds_save_ev_snapshot_creates_file(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "coach", "--cards", "10\u2660,6\u2665", "--dealer", "10\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--show-odds",
+            "--composition-aware",
+            "--save-ev-snapshot", "--ev-dir", str(tmp_path),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Saved EV snapshot" in out
+        assert len(list(tmp_path.glob("ev_snapshot_*.json"))) == 1
+
+    def test_coach_save_ev_snapshot_without_show_odds_errors(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "coach", "--cards", "10\u2660,6\u2665", "--dealer", "10\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS",
+            "--save-ev-snapshot", "--ev-dir", str(tmp_path),
+        ])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "--save-ev-snapshot requires --show-odds" in err
+        assert not list(tmp_path.glob("ev_snapshot_*.json"))
+
+    def test_ev_review_without_data_shows_clear_message(self, capsys, tmp_path):
+        exit_code = cli.main(["ev-review", "--dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== EV Snapshot Review ===" in out
+        assert "No saved EV snapshots yet" in out
+        assert "--save-ev-snapshot" in out
+
+    def test_ev_review_with_snapshots_shows_total(self, capsys, tmp_path):
+        for _ in range(3):
+            cli.main([
+                "odds", "--cards", "10\u2660,6\u2665", "--dealer", "10\u2666",
+                "--profile", "SIX_DECK_H17_DAS_LS", "--composition-aware",
+                "--save-ev-snapshot", "--ev-dir", str(tmp_path),
+            ])
+        capsys.readouterr()  # discard odds output
+        exit_code = cli.main(["ev-review", "--dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total snapshots    : 3" in out
+        assert "Agreement count" in out
+        assert "Agreement rate" in out
+
+    def test_ev_review_disagreements_only_filters(self, capsys, tmp_path):
+        # 10,6 vs 10 agrees (both SURRENDER), so disagreements-only is empty.
+        cli.main([
+            "odds", "--cards", "10\u2660,6\u2665", "--dealer", "10\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--composition-aware",
+            "--save-ev-snapshot", "--ev-dir", str(tmp_path),
+        ])
+        capsys.readouterr()
+        exit_code = cli.main([
+            "ev-review", "--dir", str(tmp_path), "--disagreements-only",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "No saved EV snapshots yet" in out
+
+    def test_ev_review_profile_filter(self, capsys, tmp_path):
+        cli.main([
+            "odds", "--cards", "10\u2660,6\u2665", "--dealer", "10\u2666",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--composition-aware",
+            "--save-ev-snapshot", "--ev-dir", str(tmp_path),
+        ])
+        capsys.readouterr()
+        # A matching profile shows the snapshot.
+        exit_code = cli.main([
+            "ev-review", "--dir", str(tmp_path),
+            "--profile", "SIX_DECK_H17_DAS_LS",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total snapshots    : 1" in out
+        # A non-matching profile yields the empty message.
+        exit_code = cli.main([
+            "ev-review", "--dir", str(tmp_path),
+            "--profile", "SIX_DECK_S17_DAS_LS",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "No saved EV snapshots yet" in out
+
+    def test_version_prints_1_17_0(self, capsys):
+        exit_code = cli.main(["--version"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert out.strip() == "blackjack-coach 1.17.0"

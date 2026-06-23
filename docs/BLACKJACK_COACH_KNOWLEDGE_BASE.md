@@ -81,6 +81,13 @@ tool relies on and the project's evolution.
   `estimate_dealer_outcomes`, `estimate_action_ev`, and
   `build_probability_advice`. Approximate / advisory only; never overrides the
   recommendation and never changes the engine or counting math.
+- `app/ev_history.py` — Local EV-snapshot history & Strategy-vs-EV review
+  (summary only): `EVSnapshotRecord`, `EVReviewSummary`,
+  `default_ev_history_dir`, `ensure_ev_history_dir`, `build_ev_snapshot_record`
+  (from a `ProbabilityAdvice` or `CompositionAwareProbabilityAdvice`),
+  save/load/list (with limit / profile / disagreements-only filters), and
+  `summarize_ev_snapshots`. Advisory audit only; it never changes the
+  recommendation and stores no sensitive data.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -107,7 +114,8 @@ tool relies on and the project's evolution.
   `blackjack-coach` command, plus `count`, `simulate`, `play`, `quiz`,
   `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`,
   `deviation-quiz`, `diagnose`, `profiles`, `split-rules`, `matrix`,
-  `audit`, `outcomes`, `coach`, and `coach-play` subcommands).
+  `audit`, `outcomes`, `coach`, `coach-play`, `odds`, `learn`, and `ev-review`
+  subcommands).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -962,7 +970,7 @@ simplified, and never overrides the main strategy without explicit validation.
 No change to `strategy_engine.recommend` or the Hi-Lo math; no external
 dependencies; no Monte Carlo / slow simulations.
 
-### v1.16.0 — Full Player EV Decision Tree (current)
+### v1.16.0 — Full Player EV Decision Tree (done)
 
 Builds on v1.15.0. The composition layer, exact finite-shoe dealer
 distribution, and split/re-split EV were already in place, but some hittable
@@ -999,6 +1007,49 @@ aggregated, and the SPLIT portion keeps its own approximations. Per
 exactness, and approximation, and never overrides the main strategy without
 explicit validation. No change to `strategy_engine.recommend` or the Hi-Lo math;
 no external dependencies; no Monte Carlo / slow simulations.
+
+### v1.17.0 — EV Snapshot History & Review (current)
+
+Builds on the v1.12.0-v1.16.0 probability / EV advisor. The advisor is advisory
+only, but there was no way to **remember** its output or to study, over many
+hands, when the coach's main recommendation agreed with the advisory best-EV
+action and when it differed. v1.17.0 adds a **local EV-snapshot history** and a
+**Strategy-vs-EV review** so the advisor becomes more transparent and useful for
+local self-study. It saves only a safe local summary and never changes play.
+
+Delivered:
+
+- **`app/ev_history.py`**: `EVSnapshotRecord` (snapshot id, timestamp, profile,
+  cards, dealer upcard, decks, optional true count / seen cards, the recommended
+  and best-EV actions, per-action EVs, the recommended action's EV, the best EV,
+  the EV gap, agreement, `has_split_ev` / `has_decision_tree` /
+  `composition_aware` flags, an exactness note, an approximation note, warnings,
+  and a note) and `EVReviewSummary` (total snapshots, agreement / disagreement
+  counts and rate, most common profile, most common recommended / best-EV
+  actions, largest EV gaps, disagreement spots, practice recommendations, a
+  data-quality note, and warnings). Functions: `default_ev_history_dir`,
+  `ensure_ev_history_dir`, `build_ev_snapshot_record` (from a `ProbabilityAdvice`
+  or `CompositionAwareProbabilityAdvice`), `save_ev_snapshot_record`,
+  `load_ev_snapshot_record`, `list_ev_snapshot_records` (limit / profile /
+  disagreements-only filters), and `summarize_ev_snapshots` (LOW sample below 10
+  snapshots).
+- **CLI**: `odds` and `coach --show-odds` gain `--save-ev-snapshot` /
+  `--ev-dir`; `coach --save-ev-snapshot` requires `--show-odds` (clear error
+  otherwise). New `ev-review` command (`--dir`, `--limit`, `--profile`,
+  `--disagreements-only`, `--min-gap`) prints the Strategy-vs-EV review, or a
+  clear "use `--save-ev-snapshot` first" message when there is no data.
+- **Tests**: new `tests/test_ev_history.py` (build from composition-aware /
+  idealised advice, agreement and EV-gap computation, save/load roundtrip, list
+  filters, empty / counting / largest-gap / LOW-sample / min-gap summaries, no
+  sensitive fields, and a guard that building a snapshot never changes
+  `recommend()`) plus CLI tests for the new flags and `ev-review`.
+
+**Limits / honesty:** EV snapshots are a **local advisory audit only**. They
+never override the main recommendation (differences are reported, not applied),
+never change `strategy_engine.recommend` or the Hi-Lo math, and store no money,
+bankroll, bets, accounts, tokens, screenshots, or personal data - no database,
+no network, no cloud. Saved files live under the git-ignored `.blackjack_coach/`
+tree and are never committed. No external dependencies and no slow simulations.
 
 ### v2.0 — Possible Web UI (if decided later)
 

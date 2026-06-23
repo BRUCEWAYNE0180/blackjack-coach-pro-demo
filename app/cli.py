@@ -44,6 +44,12 @@ from .deviations import (
     normalize_true_count,
     recommend_with_deviation,
 )
+from .ev_history import (
+    build_ev_snapshot_record,
+    list_ev_snapshot_records,
+    save_ev_snapshot_record,
+    summarize_ev_snapshots,
+)
 from .explanations import explain_insurance_no
 from .formatting import (
     format_cards,
@@ -1612,6 +1618,14 @@ def build_coach_parser() -> argparse.ArgumentParser:
     parser.add_argument("--history-dir", default=None, dest="history_dir",
                         help="Outcome history directory for --use-history "
                              "(default: ./.blackjack_coach/outcomes).")
+    parser.add_argument("--save-ev-snapshot", action="store_true",
+                        dest="save_ev_snapshot",
+                        help="Save a local EV snapshot of the odds advisory for "
+                             "later Strategy-vs-EV review. Requires --show-odds; "
+                             "never changes the recommendation.")
+    parser.add_argument("--ev-dir", default=None, dest="ev_dir",
+                        help="Directory for the saved EV snapshot (default: "
+                             "./.blackjack_coach/ev_snapshots).")
     return parser
 
 
@@ -1619,6 +1633,10 @@ def _run_coach(argv: Sequence[str]) -> int:
     """Handle the 'coach' direct-advice subcommand."""
     parser = build_coach_parser()
     args = parser.parse_args(argv)
+
+    if args.save_ev_snapshot and not args.show_odds:
+        print("Error: --save-ev-snapshot requires --show-odds", file=sys.stderr)
+        return 2
 
     try:
         cards = cards_mod.parse_cards(args.cards)
@@ -1628,11 +1646,11 @@ def _run_coach(argv: Sequence[str]) -> int:
         step = build_coach_step(ranks, dealer_card.rank, profile,
                                 true_count=args.true_count)
         composition_aware = bool(args.composition_aware or args.seen_cards)
+        seen_ranks = (
+            cards_mod.cards_to_ranks(cards_mod.parse_cards(args.seen_cards))
+            if args.seen_cards else None
+        )
         if args.show_odds and composition_aware:
-            seen_ranks = (
-                cards_mod.cards_to_ranks(cards_mod.parse_cards(args.seen_cards))
-                if args.seen_cards else None
-            )
             odds = build_composition_aware_advice(
                 ranks, dealer_card.rank, profile,
                 decks=profile.decks, seen_cards=seen_ranks,
@@ -1659,6 +1677,16 @@ def _run_coach(argv: Sequence[str]) -> int:
         odds=odds,
         history_ctx=history_ctx,
     ))
+
+    if args.save_ev_snapshot and odds is not None:
+        record = build_ev_snapshot_record(
+            odds, ranks, dealer_card.rank, profile.key,
+            decks=profile.decks, true_count=args.true_count,
+            seen_cards=seen_ranks,
+        )
+        path = save_ev_snapshot_record(record, args.ev_dir)
+        print("")
+        print(format_kv("Saved EV snapshot", str(path)))
     return 0
 
 
@@ -2006,6 +2034,14 @@ def build_odds_parser() -> argparse.ArgumentParser:
     parser.add_argument("--composition", action="store_true", dest="show_composition",
                         help="Show the remaining-shoe composition summary "
                              "(implies --composition-aware).")
+    parser.add_argument("--save-ev-snapshot", action="store_true",
+                        dest="save_ev_snapshot",
+                        help="Save a local EV snapshot of this advisory for "
+                             "later Strategy-vs-EV review (advisory only; never "
+                             "changes the recommendation).")
+    parser.add_argument("--ev-dir", default=None, dest="ev_dir",
+                        help="Directory for the saved EV snapshot (default: "
+                             "./.blackjack_coach/ev_snapshots).")
     return parser
 
 
@@ -2048,6 +2084,16 @@ def _run_odds(argv: Sequence[str]) -> int:
         dealer_display=_render_cards([dealer_card]),
         show_composition=args.show_composition,
     ))
+
+    if args.save_ev_snapshot:
+        record = build_ev_snapshot_record(
+            advice, ranks, dealer_card.rank, profile.key,
+            decks=args.decks, true_count=args.true_count,
+            seen_cards=seen_ranks,
+        )
+        path = save_ev_snapshot_record(record, args.ev_dir)
+        print("")
+        print(format_kv("Saved EV snapshot", str(path)))
     return 0
 
 
@@ -2176,6 +2222,125 @@ def _run_learn(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_ev_review_output(summary) -> str:
+    """Render an EV-snapshot review summary as terminal output."""
+    lines = [format_header("EV Snapshot Review")]
+    if summary.total_snapshots == 0:
+        lines.append("No saved EV snapshots yet. Use odds/coach with "
+                     "--save-ev-snapshot first.")
+        lines.append("")
+        lines.append(format_kv("Data quality", summary.data_quality_note))
+        return "\n".join(lines)
+
+    lines += _kv_block([
+        ("Total snapshots", summary.total_snapshots),
+        ("Agreement count", summary.agreement_count),
+        ("Disagreement count", summary.disagreement_count),
+        ("Agreement rate", format_percentage(summary.agreement_rate)),
+        ("Most common profile", summary.most_common_profile),
+    ])
+
+    lines.append("")
+    lines.append(format_section("Most common recommended actions"))
+    if summary.most_common_recommended_actions:
+        lines.append(format_list(
+            f"{label} (x{count})"
+            for label, count in summary.most_common_recommended_actions
+        ))
+    else:
+        lines.append(format_list([]))
+
+    lines.append("")
+    lines.append(format_section("Most common best-EV actions"))
+    if summary.most_common_best_ev_actions:
+        lines.append(format_list(
+            f"{label} (x{count})"
+            for label, count in summary.most_common_best_ev_actions
+        ))
+    else:
+        lines.append(format_list([]))
+
+    lines.append("")
+    lines.append(format_section("Largest EV gaps"))
+    if summary.largest_ev_gaps:
+        lines.append(format_list(
+            f"{label} (~{gap:+.3f})" for label, gap in summary.largest_ev_gaps
+        ))
+    else:
+        lines.append(format_list([]))
+
+    lines.append("")
+    lines.append(format_section("Disagreement spots"))
+    if summary.disagreement_spots:
+        lines.append(format_list(
+            f"{label} (x{count})" for label, count in summary.disagreement_spots
+        ))
+    else:
+        lines.append(format_list([]))
+
+    lines.append("")
+    lines.append(format_section("Practice recommendations"))
+    lines.append(format_list(summary.practice_recommendations))
+
+    lines.append("")
+    lines.append(format_kv("Data quality", summary.data_quality_note))
+    if summary.warnings:
+        lines.append("")
+        lines.append(format_section("Warnings"))
+        lines.append(format_list(summary.warnings))
+
+    lines.append("")
+    lines.append(SCOPE_FOOTER)
+    return "\n".join(lines)
+
+
+def build_ev_review_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'ev-review' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli ev-review",
+        description=(
+            "Review locally saved EV snapshots: when the coach's recommendation "
+            "agreed with the advisory best-EV action and when it differed "
+            "(educational / local only). Never changes the recommendation."
+        ),
+    )
+    parser.add_argument("--dir", default=None, dest="ev_dir",
+                        help="EV snapshot directory (default: "
+                             "./.blackjack_coach/ev_snapshots).")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Only review the most recent N snapshots.")
+    parser.add_argument("--profile", default=None, choices=sorted(PROFILES),
+                        help="Only review snapshots for this rule profile.")
+    parser.add_argument("--disagreements-only", action="store_true",
+                        dest="disagreements_only",
+                        help="Only review snapshots where strategy and the "
+                             "advisory best-EV action differed.")
+    parser.add_argument("--min-gap", type=float, default=None, dest="min_gap",
+                        help="Only count disagreements whose EV gap is at least "
+                             "this size when detecting gaps / spots.")
+    return parser
+
+
+def _run_ev_review(argv: Sequence[str]) -> int:
+    """Handle the 'ev-review' Strategy-vs-EV subcommand."""
+    parser = build_ev_review_parser()
+    args = parser.parse_args(argv)
+
+    if args.limit is not None and args.limit < 0:
+        print("Error: --limit must be >= 0.", file=sys.stderr)
+        return 2
+
+    records = list_ev_snapshot_records(
+        history_dir=args.ev_dir,
+        limit=args.limit,
+        profile_key=args.profile,
+        disagreements_only=args.disagreements_only,
+    )
+    summary = summarize_ev_snapshots(records, min_gap=args.min_gap)
+    print(build_ev_review_output(summary))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -2199,6 +2364,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli audit --cards A,7 --dealer 9       (decision audit)
         python -m app.cli outcomes --limit 10                (win/loss history)
         python -m app.cli learn --profile SIX_DECK_H17_DAS_LS (adaptive learning)
+        python -m app.cli ev-review --limit 20               (Strategy-vs-EV review)
         python -m app.cli coach --cards A,7 --dealer 9       (direct advice)
         python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
         python -m app.cli odds --cards 10,6 --dealer 10      (probability advisor)
@@ -2257,6 +2423,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_outcomes(args[1:])
     if args and args[0] == "learn":
         return _run_learn(args[1:])
+    if args and args[0] == "ev-review":
+        return _run_ev_review(args[1:])
     if args and args[0] == "coach":
         return _run_coach(args[1:])
     if args and args[0] == "coach-play":
