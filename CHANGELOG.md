@@ -7,6 +7,59 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.13.0] - 2026-06-23
+
+Adaptive local learning. The coach now grows more useful with practice: it
+reads your **locally saved** outcome history to detect strong / weak /
+high-variance spots, recommend what to practise, and add a personalised
+local-history context block to the coach output. This is a read-only learning
+layer - it **never** changes the strategy recommendation, the count math, or
+the probability advisor, and it makes no promises and no predictions.
+
+### Added
+
+- `app/adaptive_learning.py`: dataclasses `LearningSpot`, `LearningSummary`,
+  and `CoachHistoryContext`, plus `classify_hand_spot` (e.g. `hard_16_vs_10`,
+  `soft_18_vs_9`, `pair_8_vs_6`, `pair_A_vs_6`, reusing the existing hand
+  evaluator), `build_learning_summary` (groups saved `OutcomeRecord`s by
+  starting spot / profile / outcome and detects weakest, strongest, and
+  high-variance spots with practice recommendations), `build_history_context`
+  (local context for one hand), and `format_learning_summary`.
+- CLI `learn` command (`--dir`, `--profile`, `--limit`, `--spot`): an
+  "Adaptive Learning" summary - total records, profiles seen, most common
+  profile, strongest / weakest / high-variance spots, most common outcomes,
+  practice recommendations, a data-quality note, and notes. With no saved data
+  it prints a clear "use --save-outcome first" message.
+- CLI `coach --use-history` (with optional `--history-dir`): appends a "Local
+  history context" block (matching records, local win/loss/push rates, a
+  practice note, and a caution note), and combines with `--true-count` /
+  `--show-odds`.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.13.0**.
+
+### Quality
+
+- New suite `tests/test_adaptive_learning.py` (spot classification; empty,
+  profile-count, weakest, strongest, and LOW-confidence summaries; history
+  context with and without local data and profile filtering; and a guard that
+  history never changes the recommended action) plus CLI tests for `learn`
+  (empty, with data, profile filter) and `coach --use-history` (with / without
+  history, combined with count + odds, action unchanged). Full suite passing;
+  ruff clean; CI on Python 3.9-3.12.
+
+### Safety
+
+- Learning is local, transparent, and reversible: it only reads JSON outcomes
+  the user chose to save. The main recommended action always comes from basic
+  strategy and the count math, never from short-term local results. Confidence
+  is LOW below 10 total records, and a spot with fewer than 5 records is flagged
+  as a small sample. No change to `strategy_engine.recommend`, the Hi-Lo
+  counting math, the probability advisor, guided coaching, outcome history, or
+  session history. No network, cloud, database, or external dependencies, and no
+  money, bankroll, accounts, tokens, screenshots, or sensitive data.
+
 ## [1.12.0] - 2026-06-23
 
 Approximate probability & EV advisor. The coach can now explain risk - player

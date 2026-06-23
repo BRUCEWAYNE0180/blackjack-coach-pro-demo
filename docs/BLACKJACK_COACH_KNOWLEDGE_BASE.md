@@ -821,7 +821,7 @@ study-only - the insurance rule never becomes a final action, and without a
 true count the coach uses basic strategy. Per `PROJECT_RULES.md`, deviation
 study must not be silently mixed into the base engine.
 
-### v1.12.0 — Probability & EV Advisor (current)
+### v1.12.0 — Probability & EV Advisor (done)
 
 Adds an approximate probability / EV layer so the coach can explain risk, not
 just the recommended play. Approximate and advisory only - it never overrides
@@ -847,6 +847,47 @@ override the strategy recommendation; if the best-EV action differs, the advisor
 says so and keeps the recommendation. Per `PROJECT_RULES.md`, the probability/EV
 layer must label approximations and must not override the main recommendation
 without explicit validation and tests.
+
+### v1.13.0 — Adaptive Local Learning (current)
+
+Adds a read-only adaptive-learning layer so the coach becomes more useful with
+use: it reads the locally saved outcome history to detect patterns, weak spots,
+and practice opportunities, and adds personalised local context to the coach.
+Crucially, it learns from local history to **personalise context**, not to
+**change the base strategy**: the main recommended action stays driven by basic
+strategy and the count math, never by short-term local results.
+
+Delivered:
+
+- **`app/adaptive_learning.py`**: `LearningSpot`, `LearningSummary`, and
+  `CoachHistoryContext`; `classify_hand_spot` (e.g. `hard_16_vs_10`,
+  `soft_18_vs_9`, `pair_8_vs_6`, `pair_A_vs_6`, built on the existing hand
+  evaluator and keyed by the starting two cards versus the dealer upcard);
+  `build_learning_summary` (groups saved `OutcomeRecord`s by spot / profile /
+  outcome, detects weakest / strongest / high-variance spots, and generates
+  practice recommendations); `build_history_context` (per-hand local context,
+  filtered by profile, with exact-spot then similar-pattern fallback); and
+  `format_learning_summary`.
+- **CLI**: `learn` (`--dir`, `--profile`, `--limit`, `--spot`) prints the
+  Adaptive Learning summary, with a clear "use --save-outcome first" message
+  when there is no data; `coach --use-history` (`--history-dir`) appends a Local
+  history context block (matching records, local win/loss/push rates, practice
+  note, caution note) and combines with `--true-count` / `--show-odds`.
+- **Tests**: `tests/test_adaptive_learning.py` (spot classification; empty /
+  profile-count / weakest / strongest / LOW-confidence summaries; history
+  context with and without local data and profile filtering; and a guard that
+  history never changes the recommended action) plus CLI tests for `learn` and
+  `coach --use-history`.
+
+**Learns locally, not blindly:** confidence is LOW below 10 total records, and a
+spot with fewer than 5 records is flagged as a small sample. Per
+`PROJECT_RULES.md`, adaptive learning keeps history, variance, sample size, and
+the mathematical strategy separate, must not change the main recommendation
+without explicit validation, promises no edge, and makes no exact predictions.
+It is local, transparent, and reversible (read-only over the git-ignored
+`.blackjack_coach/` outcomes; no network, cloud, database, or external
+dependencies; no money, bankroll, accounts, tokens, screenshots, or sensitive
+data) and does not change `strategy_engine.recommend` or the counting math.
 
 ### v2.0 — Possible Web UI (if decided later)
 

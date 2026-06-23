@@ -1001,3 +1001,116 @@ class TestCliOdds:
         assert exit_code == 0
         assert "Odds (approximate)" in out
         assert "Count-aware advisory" in out
+
+
+
+class TestCliLearn:
+    """Adaptive local-learning 'learn' command and coach --use-history."""
+
+    def _save_outcomes(self, outcome_dir, count=12, profile="SIX_DECK_H17_DAS_LS"):
+        for seed in range(1, count + 1):
+            cli.main([
+                "coach-play", "--decks", "6", "--seed", str(seed),
+                "--profile", profile, "--save-outcome",
+                "--outcome-dir", str(outcome_dir),
+            ])
+
+    def test_learn_without_data_shows_clear_message(self, capsys, tmp_path):
+        exit_code = cli.main(["learn", "--dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Adaptive Learning ===" in out
+        assert "No saved outcome history yet" in out
+        assert "--save-outcome" in out
+
+    def test_learn_with_saved_outcomes_shows_total(self, capsys, tmp_path):
+        self._save_outcomes(tmp_path, count=12)
+        capsys.readouterr()  # discard coach-play output
+        exit_code = cli.main(["learn", "--dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total records      : 12" in out
+        assert "Strongest spots" in out
+        assert "Weakest spots" in out
+
+    def test_learn_profile_filter(self, capsys, tmp_path):
+        self._save_outcomes(tmp_path, count=6, profile="SIX_DECK_H17_DAS_LS")
+        capsys.readouterr()
+        exit_code = cli.main([
+            "learn", "--dir", str(tmp_path),
+            "--profile", "SIX_DECK_H17_DAS_LS",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "SIX_DECK_H17_DAS_LS" in out
+        # A profile with no saved outcomes yields the empty-history message.
+        exit_code = cli.main([
+            "learn", "--dir", str(tmp_path),
+            "--profile", "SIX_DECK_S17_DAS_LS",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "No saved outcome history yet" in out
+
+    def test_coach_use_history_without_history(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "coach", "--cards", "10,6", "--dealer", "10",
+            "--profile", "SIX_DECK_H17_DAS_LS",
+            "--use-history", "--history-dir", str(tmp_path),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Recommended action" in out
+        assert "Local history context" in out
+        assert "No saved outcome history yet" in out
+
+    def test_coach_use_history_with_history(self, capsys, tmp_path):
+        self._save_outcomes(tmp_path, count=12)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "coach", "--cards", "10,6", "--dealer", "10",
+            "--profile", "SIX_DECK_H17_DAS_LS",
+            "--use-history", "--history-dir", str(tmp_path),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Local history context" in out
+        assert "Local win rate" in out
+        assert "Caution" in out
+
+    def test_coach_combined_count_odds_history(self, capsys, tmp_path):
+        self._save_outcomes(tmp_path, count=12)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "coach", "--cards", "10,6", "--dealer", "10",
+            "--profile", "SIX_DECK_H17_DAS_LS",
+            "--true-count", "1", "--show-odds",
+            "--use-history", "--history-dir", str(tmp_path),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Count-aware advisory" in out
+        assert "Odds (approximate)" in out
+        assert "Local history context" in out
+
+    def test_coach_use_history_does_not_change_action(self, capsys, tmp_path):
+        # Action with history must match action without history.
+        cli.main([
+            "coach", "--cards", "10,6", "--dealer", "10",
+            "--profile", "SIX_DECK_H17_DAS_LS",
+        ])
+        base = capsys.readouterr().out
+        base_action = [line for line in base.splitlines()
+                       if line.startswith("Recommended action")][0]
+
+        self._save_outcomes(tmp_path, count=12)
+        capsys.readouterr()
+        cli.main([
+            "coach", "--cards", "10,6", "--dealer", "10",
+            "--profile", "SIX_DECK_H17_DAS_LS",
+            "--use-history", "--history-dir", str(tmp_path),
+        ])
+        with_history = capsys.readouterr().out
+        hist_action = [line for line in with_history.splitlines()
+                       if line.startswith("Recommended action")][0]
+        assert base_action == hist_action
