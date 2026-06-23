@@ -409,6 +409,54 @@ These figures are **approximate** (idealised shoe, one-card look-ahead) and
 never override the recommendation: if the best-EV action differs from the
 strategy recommendation, the advisor says so and keeps the recommendation.
 
+## Adaptive local learning (v1.13.0)
+
+### learn
+
+```bash
+blackjack-coach learn
+blackjack-coach learn --profile SIX_DECK_H17_DAS_LS
+blackjack-coach learn --dir ./my_outcomes --limit 50
+blackjack-coach learn --spot hard_16_vs_10
+```
+
+Reads the locally saved outcome history (from `play`/`coach-play
+--save-outcome`) and prints an "Adaptive Learning" summary: total records,
+profiles seen, the most common profile, your strongest / weakest / high-variance
+spots, the most common outcomes, practice recommendations, a data-quality note,
+and notes. Spots are keyed by the starting two cards versus the dealer upcard
+(e.g. `hard_16_vs_10`, `soft_18_vs_9`, `pair_8_vs_6`, `pair_A_vs_6`).
+
+Flags: `--dir <path>` (history directory, default `./.blackjack_coach/outcomes`),
+`--profile <KEY>` (only learn from that profile's outcomes), `--limit N` (only
+the most recent N records), and `--spot <spot_id>` (focus on one spot). With no
+saved history it prints: *"No saved outcome history yet. Use coach-play/play
+with --save-outcome first."*
+
+The recommended workflow is: play with `coach-play --save-outcome`, review with
+`learn`, then use `coach --use-history` for personalised context. Learning is
+local and read-only; it never changes the strategy recommendation.
+
+### coach --use-history
+
+```bash
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --use-history
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --true-count 1 --show-odds --use-history
+blackjack-coach coach --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS --use-history --history-dir ./my_outcomes
+```
+
+Adds a "Local history context" block to the coach output: matching records,
+your local win / loss / push rates for this spot (or a similar one), a practice
+note, and a caution note. `--history-dir <path>` chooses the outcomes directory.
+It combines with `--true-count` and `--show-odds`.
+
+This is **context only** and never changes the recommendation: the main action
+always comes from basic strategy and the count math. Confidence is LOW with
+fewer than 10 total records, and a spot with fewer than 5 records is flagged as
+a small sample. If there is no saved history, the block prints a clear message
+and the coach continues normally.
+
+
 
 
 

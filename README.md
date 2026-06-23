@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.12.0 feature summary
+## v1.13.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -82,6 +82,10 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 - **Probability & EV advisor** (v1.12.0): `odds` (and `coach --show-odds`) show
   approximate player bust chance, the dealer's final-total distribution, and a
   rough EV per action - advisory only; never overrides the recommendation.
+- **Adaptive local learning** (v1.13.0): `learn` reads your locally saved
+  outcomes to surface strong / weak / high-variance spots and practice tips,
+  and `coach --use-history` adds a personalised local-history context block.
+  It personalises context only and never changes the strategy recommendation.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -147,6 +151,10 @@ blackjack-coach outcomes
 blackjack-coach coach --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
 blackjack-coach coach --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS
 blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS --save-outcome
+blackjack-coach learn
+blackjack-coach learn --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --use-history
 blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS
 ```
 
@@ -776,6 +784,63 @@ look-ahead) and are for understanding risk only. They **never override** the
 strategy recommendation - if the best-EV action differs, the coach says so and
 keeps the recommendation. `--true-count` and `--decks` are accepted; the global
 `--no-color` / `--plain-cards` flags apply.
+
+## Adaptive local learning (v1.13.0)
+
+The coach gets more useful the more you practise. `learn` reads the **locally
+saved** outcome history (see the outcome-history section above) and turns it
+into practice insight: it groups played hands into recognisable **spots** (by
+the starting two cards versus the dealer upcard, e.g. `hard_16_vs_10`,
+`soft_18_vs_9`, `pair_8_vs_6`), then surfaces your strongest, weakest, and
+high-variance spots plus concrete practice recommendations.
+
+Recommended workflow:
+
+```bash
+blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS --save-outcome
+blackjack-coach learn
+blackjack-coach learn --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --use-history
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --true-count 1 --show-odds --use-history
+```
+
+```text
+=== Adaptive Learning ===
+=========================
+Total records      : 12
+Profiles seen      : SIX_DECK_H17_DAS_LS
+Most common profile: SIX_DECK_H17_DAS_LS
+
+-- Weakest spots --
+  - hard_16_vs_10: 0W/3L/0P (seen 3, win 0.0%, LOW) -> High local loss rate ...
+
+-- Practice recommendations --
+  - Drill hard 16 vs 10: High local loss rate - revisit the correct basic play.
+```
+
+`learn` options: `--dir <path>` (history directory, default
+`./.blackjack_coach/outcomes`), `--profile <KEY>` (only learn from one
+profile's outcomes), `--limit N` (only the most recent N), and `--spot
+<spot_id>` (focus on one spot, e.g. `hard_16_vs_10`). With no saved history it
+prints a clear message: *"No saved outcome history yet. Use coach-play/play
+with --save-outcome first."*
+
+`coach --use-history` adds a **Local history context** block - matching
+records, your local win/loss/push rates, a practice note, and a caution note -
+built from the same saved outcomes. It combines with `--true-count` and
+`--show-odds`. Crucially, this is **context only**:
+
+- The main recommended action always comes from basic strategy
+  (`strategy_engine.recommend`) and the count math - **never** from short-term
+  local results.
+- With fewer than 10 total records, confidence is **LOW**; with fewer than 5
+  records in a spot, it is flagged as a **small sample**.
+- History is used to explain patterns, recommend practice, flag weak spots, and
+  show local context - never to change the base strategy, promise an edge, or
+  make exact predictions.
+- Learning is **local, transparent, and reversible**: it only reads JSON files
+  you chose to save. No network, cloud, database, or external dependencies, and
+  no money / bankroll / account / token / screenshot data.
 
 ## Professional card display (v1.10.0)
 

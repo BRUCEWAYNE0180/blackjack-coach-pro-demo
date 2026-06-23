@@ -6,6 +6,15 @@ camera/video at a real table, and makes NO promise of winnings.
 See docs/PROJECT_RULES.md for the full project rules.
 """
 
+from .adaptive_learning import (
+    CoachHistoryContext,
+    LearningSpot,
+    LearningSummary,
+    build_history_context,
+    build_learning_summary,
+    classify_hand_spot,
+    format_learning_summary,
+)
 from .counting import (
     CountingState,
     counting_summary,
@@ -131,11 +140,12 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.12.0"
+__version__ = "1.13.0"
 
 __all__ = [
     "ACTION_NOTES",
     "Action",
+    "CoachHistoryContext",
     "CountQuizResult",
     "CountingState",
     "DEFAULT_PROFILE",
@@ -151,6 +161,8 @@ __all__ = [
     "HandEvaluation",
     "HandOutcome",
     "HistorySummary",
+    "LearningSpot",
+    "LearningSummary",
     "MULTI_DECK_H17_DAS_LS",
     "MULTI_DECK_S17_DAS_LS",
     "PROFILES",
@@ -172,6 +184,8 @@ __all__ = [
     "build_session_record",
     "build_shoe",
     "build_strategy_questions",
+    "build_history_context",
+    "build_learning_summary",
     "can_double_after_split",
     "can_hit_split_aces",
     "can_resplit",
@@ -179,6 +193,7 @@ __all__ = [
     "can_split_initial_hand",
     "card_value",
     "cards_remaining",
+    "classify_hand_spot",
     "compare_true_count",
     "counting_summary",
     "deal_initial_hand",
@@ -197,6 +212,7 @@ __all__ = [
     "format_cards",
     "format_header",
     "format_kv",
+    "format_learning_summary",
     "format_list",
     "format_percentage",
     "format_result_status",

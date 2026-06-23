@@ -31,6 +31,11 @@ from collections.abc import Sequence
 
 from . import __version__
 from . import cards as cards_mod
+from .adaptive_learning import (
+    build_history_context,
+    build_learning_summary,
+    classify_hand_spot,
+)
 from .counting import EDUCATIONAL_NOTE, CountingState, update_running_count_many
 from .decision_audit import audit_decision
 from .decision_diagnostics import explain_decision_factors
@@ -1495,7 +1500,7 @@ def _run_outcomes(argv: Sequence[str]) -> int:
 
 
 def build_coach_step_output(step, player_display=None, dealer_display=None,
-                            odds=None) -> str:
+                            odds=None, history_ctx=None) -> str:
     """Render a single guided-coach recommendation for the terminal."""
     cards_line = (player_display if player_display is not None
                   else format_cards(step.player_cards))
@@ -1543,9 +1548,30 @@ def build_coach_step_output(step, player_display=None, dealer_display=None,
     if odds is not None:
         lines += _odds_compact_lines(odds)
 
+    if history_ctx is not None:
+        lines += _history_context_lines(history_ctx)
+
     lines.append("")
     lines.append(SCOPE_FOOTER)
     return "\n".join(lines)
+
+
+def _history_context_lines(ctx) -> list[str]:
+    """Render the optional 'Local history context' block for the coach."""
+    lines = ["", format_section("Local history context")]
+    if not ctx.has_history:
+        lines.append(ctx.practice_note)
+        return lines
+    lines += _kv_block([
+        ("Matching records", ctx.matching_records),
+        ("Local win rate", format_percentage(ctx.local_win_rate)),
+        ("Local loss rate", format_percentage(ctx.local_loss_rate)),
+        ("Local push rate", format_percentage(ctx.local_push_rate)),
+        ("Similar spots", ctx.similar_spot_summary),
+        ("Practice note", ctx.practice_note),
+        ("Caution", ctx.caution_note),
+    ])
+    return lines
 
 
 def build_coach_parser() -> argparse.ArgumentParser:
@@ -1569,6 +1595,12 @@ def build_coach_parser() -> argparse.ArgumentParser:
                              "educational deviation study when one applies.")
     parser.add_argument("--show-odds", action="store_true", dest="show_odds",
                         help="Append a compact approximate odds / EV summary.")
+    parser.add_argument("--use-history", action="store_true", dest="use_history",
+                        help="Append a local-history context block built from "
+                             "saved outcomes (never changes the recommendation).")
+    parser.add_argument("--history-dir", default=None, dest="history_dir",
+                        help="Outcome history directory for --use-history "
+                             "(default: ./.blackjack_coach/outcomes).")
     return parser
 
 
@@ -1589,6 +1621,11 @@ def _run_coach(argv: Sequence[str]) -> int:
                                      true_count=args.true_count)
             if args.show_odds else None
         )
+        history_ctx = (
+            build_history_context(ranks, dealer_card.rank, profile,
+                                  history_dir=args.history_dir)
+            if args.use_history else None
+        )
     except (ValueError, KeyError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
@@ -1598,6 +1635,7 @@ def _run_coach(argv: Sequence[str]) -> int:
         player_display=_render_cards(cards),
         dealer_display=_render_cards([dealer_card]),
         odds=odds,
+        history_ctx=history_ctx,
     ))
     return 0
 
@@ -1826,6 +1864,131 @@ def _run_odds(argv: Sequence[str]) -> int:
     return 0
 
 
+def _format_spot_block(spots) -> list[str]:
+    """Render a list of LearningSpot objects as bulleted lines."""
+    if not spots:
+        return [format_list([])]
+    rows = []
+    for spot in spots:
+        rate = format_percentage(spot.win_rate)
+        rows.append(
+            f"{spot.spot_id}: {spot.wins}W/{spot.losses}L/{spot.pushes}P "
+            f"(seen {spot.total_seen}, win {rate}, {spot.confidence_label}) "
+            f"-> {spot.recommended_focus}"
+        )
+    return [format_list(rows)]
+
+
+def build_learn_output(summary) -> str:
+    """Render an adaptive-learning summary as terminal output."""
+    lines = [format_header("Adaptive Learning")]
+    if summary.total_records == 0:
+        lines.append("No saved outcome history yet. Use coach-play/play with "
+                     "--save-outcome first.")
+        lines.append("")
+        lines.append(format_kv("Note", summary.data_quality_note))
+        return "\n".join(lines)
+
+    lines += _kv_block([
+        ("Total records", summary.total_records),
+        ("Profiles seen", ", ".join(summary.profiles_seen) or "(none)"),
+        ("Most common profile", summary.most_common_profile),
+    ])
+
+    lines.append("")
+    lines.append(format_section("Strongest spots"))
+    lines += _format_spot_block(summary.strongest_spots)
+
+    lines.append("")
+    lines.append(format_section("Weakest spots"))
+    lines += _format_spot_block(summary.weakest_spots)
+
+    lines.append("")
+    lines.append(format_section("High variance spots"))
+    lines += _format_spot_block(summary.high_variance_spots)
+
+    lines.append("")
+    lines.append(format_section("Most common outcomes"))
+    if summary.most_common_outcomes:
+        lines.append(format_list(
+            f"{label} (x{count})" for label, count in summary.most_common_outcomes
+        ))
+    else:
+        lines.append(format_list([]))
+
+    lines.append("")
+    lines.append(format_section("Practice recommendations"))
+    lines.append(format_list(summary.practice_recommendations))
+
+    lines.append("")
+    lines.append(format_kv("Data quality", summary.data_quality_note))
+    if summary.warnings:
+        lines.append("")
+        lines.append(format_section("Notes"))
+        lines.append(format_list(summary.warnings))
+
+    lines.append("")
+    lines.append(SCOPE_FOOTER)
+    return "\n".join(lines)
+
+
+def build_learn_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'learn' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli learn",
+        description=(
+            "Adaptive local learning: read locally saved outcomes to surface "
+            "weak / strong spots and practice tips (educational / local only). "
+            "Never changes the strategy recommendation."
+        ),
+    )
+    parser.add_argument("--dir", default=None, dest="history_dir",
+                        help="Outcome history directory (default: "
+                             "./.blackjack_coach/outcomes).")
+    parser.add_argument("--profile", default=None, choices=sorted(PROFILES),
+                        help="Only learn from outcomes for this rule profile.")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Only use the most recent N outcomes.")
+    parser.add_argument("--spot", default=None,
+                        help="Only learn from one spot, e.g. 'hard_16_vs_10'.")
+    return parser
+
+
+def _run_learn(argv: Sequence[str]) -> int:
+    """Handle the 'learn' adaptive-learning subcommand."""
+    parser = build_learn_parser()
+    args = parser.parse_args(argv)
+
+    if args.limit is not None and args.limit < 0:
+        print("Error: --limit must be >= 0.", file=sys.stderr)
+        return 2
+
+    records = list_outcome_records(
+        history_dir=args.history_dir,
+        limit=args.limit,
+        profile_key=args.profile,
+    )
+
+    if args.spot:
+        target = args.spot.strip().lower()
+        filtered = []
+        for record in records:
+            if not record.player_cards or not record.dealer_upcard:
+                continue
+            try:
+                spot_id = classify_hand_spot(
+                    list(record.player_cards[:2]), record.dealer_upcard)
+            except (ValueError, KeyError):
+                continue
+            if spot_id == target:
+                filtered.append(record)
+        records = filtered
+
+    summary = build_learning_summary(records)
+    print(build_learn_output(summary))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -1848,6 +2011,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli matrix --profile SIX_DECK_H17_DAS_LS --section hard
         python -m app.cli audit --cards A,7 --dealer 9       (decision audit)
         python -m app.cli outcomes --limit 10                (win/loss history)
+        python -m app.cli learn --profile SIX_DECK_H17_DAS_LS (adaptive learning)
         python -m app.cli coach --cards A,7 --dealer 9       (direct advice)
         python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
         python -m app.cli odds --cards 10,6 --dealer 10      (probability advisor)
@@ -1904,6 +2068,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_audit(args[1:])
     if args and args[0] == "outcomes":
         return _run_outcomes(args[1:])
+    if args and args[0] == "learn":
+        return _run_learn(args[1:])
     if args and args[0] == "coach":
         return _run_coach(args[1:])
     if args and args[0] == "coach-play":
