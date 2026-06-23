@@ -524,3 +524,55 @@ class TestCliDiagnose:
         err = capsys.readouterr().err
         assert exit_code == 2
         assert "Error" in err
+
+
+
+class TestCliProfiles:
+    def test_profiles_list(self, capsys):
+        exit_code = cli.main(["profiles", "--list"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Rule Profiles ===" in out
+        assert "MULTI_DECK_H17_DAS_LS" in out
+        assert "SIX_DECK_S17_DAS_LS" in out
+        assert "decks" in out
+
+    def test_profiles_detail(self, capsys):
+        exit_code = cli.main(["profiles", "--profile", "MULTI_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Key" in out
+        assert "Number of decks" in out
+        assert "Late surrender" in out
+        assert "Blackjack payout" in out
+
+    def test_profiles_default_lists(self, capsys):
+        # With no flags, 'profiles' lists all profiles.
+        exit_code = cli.main(["profiles"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Rule Profiles ===" in out
+
+
+class TestCliNewProfilesAccepted:
+    def test_strategy_accepts_new_profile(self, capsys):
+        exit_code = cli.main(["--cards", "A,7", "--dealer", "9",
+                              "--profile", "SIX_DECK_S17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "SIX_DECK_S17_DAS_LS" in out
+
+    def test_diagnose_accepts_new_profile(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "A,7", "--dealer", "9",
+                              "--profile", "SIX_DECK_S17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Profile context" in out
+        assert "S17" in out
+
+    def test_deviations_accepts_new_profile(self, capsys):
+        exit_code = cli.main(["deviations", "--cards", "10,6", "--dealer", "10",
+                              "--true-count", "1", "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Deviation Study ===" in out

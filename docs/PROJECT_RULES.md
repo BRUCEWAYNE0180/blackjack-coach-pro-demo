@@ -101,6 +101,11 @@ As of v0.9 the project enforces these gates on every change:
   study aid. They must not enable real betting, bankroll, bet spread, Kelly,
   live casino assistance, or camera/video, and must not modify the basic
   strategy engine or change its insurance recommendation (always NO).
+- **New rule profiles need tests and descriptions.** Every new rule profile
+  must have a `profile_description`, be covered by tests, and be registered in
+  `PROFILES`. If a profile field is metadata that does not yet alter engine
+  logic (e.g. `resplit_allowed`, `max_split_hands`, `hit_split_aces`), that
+  must be documented in the field/profile notes.
 
 ## 8. Release Rules
 
