@@ -122,6 +122,12 @@ from .quiz import (
     run_count_session,
     run_strategy_session,
 )
+from .repeat_pack import (
+    build_repeat_pack,
+    export_repeat_pack,
+    render_repeat_pack,
+    render_repeat_pack_markdown,
+)
 from .reporting import export_report
 from .review_scheduler import (
     build_drill_streak_summary,
@@ -3004,6 +3010,80 @@ def _run_practice_pack(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_repeat_pack_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'repeat-pack' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli repeat-pack",
+        description=(
+            "Generate a local repeat pack focused on the spots you keep missing "
+            "(from practice-pack completions), or a starter educational set. "
+            "Never changes the recommendation or the correct answers "
+            "(educational / local only)."
+        ),
+    )
+    parser.add_argument("--profile", default=None, choices=sorted(PROFILES),
+                        help="Rule profile for the pack.")
+    parser.add_argument("--count", type=int, default=20,
+                        help="Maximum number of items (default: 20).")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Seed for a deterministic pack order.")
+    parser.add_argument("--today", default=None,
+                        help="Treat this YYYY-MM-DD date as today (for due "
+                             "review top-up).")
+    parser.add_argument("--pack-dir", default=None, dest="pack_dir",
+                        help="Practice-pack completion directory (default: "
+                             "./.blackjack_coach/practice_packs).")
+    parser.add_argument("--drill-dir", default=None, dest="drill_dir",
+                        help="Drill session directory (for the review top-up).")
+    parser.add_argument("--markdown", action="store_true",
+                        help="Print the pack as Markdown instead of text.")
+    parser.add_argument("--export", action="store_true",
+                        help="Save the pack as a local Markdown file and print "
+                             "the path.")
+    parser.add_argument("--output", default=None,
+                        help="Exact output file path for --export (default: a "
+                             "timestamped file under ./.blackjack_coach/reports).")
+    return parser
+
+
+def _run_repeat_pack(argv: Sequence[str]) -> int:
+    """Handle the 'repeat-pack' missed-spot repeat subcommand."""
+    parser = build_repeat_pack_parser()
+    args = parser.parse_args(argv)
+
+    if args.count <= 0:
+        print("Error: --count must be >= 1.", file=sys.stderr)
+        return 2
+
+    try:
+        pack = build_repeat_pack(
+            profile_key=args.profile,
+            count=args.count,
+            pack_dir=args.pack_dir,
+            drill_dir=args.drill_dir,
+            today=args.today,
+            seed=args.seed,
+        )
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    if args.markdown:
+        print(render_repeat_pack_markdown(pack))
+    else:
+        print(render_repeat_pack(pack))
+
+    if args.export or args.output:
+        try:
+            export = export_repeat_pack(pack, output_path=args.output)
+        except OSError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print("")
+        print(format_kv("Saved repeat pack", export.output_path))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -3033,6 +3113,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli drill --focus weak --count 5         (practice drills)
         python -m app.cli review-queue --due-only             (scheduled reviews)
         python -m app.cli practice-pack --focus daily         (daily practice pack)
+        python -m app.cli repeat-pack --count 10              (repeat missed spots)
         python -m app.cli coach --cards A,7 --dealer 9       (direct advice)
         python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
         python -m app.cli odds --cards 10,6 --dealer 10      (probability advisor)
@@ -3103,6 +3184,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_review_queue(args[1:])
     if args and args[0] == "practice-pack":
         return _run_practice_pack(args[1:])
+    if args and args[0] == "repeat-pack":
+        return _run_repeat_pack(args[1:])
     if args and args[0] == "coach":
         return _run_coach(args[1:])
     if args and args[0] == "coach-play":
