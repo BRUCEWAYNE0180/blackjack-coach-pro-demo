@@ -93,6 +93,10 @@ As of v0.9 the project enforces these gates on every change:
   contain secrets, real money, bets, bankroll, accounts, personal data,
   screenshots, or casino data. It is a local summary only (no database, no
   network), and the `.blackjack_coach/` folder must remain git-ignored.
+- **Deviations are study-only.** True-count deviation features are a local
+  study aid. They must not enable real betting, bankroll, bet spread, Kelly,
+  live casino assistance, or camera/video, and must not modify the basic
+  strategy engine or change its insurance recommendation (always NO).
 
 ## 8. Release Rules
 

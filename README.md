@@ -18,7 +18,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.2.0 feature summary
+## v1.3.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -42,6 +42,9 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   rows, visible pass/fail badges, and percentage summaries.
 - **Local session history** (v1.2.0): optionally save scored sessions to local
   JSON files and review your progress with `blackjack-coach history`.
+- **Deviation study mode** (v1.3.0): study a small set of well-known Hi-Lo
+  true-count deviations (`deviations`, `deviation-quiz`) without touching the
+  basic-strategy engine.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -357,6 +360,30 @@ summary** (mode, totals, accuracy, weak spots) — never money, bankroll, bets,
 accounts, or personal data — and the `.blackjack_coach/` folder is git-ignored
 so nothing is committed.
 
+## Deviation study mode (v1.3.0)
+
+Study a small, explicit set of well-known Hi-Lo **true-count deviations**. This
+is layered on top of the basic-strategy engine — it never modifies it. It is a
+local **study aid**, not live casino assistance, and involves no betting,
+bankroll, or bet spread.
+
+```bash
+blackjack-coach deviations --cards 10,6 --dealer 10 --true-count 1
+blackjack-coach deviations --list
+blackjack-coach deviation-quiz --seed 42 --answer S
+```
+
+`deviations` shows the basic action, whether a studied deviation applies at the
+given true count, and the resulting study recommendation with an explanation.
+`deviations --list` lists the available rules (id, title, threshold, and the
+`basic -> deviation` change). `deviation-quiz` poses a study question and grades
+your answer (omit `--answer` to be prompted).
+
+The set is intentionally small (not the full Illustrious 18) and the insurance
+deviation is **study-only** — it does not change the engine's insurance stance
+(always NO). Every recommendation notes that results depend on the rule
+profile, deck estimation, true-count rounding, and table context.
+
 ## Library usage
 
 ```python
@@ -384,13 +411,13 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.2.0 adds **local session history** (opt-in JSON summaries + a `history`
-command) on top of v1.1.0's terminal polish, with no changes to strategy,
-counting, simulation, split, or scoring logic. It remains an educational,
-local, well-tested trainer with modern packaging and CI.
+v1.3.0 adds a **deviation study mode** (true-count playing deviations as a
+local study aid) on top of v1.2.0's session history, with no changes to the
+strategy engine, Hi-Lo math, simulator, split, or scoring. It remains an
+educational, local, well-tested trainer with modern packaging and CI.
 
-Planned next (educational/local only): v1.3 advanced count deviations
-(educational only), and a possible v2.0 web UI if decided later. See
+Planned next (educational/local only): a possible v2.0 web UI if decided later.
+See
 [`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
 for the full roadmap.
 

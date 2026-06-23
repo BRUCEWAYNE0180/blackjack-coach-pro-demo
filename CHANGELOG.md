@@ -7,6 +7,38 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.3.0] - 2026-06-23
+
+Deviation study mode. Adds an educational, local study aid for a small set of
+Hi-Lo true-count playing deviations. No changes to the basic-strategy engine,
+Hi-Lo math, simulator, split handling, or scoring.
+
+### Added
+
+- `app/deviations.py` with `DeviationRule`, `DeviationRecommendation`, a small
+  explicit `DEFAULT_DEVIATION_RULES` study set, `normalize_true_count`,
+  `compare_true_count`, `find_matching_deviation`, and
+  `recommend_with_deviation` (which calls the engine and only overrides the
+  action when a deviation applies).
+- `deviations` command (`--cards/--dealer/--true-count`, `--list`) and a
+  `deviation-quiz` command (`--seed`, `--answer`, interactive).
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.3.0**.
+
+### Quality
+
+- Added `tests/test_deviations.py` and CLI tests for the new commands. Full
+  suite passing; ruff clean; CI on Python 3.9-3.12.
+
+### Safety
+
+- Deviations are **study-only and local**: not live casino assistance. The
+  insurance deviation is study-only and does NOT change the engine's insurance
+  recommendation (always NO). No betting, bankroll, bet spread, Kelly,
+  camera/video, scraping, or promise of winnings. The engine is unmodified.
+
 ## [1.2.0] - 2026-06-23
 
 Local session history. Adds opt-in, local-only progress tracking. No changes

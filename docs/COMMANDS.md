@@ -148,3 +148,27 @@ Summarises saved sessions: total sessions, average/best/worst accuracy, and the
 most common weak spots. `--limit N` summarises only the most recent N sessions;
 `--dir` reads from a specific folder. The history is a **summary only** — no
 money, accounts, or personal data — and is never committed to git.
+
+## Deviation study mode (v1.3.0)
+
+### deviations
+
+```bash
+blackjack-coach deviations --cards 10,6 --dealer 10 --true-count 1
+blackjack-coach deviations --list
+```
+
+Shows the basic action, whether a studied true-count deviation applies, and the
+resulting study recommendation. `--list` lists the available study rules (id,
+title, threshold, `basic -> deviation`). Study-only and local; not live casino
+advice.
+
+### deviation-quiz
+
+```bash
+blackjack-coach deviation-quiz --seed 42 --answer S
+```
+
+Poses a deviation study question and grades your answer (`H/S/D/P/R` or full
+names). Omit `--answer` to be prompted interactively. Study-only; the insurance
+deviation never changes the engine's insurance recommendation.

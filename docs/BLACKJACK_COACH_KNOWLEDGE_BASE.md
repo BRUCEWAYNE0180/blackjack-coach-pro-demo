@@ -39,6 +39,10 @@ through v0.6.
   aligned key/value rows, result badges, percentages); presentation only.
 - `app/session_history.py` — Local JSON session history (summary only):
   `SessionRecord`, `HistorySummary`, save/load/list, and `summarize_history`.
+- `app/deviations.py` — Educational true-count deviation study (study-only):
+  `DeviationRule`, `DeviationRecommendation`, `DEFAULT_DEVIATION_RULES`,
+  `find_matching_deviation`, and `recommend_with_deviation` (wraps the engine
+  without modifying it).
 - `app/counting.py` — Hi-Lo counting trainer: tag values, running count, true
   count, and `CountingState` (educational / simulated practice only).
 - `app/shoe.py` — Virtual multi-deck shoe: build, shuffle (seedable), draw,
@@ -58,7 +62,8 @@ through v0.6.
   `run_count_session`).
 - `app/cli.py` — Terminal trainer (`python -m app.cli` or the installed
   `blackjack-coach` command, plus `count`, `simulate`, `play`, `quiz`,
-  `count-quiz`, `quiz-session`, `count-session`, and `history` subcommands).
+  `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`, and
+  `deviation-quiz` subcommands).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -476,7 +481,7 @@ Out of scope (unchanged): no logic changes, no casino connectivity, no real
 betting/bankroll, no camera/video, no scraping, no betting spread, no Kelly, no
 Illustrious 18, no insurance index, no web app, and no promise of winnings.
 
-### v1.2.0 — Local Session History (current)
+### v1.2.0 — Local Session History (done)
 
 Adds opt-in, local-only progress tracking. No changes to strategy, counting,
 simulation, split, or scoring logic.
@@ -501,11 +506,30 @@ accuracy, weak spots, timestamp, id). It never stores money, bankroll, bets,
 accounts, personal data, secrets, screenshots, or casino data; there is no
 database, network, or cloud, and history files are never committed.
 
-### v1.3 — Advanced Deviations (educational only)
+### v1.3.0 — Deviation Study Mode (current)
 
-- Teach well-known count-based deviations (e.g. the Illustrious 18) as a
-  **learning topic**, practiced only against the local simulator. Still no real
-  betting, bankroll, or bet sizing.
+Adds a local, educational study aid for true-count playing deviations. No
+changes to the basic-strategy engine, Hi-Lo math, simulator, split, or scoring.
+
+Delivered:
+
+- **`app/deviations.py`**: `DeviationRule` and `DeviationRecommendation`
+  dataclasses; a small, explicit `DEFAULT_DEVIATION_RULES` study set (a few
+  common Hi-Lo deviations, plus a study-only insurance note); helpers
+  `normalize_true_count`, `compare_true_count`, `find_matching_deviation`; and
+  `recommend_with_deviation`, which calls `strategy_engine.recommend` and only
+  overrides the action when a deviation applies.
+- **CLI**: `deviations` (`--cards/--dealer/--true-count`, `--list`) and
+  `deviation-quiz` (`--seed`, `--answer`, interactive).
+- Version bumped to **1.3.0**; tests in `tests/test_deviations.py` plus CLI
+  tests; all earlier tests pass; ruff clean.
+
+This is **study, not live assistance**: it is local-only, never connects to a
+casino, and involves no betting, bankroll, bet spread, or Kelly. The insurance
+deviation is study-only and does not change the engine's insurance
+recommendation (always NO). The deviation set is intentionally small (not the
+full Illustrious 18), and every recommendation notes its dependence on the rule
+profile, deck estimation, true-count rounding, and table context.
 
 ### v2.0 — Possible Web UI (if decided later)
 
