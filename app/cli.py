@@ -31,6 +31,15 @@ from collections.abc import Sequence
 from . import __version__
 from .counting import EDUCATIONAL_NOTE, CountingState, update_running_count_many
 from .explanations import explain_insurance_no
+from .formatting import (
+    format_cards,
+    format_header,
+    format_kv,
+    format_list,
+    format_percentage,
+    format_result_status,
+    format_section,
+)
 from .quiz import (
     ACTION_PROMPT,
     QuizResult,
@@ -55,6 +64,15 @@ from .strategy_engine import Recommendation, recommend
 # pyproject.toml). Used for argparse program names and the --version output.
 PROG = "blackjack-coach"
 
+# Short scope reminder shown at the foot of command output.
+SCOPE_FOOTER = "Educational / simulated practice only - no real bets, no winnings."
+
+
+def _kv_block(pairs: list[tuple[str, object]]) -> list[str]:
+    """Render aligned ``label : value`` lines from (label, value) pairs."""
+    width = max((len(label) for label, _ in pairs), default=0)
+    return [format_kv(label, value, width) for label, value in pairs]
+
 
 def _parse_cards(raw: str) -> list[str]:
     """Split a comma-separated list of card ranks into a clean list."""
@@ -66,17 +84,19 @@ def _parse_cards(raw: str) -> list[str]:
 
 def build_output(rec: Recommendation, dealer_upcard: str) -> str:
     """Render a recommendation as human-readable terminal output."""
-    lines = [
-        f"Hand:    {rec.hand_description}",
-        f"Profile: {rec.profile_key}",
-        f"Action:  {rec.action.value}",
-        f"Why:     {rec.reason}",
-        f"Insurance: NO ({'always' if rec.take_insurance is False else 'unexpected'})",
-    ]
+    lines = [format_header("Basic Strategy")]
+    lines += _kv_block([
+        ("Hand", rec.hand_description),
+        ("Profile", rec.profile_key),
+        ("Action", rec.action.value),
+        ("Why", rec.reason),
+        ("Insurance", "NO (always)" if rec.take_insurance is False else "unexpected"),
+    ])
 
     dealer_shows_ace = dealer_upcard.strip().upper() == "A"
     if dealer_shows_ace:
         lines.append("")
+        lines.append(format_section("Insurance"))
         lines.append("Dealer shows an Ace - insurance may be offered.")
         lines.append(f"Insurance advice: NO. {explain_insurance_no()}")
 
@@ -88,23 +108,24 @@ def build_output(rec: Recommendation, dealer_upcard: str) -> str:
 
     if extra_warnings:
         lines.append("")
-        lines.append("Notes:")
-        for w in extra_warnings:
-            lines.append(f"  - {w}")
+        lines.append(format_section("Notes"))
+        lines.append(format_list(extra_warnings))
 
+    lines.append("")
+    lines.append(SCOPE_FOOTER)
     return "\n".join(lines)
 
 
 def build_count_output(state: CountingState) -> str:
     """Render a Hi-Lo counting state as human-readable terminal output."""
-    lines = [
-        "Hi-Lo counting (educational / simulated practice)",
-        f"Cards seen:       {state.cards_seen}",
-        f"Running count:    {state.running_count:+d}",
-        f"Decks remaining:  {state.decks_remaining}",
-        f"True count:       {state.true_count:+.2f}",
-        f"Note:             {state.note}",
-    ]
+    lines = [format_header("Hi-Lo Count")]
+    lines += _kv_block([
+        ("Cards seen", state.cards_seen),
+        ("Running count", f"{state.running_count:+d}"),
+        ("Decks remaining", state.decks_remaining),
+        ("True count", f"{state.true_count:+.2f}"),
+        ("Note", state.note),
+    ])
     return "\n".join(lines)
 
 
@@ -224,17 +245,19 @@ def _run_count(argv: Sequence[str]) -> int:
 def build_simulate_output(hand: SimulatedHand) -> str:
     """Render a simulated training hand as human-readable terminal output."""
     rec = hand.recommendation
-    lines = [
-        "Simulated training hand (local / simulated practice only)",
-        f"Player cards:         {', '.join(hand.player_cards)}",
-        f"Dealer upcard:        {hand.dealer_upcard}",
-        f"Recommendation:       {rec.action.value}",
-        f"  Why:                {rec.reason}",
-        f"Running count before: {hand.running_count_before:+d}",
-        f"Running count after:  {hand.running_count_after:+d}",
-        f"True count after:     {hand.true_count_after:+.2f}",
-        f"Note:                 {hand.note}",
-    ]
+    lines = [format_header("Training Simulator")]
+    lines += _kv_block([
+        ("Player cards", format_cards(hand.player_cards)),
+        ("Dealer upcard", hand.dealer_upcard),
+        ("Recommendation", rec.action.value),
+        ("Why", rec.reason),
+        ("Running count before", f"{hand.running_count_before:+d}"),
+        ("Running count after", f"{hand.running_count_after:+d}"),
+        ("True count after", f"{hand.true_count_after:+.2f}"),
+        ("Note", hand.note),
+    ])
+    lines.append("")
+    lines.append(SCOPE_FOOTER)
     return "\n".join(lines)
 
 
@@ -287,47 +310,55 @@ def _run_simulate(argv: Sequence[str]) -> int:
 def build_play_output(hand: PlayedHand) -> str:
     """Render a fully played-out (non-split) hand as terminal output."""
     outcome = hand.final_outcome.value if hand.final_outcome else "NOT PLAYED (split)"
-    starting = ", ".join(hand.player_cards[:2])
-    lines = [
-        "Played training hand (local / simulated practice only)",
-        f"Player starting cards: {starting}",
-        f"Dealer upcard:         {hand.dealer_cards[0]}",
-        f"Actions taken:         {', '.join(hand.actions_taken) or '(none)'}",
-        f"Final player cards:    {', '.join(hand.player_cards)}",
-        f"Final dealer cards:    {', '.join(hand.dealer_cards)}",
-        f"Outcome:               {outcome}",
-        f"Running count before:  {hand.running_count_before:+d}",
-        f"Running count after:   {hand.running_count_after:+d}",
-        f"True count after:      {hand.true_count_after:+.2f}",
-        f"Note:                  {hand.note}",
-    ]
+    lines = [format_header("Played Hand")]
+    lines += _kv_block([
+        ("Player starting cards", format_cards(hand.player_cards[:2])),
+        ("Dealer upcard", hand.dealer_cards[0]),
+        ("Actions taken", format_cards(hand.actions_taken) or "(none)"),
+        ("Final player cards", format_cards(hand.player_cards)),
+        ("Final dealer cards", format_cards(hand.dealer_cards)),
+        ("Outcome", outcome),
+        ("Running count before", f"{hand.running_count_before:+d}"),
+        ("Running count after", f"{hand.running_count_after:+d}"),
+        ("True count after", f"{hand.true_count_after:+.2f}"),
+        ("Note", hand.note),
+    ])
+    lines.append("")
+    lines.append(SCOPE_FOOTER)
     return "\n".join(lines)
 
 
 def build_split_play_output(hand: PlayedSplitHand) -> str:
     """Render a split hand (two sub-hands) as terminal output."""
-    lines = [
-        "Played training hand - SPLIT (local / simulated practice only)",
-        f"Original hand:         {', '.join(hand.original_player_cards)}",
-        f"Dealer upcard:         {hand.dealer_cards[0]}",
-    ]
+    lines = [format_header("Played Hand (SPLIT)")]
+    lines += _kv_block([
+        ("Original hand", format_cards(hand.original_player_cards)),
+        ("Dealer upcard", hand.dealer_cards[0]),
+    ])
     for i, sub in enumerate(hand.split_hands, start=1):
-        actions = ", ".join(sub.actions_taken) or "(none)"
+        actions = format_cards(sub.actions_taken) or "(none)"
         outcome = sub.final_outcome.value if sub.final_outcome else "(unresolved)"
-        lines.append(f"Split hand {i}:          {', '.join(sub.cards)}")
-        lines.append(f"  Actions:             {actions}")
-        lines.append(f"  Outcome:             {outcome}")
-    lines.extend([
-        f"Final dealer cards:    {', '.join(hand.dealer_cards)}",
-        f"Running count before:  {hand.running_count_before:+d}",
-        f"Running count after:   {hand.running_count_after:+d}",
-        f"True count after:      {hand.true_count_after:+.2f}",
-        f"Note:                  {hand.note}",
+        lines.append("")
+        lines.append(format_section(f"Split hand {i}"))
+        lines += _kv_block([
+            ("Cards", format_cards(sub.cards)),
+            ("Actions", actions),
+            ("Outcome", outcome),
+        ])
+    lines.append("")
+    lines += _kv_block([
+        ("Final dealer cards", format_cards(hand.dealer_cards)),
+        ("Running count before", f"{hand.running_count_before:+d}"),
+        ("Running count after", f"{hand.running_count_after:+d}"),
+        ("True count after", f"{hand.true_count_after:+.2f}"),
+        ("Note", hand.note),
     ])
     if hand.warnings:
-        lines.append("Warnings:")
-        for w in hand.warnings:
-            lines.append(f"  - {w}")
+        lines.append("")
+        lines.append(format_section("Warnings"))
+        lines.append(format_list(hand.warnings))
+    lines.append("")
+    lines.append(SCOPE_FOOTER)
     return "\n".join(lines)
 
 
@@ -383,17 +414,17 @@ def _run_play(argv: Sequence[str]) -> int:
 def build_quiz_output(result: QuizResult) -> str:
     """Render a graded strategy-quiz result as terminal output."""
     q = result.question
-    verdict = "Correct" if result.is_correct else "Incorrect"
-    return "\n".join([
-        "Strategy quiz (local / educational practice only)",
-        f"Player cards:   {', '.join(q.player_cards)}",
-        f"Dealer upcard:  {q.dealer_upcard}",
-        f"Profile:        {q.profile_key}",
-        f"Your answer:    {result.user_action}",
-        f"Correct action: {result.correct_action}",
-        f"Result:         {verdict}",
-        f"Why:            {result.explanation}",
+    lines = [format_header("Strategy Quiz")]
+    lines += _kv_block([
+        ("Player cards", format_cards(q.player_cards)),
+        ("Dealer upcard", q.dealer_upcard),
+        ("Profile", q.profile_key),
+        ("Your answer", result.user_action),
+        ("Correct action", result.correct_action),
+        ("Result", format_result_status(result.is_correct)),
+        ("Why", result.explanation),
     ])
+    return "\n".join(lines)
 
 
 def build_quiz_parser() -> argparse.ArgumentParser:
@@ -427,10 +458,13 @@ def _run_quiz(argv: Sequence[str]) -> int:
 
         answer = args.answer
         if answer is None:  # interactive mode: ask for the action
-            print("Strategy quiz (local / educational practice only)")
-            print(f"Player cards:   {', '.join(question.player_cards)}")
-            print(f"Dealer upcard:  {question.dealer_upcard}")
-            print(f"Profile:        {question.profile_key}")
+            print(format_header("Strategy Quiz"))
+            for line in _kv_block([
+                ("Player cards", format_cards(question.player_cards)),
+                ("Dealer upcard", question.dealer_upcard),
+                ("Profile", question.profile_key),
+            ]):
+                print(line)
             try:
                 answer = input(ACTION_PROMPT)
             except EOFError:
@@ -475,34 +509,37 @@ def _run_count_quiz(argv: Sequence[str]) -> int:
         return 2
 
     is_correct = args.answer == correct
-    verdict = "Correct" if is_correct else "Incorrect"
-    print("\n".join([
-        "Hi-Lo running-count quiz (local / educational practice only)",
-        f"Cards:                {', '.join(cards)}",
-        f"Your answer:          {args.answer:+d}",
-        f"Correct running count: {correct:+d}",
-        f"Result:               {verdict}",
-        f"Note:                 {EDUCATIONAL_NOTE}",
-    ]))
+    lines = [format_header("Hi-Lo Count Quiz")]
+    lines += _kv_block([
+        ("Cards", format_cards(cards)),
+        ("Your answer", f"{args.answer:+d}"),
+        ("Correct running count", f"{correct:+d}"),
+        ("Result", format_result_status(is_correct)),
+        ("Note", EDUCATIONAL_NOTE),
+    ])
+    print("\n".join(lines))
     return 0
 
 
 def build_session_output(result: QuizSessionResult) -> str:
     """Render a scored session summary as terminal output."""
     title = (
-        "Strategy training session" if result.mode == "strategy"
-        else "Hi-Lo count training session"
+        "Strategy Training Session" if result.mode == "strategy"
+        else "Hi-Lo Count Training Session"
     )
-    weak = ", ".join(result.weak_spots) if result.weak_spots else "(none)"
-    return "\n".join([
-        f"{title} (local / educational practice only)",
-        f"Total questions:  {result.total_questions}",
-        f"Correct:          {result.correct_answers}",
-        f"Incorrect:        {result.incorrect_answers}",
-        f"Accuracy:         {result.accuracy * 100:.1f}%",
-        f"Weak spots:       {weak}",
-        f"Note:             {result.note}",
+    lines = [format_header(title)]
+    lines += _kv_block([
+        ("Total questions", result.total_questions),
+        ("Correct", result.correct_answers),
+        ("Incorrect", result.incorrect_answers),
+        ("Accuracy", format_percentage(result.accuracy)),
     ])
+    lines.append("")
+    lines.append(format_section("Weak spots"))
+    lines.append(format_list(result.weak_spots))
+    lines.append("")
+    lines.append(format_kv("Note", result.note))
+    return "\n".join(lines)
 
 
 def build_quiz_session_parser() -> argparse.ArgumentParser:

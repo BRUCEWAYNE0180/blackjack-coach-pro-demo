@@ -7,6 +7,37 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.1.0] - 2026-06-23
+
+Terminal visual polish. This release improves how the CLI looks and reads; it
+does **not** change any strategy, counting, simulation, split, or scoring
+logic.
+
+### Added
+
+- `app/formatting.py` with dependency-free helpers: `format_header`,
+  `format_section`, `format_kv`, `format_list`, `format_result_status`,
+  `format_percentage`, `format_warning`, and `format_cards`.
+- Clear section headers, aligned key/value rows, a visible `[ CORRECT ]` /
+  `[ INCORRECT ]` result badge, and percentage summaries across the CLI.
+
+### Changed
+
+- Reformatted the output of every command (`strategy`, `count`, `simulate`,
+  `play`, `quiz`, `count-quiz`, `quiz-session`, `count-session`) for clarity.
+- Bumped the package and `app.__version__` to **1.1.0**.
+
+### Quality
+
+- Added `tests/test_formatting.py`; updated CLI tests to assert the clearer
+  output. Full suite passing; ruff clean; CI on Python 3.9-3.12.
+
+### Safety
+
+- No logic changes: strategy, Hi-Lo math, simulator, split handling, and quiz
+  grading are untouched. Still no casino connectivity, real betting, bankroll,
+  camera/video, scraping, or promise of winnings.
+
 ## [1.0.0] - 2026-06-23
 
 First stable release. This consolidates the work from v0.1 through v0.9 into a

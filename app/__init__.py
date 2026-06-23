@@ -21,6 +21,16 @@ from .explanations import (
     explain_insurance_no,
     explain_state,
 )
+from .formatting import (
+    format_cards,
+    format_header,
+    format_kv,
+    format_list,
+    format_percentage,
+    format_result_status,
+    format_section,
+    format_warning,
+)
 from .hand_evaluator import HandEvaluation, card_value, evaluate_hand, normalize_rank
 from .quiz import (
     CountQuizResult,
@@ -73,7 +83,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -108,6 +118,14 @@ __all__ = [
     "explain_action",
     "explain_insurance_no",
     "explain_state",
+    "format_cards",
+    "format_header",
+    "format_kv",
+    "format_list",
+    "format_percentage",
+    "format_result_status",
+    "format_section",
+    "format_warning",
     "generate_strategy_question",
     "get_profile",
     "grade_strategy_answer",

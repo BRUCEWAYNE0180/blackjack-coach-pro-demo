@@ -35,6 +35,8 @@ through v0.6.
 - `app/explanations.py` — Short educational notes for each action and state
   (`HIT`, `STAND`, `DOUBLE`, `SPLIT`, `SURRENDER`, `BLACKJACK`, `BUST`,
   insurance-NO).
+- `app/formatting.py` — Dependency-free terminal formatting helpers (headers,
+  aligned key/value rows, result badges, percentages); presentation only.
 - `app/counting.py` — Hi-Lo counting trainer: tag values, running count, true
   count, and `CountingState` (educational / simulated practice only).
 - `app/shoe.py` — Virtual multi-deck shoe: build, shuffle (seedable), draw,
@@ -59,7 +61,7 @@ through v0.6.
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
 - `tests/` — Behavioural tests for the evaluator, engine, explanations,
-  counting, shoe, simulator, quiz, CLI, and packaging.
+  formatting, counting, shoe, simulator, quiz, CLI, and packaging.
 
 ## Roadmap
 
@@ -421,7 +423,7 @@ Delivered (no new gameplay scope; tooling and quality only):
 - Still local/simulated only: no casino connectivity, no real-money betting or
   bankroll, no camera/video, no screen scraping, and no promise of winnings.
 
-### v1.0.0 — Stable Release (current)
+### v1.0.0 — Stable Release (done)
 
 The first **stable** release. It is release polish only: no new blackjack
 gameplay is added. v1.0.0 consolidates v0.1-v0.9 into a documented, packaged,
@@ -450,9 +452,27 @@ no web app, and no promise of winnings.
 All future work stays educational and local unless explicitly decided
 otherwise.
 
-### v1.1 — Visual / Terminal Polish
+### v1.1.0 — Terminal Visual Polish (current)
 
-- Nicer terminal output (tables/colour), clearer prompts, and quiz UX polish.
+Presentation-only release: the CLI looks clearer and more professional, with
+**no changes** to strategy, counting, simulation, split, or scoring logic.
+
+Delivered:
+
+- **`app/formatting.py`** — dependency-free helpers (standard library only, no
+  rich/typer/click): `format_header`, `format_section`, `format_kv`,
+  `format_list`, `format_result_status`, `format_percentage`, `format_warning`,
+  and `format_cards`.
+- **Reformatted CLI output** for every command (`strategy`, `count`,
+  `simulate`, `play`, `quiz`, `count-quiz`, `quiz-session`, `count-session`):
+  titled headers with underlines, aligned `label : value` rows, a visible
+  `[ CORRECT ]` / `[ INCORRECT ]` badge, and percentage summaries.
+- Version bumped to **1.1.0** (with `tests/test_formatting.py` and updated CLI
+  assertions). All tests pass; ruff clean.
+
+Out of scope (unchanged): no logic changes, no casino connectivity, no real
+betting/bankroll, no camera/video, no scraping, no betting spread, no Kelly, no
+Illustrious 18, no insurance index, no web app, and no promise of winnings.
 
 ### v1.2 — Saved Local Session History
 
