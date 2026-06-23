@@ -132,6 +132,12 @@ tool relies on and the project's evolution.
   review queue, drill generator, and history into one daily pack; the correct
   play comes from the strategy engine, so it never duplicates rules or changes
   the recommendation.
+- `app/practice_pack_history.py` — Local practice-pack completion history:
+  `PracticePackCompletionRecord`, `PracticePackProgressSummary`, plus
+  `build_practice_pack_completion_record`, save/load/list,
+  `summarize_practice_pack_history`, and
+  `render_practice_pack_progress_summary`. Records pack completion / accuracy /
+  streaks locally; never changes the correct answers or the recommendation.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -1328,7 +1334,7 @@ results, keeps exported files under the git-ignored `.blackjack_coach/reports`
 tree (unless an `--output` path is given), and uses no external dependencies,
 network, cloud, or database.
 
-### v1.24.0 — Daily Practice Pack Generator (current)
+### v1.24.0 — Daily Practice Pack Generator (done)
 
 Builds on the review scheduler (v1.23.0), the drill generator (v1.21.0), and the
 drill history (v1.22.0). Those features could say what is due and what to drill;
@@ -1361,6 +1367,42 @@ scheduler. Per `PROJECT_RULES.md` it stores no sensitive data, suggests practice
 without promising results, keeps exported files under the git-ignored
 `.blackjack_coach/reports` tree (unless an `--output` path is given), and uses no
 external dependencies, network, cloud, or database.
+
+### v1.25.0 — Practice Pack Completion History (current)
+
+Builds on the v1.24.0 daily practice pack. The generator could create a pack but
+not record whether it was done; v1.25.0 adds a local completion history (items
+done, correct / missed / skipped, completion rate, accuracy) and a per-pack
+progress summary with streaks. It never changes the correct answers or the
+strategy engine.
+
+Delivered:
+
+- **`app/practice_pack_history.py`**: `PracticePackCompletionRecord` (pack id /
+  date, profile, focus, totals, completion rate, accuracy, completed / missed /
+  skipped spot ids, source summary) and `PracticePackProgressSummary` (completed
+  vs partial packs, overall completion rate / accuracy, pack streaks, weakest /
+  strongest spots, recommendations). Functions:
+  `default_practice_pack_history_dir`, `ensure_practice_pack_history_dir`,
+  `build_practice_pack_completion_record`, `save_practice_pack_completion_record`,
+  `load_practice_pack_completion_record`,
+  `list_practice_pack_completion_records`, `summarize_practice_pack_history`, and
+  `render_practice_pack_progress_summary`.
+- **CLI**: `practice-pack` gains `--complete`, `--completed-spots`,
+  `--correct-spots`, `--missed-spots`, `--skipped-spots`, `--pack-dir`, and
+  `--progress` (kept inside `practice-pack` rather than a new command).
+- **Tests**: new `tests/test_practice_pack_history.py` and
+  `TestCliPracticePackHistory` in `tests/test_cli.py`.
+
+**Limits / honesty:** the completion history is local practice training. It
+records practice without promising results and never changes the correct
+answers, `strategy_engine.recommend`, the Hi-Lo math, adaptive learning, guided
+coaching, outcome / session history, the EV-snapshot history, the Strategy-vs-EV
+engine, reporting, the dashboard, the drill generator, the drill history, the
+review scheduler, or the practice-pack generator. Per `PROJECT_RULES.md` it
+stores no sensitive data, keeps files under the git-ignored
+`.blackjack_coach/practice_packs` tree (unless a `--pack-dir` is given), and uses
+no external dependencies, network, cloud, or database.
 
 ### v2.0 — Possible Web UI (if decided later)
 

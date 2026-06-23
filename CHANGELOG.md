@@ -7,6 +7,64 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.25.0] - 2026-06-23
+
+Local practice-pack completion history. The v1.24.0 daily practice pack can now
+be marked **done**: `practice-pack --complete` saves a local completion record
+(items completed, correct / missed / skipped, completion rate, accuracy), and
+`practice-pack --progress` summarises pack streaks and progress over time. It
+never changes the correct answers, `strategy_engine.recommend`, or the Hi-Lo
+math.
+
+### Added
+
+- `app/practice_pack_history.py`: dataclasses `PracticePackCompletionRecord` and
+  `PracticePackProgressSummary`, plus `default_practice_pack_history_dir`,
+  `ensure_practice_pack_history_dir`, `build_practice_pack_completion_record`
+  (whole-pack completion with no detail, or counts / completion rate / accuracy
+  from correct / missed / skipped spot ids, with an optional answers mapping),
+  `save_practice_pack_completion_record`, `load_practice_pack_completion_record`,
+  `list_practice_pack_completion_records` (with `limit` / `profile_key`),
+  `summarize_practice_pack_history` (completed vs partial packs, overall
+  completion rate / accuracy, pack streaks, weakest / strongest spots, practice
+  recommendations, and a data-quality note), and
+  `render_practice_pack_progress_summary`.
+- CLI `practice-pack` flags `--complete`, `--completed-spots`,
+  `--correct-spots`, `--missed-spots`, `--skipped-spots`, `--pack-dir`, and
+  `--progress`. `--complete` saves a completion record (and works alongside
+  `--export`); `--progress` shows the completion summary; with no data it prints
+  a clear message.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.25.0**.
+
+### Quality
+
+- New suite `tests/test_practice_pack_history.py` (complete-all with no detail;
+  counts / completion rate / accuracy from detail; save/load roundtrip; list
+  `limit` / `profile_key`; empty summary; completed vs partial packs;
+  consecutive-day streak; weakest / strongest spot detection; renderer; no
+  sensitive field names; serialized JSON has no sensitive keys; and that
+  building a record never changes `recommend()`) plus
+  `TestCliPracticePackHistory` in `tests/test_cli.py` (`--complete` saves a
+  file, detail accuracy, `--progress` no-data message, `--progress` with data,
+  `--progress --profile`, `--complete --export`, and `--version` = 1.25.0). Full
+  suite passing; ruff clean.
+
+### Safety
+
+- Practice-pack completion history is **local practice training** only. It never
+  changes the correct answers, `strategy_engine.recommend`, the Hi-Lo math,
+  adaptive learning, guided coaching, outcome / session history, the EV-snapshot
+  history, the Strategy-vs-EV engine, reporting, the dashboard, the drill
+  generator, the drill history, the review scheduler, or the practice-pack
+  generator. Records store no money, bankroll, real bets, accounts, tokens,
+  screenshots, or any sensitive/personal data, record practice without promising
+  results, and use no external dependencies, network, cloud, or database. Saved
+  files live under the git-ignored `.blackjack_coach/practice_packs` tree
+  (unless a `--pack-dir` is given) and are never committed.
+
 ## [1.24.0] - 2026-06-23
 
 Local daily practice-pack generator. A new `practice-pack` command assembles one

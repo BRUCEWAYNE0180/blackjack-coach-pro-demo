@@ -117,6 +117,18 @@ from .practice_pack import (
     render_practice_pack,
     render_practice_pack_markdown,
 )
+from .practice_pack_history import (
+    PracticePackCompletionRecord,
+    PracticePackProgressSummary,
+    build_practice_pack_completion_record,
+    default_practice_pack_history_dir,
+    ensure_practice_pack_history_dir,
+    list_practice_pack_completion_records,
+    load_practice_pack_completion_record,
+    render_practice_pack_progress_summary,
+    save_practice_pack_completion_record,
+    summarize_practice_pack_history,
+)
 from .quiz import (
     CountQuizResult,
     QuizQuestion,
@@ -230,7 +242,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.24.0"
+__version__ = "1.25.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -269,6 +281,8 @@ __all__ = [
     "PracticePack",
     "PracticePackExport",
     "PracticePackItem",
+    "PracticePackCompletionRecord",
+    "PracticePackProgressSummary",
     "FOUR_DECK_H17_DAS_LS",
     "HandEvaluation",
     "HandOutcome",
@@ -344,6 +358,14 @@ __all__ = [
     "export_practice_pack",
     "render_practice_pack",
     "render_practice_pack_markdown",
+    "build_practice_pack_completion_record",
+    "default_practice_pack_history_dir",
+    "ensure_practice_pack_history_dir",
+    "list_practice_pack_completion_records",
+    "load_practice_pack_completion_record",
+    "render_practice_pack_progress_summary",
+    "save_practice_pack_completion_record",
+    "summarize_practice_pack_history",
     "can_double_after_split",
     "can_hit_split_aces",
     "can_resplit",

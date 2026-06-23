@@ -99,6 +99,13 @@ from .practice_pack import (
     render_practice_pack,
     render_practice_pack_markdown,
 )
+from .practice_pack_history import (
+    build_practice_pack_completion_record,
+    list_practice_pack_completion_records,
+    render_practice_pack_progress_summary,
+    save_practice_pack_completion_record,
+    summarize_practice_pack_history,
+)
 from .probability_advisor import (
     COMPOSITION_RANKS,
     build_composition_aware_advice,
@@ -2907,6 +2914,23 @@ def build_practice_pack_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", default=None,
                         help="Exact output file path for --export (default: a "
                              "timestamped file under ./.blackjack_coach/reports).")
+    parser.add_argument("--complete", action="store_true",
+                        help="Save a local completion record for the generated "
+                             "pack (marks it practised).")
+    parser.add_argument("--completed-spots", default=None, dest="completed_spots",
+                        help="Comma-separated spot ids that were completed.")
+    parser.add_argument("--correct-spots", default=None, dest="correct_spots",
+                        help="Comma-separated spot ids answered correctly.")
+    parser.add_argument("--missed-spots", default=None, dest="missed_spots",
+                        help="Comma-separated spot ids answered incorrectly.")
+    parser.add_argument("--skipped-spots", default=None, dest="skipped_spots",
+                        help="Comma-separated spot ids that were skipped.")
+    parser.add_argument("--pack-dir", default=None, dest="pack_dir",
+                        help="Practice-pack completion directory (default: "
+                             "./.blackjack_coach/practice_packs).")
+    parser.add_argument("--progress", action="store_true",
+                        help="Show the practice-pack completion progress "
+                             "summary instead of generating a pack.")
     return parser
 
 
@@ -2914,6 +2938,14 @@ def _run_practice_pack(argv: Sequence[str]) -> int:
     """Handle the 'practice-pack' daily-pack subcommand."""
     parser = build_practice_pack_parser()
     args = parser.parse_args(argv)
+
+    # Progress mode: show the completion-history summary.
+    if args.progress:
+        records = list_practice_pack_completion_records(
+            history_dir=args.pack_dir, profile_key=args.profile)
+        summary = summarize_practice_pack_history(records)
+        print(render_practice_pack_progress_summary(summary))
+        return 0
 
     if args.count <= 0:
         print("Error: --count must be >= 1.", file=sys.stderr)
@@ -2948,6 +2980,27 @@ def _run_practice_pack(argv: Sequence[str]) -> int:
             return 2
         print("")
         print(format_kv("Saved practice pack", export.output_path))
+
+    if args.complete:
+        record = build_practice_pack_completion_record(
+            pack,
+            completed_spot_ids=args.completed_spots,
+            correct_spot_ids=args.correct_spots,
+            missed_spot_ids=args.missed_spots,
+            skipped_spot_ids=args.skipped_spots,
+        )
+        try:
+            path = save_practice_pack_completion_record(record, args.pack_dir)
+        except OSError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print("")
+        print(format_kv("Saved pack completion", str(path)))
+        print(format_kv(
+            "Completion",
+            f"{record.completed_items}/{record.total_items} items, "
+            f"{record.completion_rate * 100:.0f}% complete, "
+            f"{record.accuracy * 100:.0f}% accuracy"))
     return 0
 
 
