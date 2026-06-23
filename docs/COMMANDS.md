@@ -880,6 +880,46 @@ With no saved drill sessions it prints "No saved drill sessions yet. Use drill
 scheduler is local practice only - it stores no sensitive data, never changes
 the correct answers or the strategy recommendation, and is never committed.
 
+## Daily practice pack generator (v1.24.0)
+
+### practice-pack
+
+```bash
+blackjack-coach practice-pack
+blackjack-coach practice-pack --focus due --count 10
+blackjack-coach practice-pack --focus ev --profile SIX_DECK_H17_DAS_LS
+blackjack-coach practice-pack --today 2026-06-23 --seed 42
+blackjack-coach practice-pack --markdown
+blackjack-coach practice-pack --export --output practice_pack.md
+```
+
+Builds one ready-to-practise pack for today by combining the review-queue's due
+items, weak drill-history spots, EV disagreement / high-gap spots, and a
+focus-specific or educational mix (with a starter set when there is no saved
+history). Priority: due reviews, then weak spots, then EV / high-gap spots, then
+the mix. The correct play for every item comes from the strategy engine - the
+pack never re-derives or changes it.
+
+Flags:
+
+- `--profile <KEY>` - rule profile for the pack.
+- `--focus daily|due|weak|ev|pairs|hard|soft|mixed` - what to build (default
+  `daily`).
+- `--count N` - maximum number of items (default 20).
+- `--seed N` - deterministic pack order.
+- `--today YYYY-MM-DD` - treat this date as today (for due scheduling).
+- `--drill-dir` / `--session-dir` / `--outcome-dir` / `--ev-dir` - read from
+  custom history folders.
+- `--markdown` - print a Markdown checklist instead of text.
+- `--export` / `--output <path>` - save a Markdown file (default under
+  `./.blackjack_coach/reports`) and print the path.
+
+With no saved history it prints a starter educational pack and says so. The pack
+is local practice only - it stores no sensitive data, never changes the correct
+answers or the strategy recommendation, and is never committed. After
+practising, save progress with `drill --answer ... --save` and re-run
+`review-queue`.
+
 
 
 
