@@ -129,6 +129,13 @@ As of v0.9 the project enforces these gates on every change:
   every cell yields a valid `Action`; and fallback cells are detected for
   profiles that restrict surrender / double / split. Coverage tooling reads
   `strategy_engine.recommend` and must never change basic strategy.
+- **Outcome history is a local summary only.** The outcome / win-loss history
+  (v1.8.0: `app/outcome_history.py`) must store only local practice summaries -
+  profile, seed, cards, actions, and result counts. It must never store money,
+  bankroll, real bets, wagers, balances, accounts, tokens, screenshots, or any
+  sensitive/personal data, and must use no database, network, or cloud. Saved
+  records live under the git-ignored `.blackjack_coach/` tree and are never
+  committed.
 
 ## 8. Release Rules
 

@@ -718,3 +718,72 @@ class TestCliAudit:
         err = capsys.readouterr().err
         assert exit_code == 2
         assert "Error" in err
+
+
+class TestCliOutcomes:
+    def test_play_save_outcome_creates_file(self, capsys, tmp_path):
+        exit_code = cli.main(["play", "--decks", "6", "--seed", "42",
+                              "--save-outcome", "--outcome-dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Saved outcome" in out
+        files = list(tmp_path.glob("outcome_*.json"))
+        assert len(files) == 1
+
+    def test_play_save_split_outcome_creates_file(self, capsys, tmp_path):
+        exit_code = cli.main(["play", "--decks", "6", "--seed", "428",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--save-outcome", "--outcome-dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Saved outcome" in out
+        assert len(list(tmp_path.glob("outcome_*.json"))) == 1
+
+    def test_outcomes_shows_total_records(self, capsys, tmp_path):
+        cli.main(["play", "--decks", "6", "--seed", "42",
+                  "--save-outcome", "--outcome-dir", str(tmp_path)])
+        cli.main(["play", "--decks", "6", "--seed", "428",
+                  "--profile", "SIX_DECK_H17_DAS_LS",
+                  "--save-outcome", "--outcome-dir", str(tmp_path)])
+        capsys.readouterr()  # clear
+        exit_code = cli.main(["outcomes", "--dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Outcome History ===" in out
+        assert "Total records      : 2" in out
+        assert "Wins" in out
+        assert "Losses" in out
+        assert "Split records" in out
+
+    def test_outcomes_limit_respected(self, capsys, tmp_path):
+        for seed in (42, 428, 5):
+            cli.main(["play", "--decks", "6", "--seed", str(seed),
+                      "--profile", "SIX_DECK_H17_DAS_LS",
+                      "--save-outcome", "--outcome-dir", str(tmp_path)])
+        capsys.readouterr()
+        exit_code = cli.main(["outcomes", "--dir", str(tmp_path), "--limit", "1"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total records      : 1" in out
+
+    def test_outcomes_profile_filter(self, capsys, tmp_path):
+        cli.main(["play", "--decks", "6", "--seed", "42",
+                  "--profile", "MULTI_DECK_H17_DAS_LS",
+                  "--save-outcome", "--outcome-dir", str(tmp_path)])
+        cli.main(["play", "--decks", "6", "--seed", "428",
+                  "--profile", "SIX_DECK_H17_DAS_LS",
+                  "--save-outcome", "--outcome-dir", str(tmp_path)])
+        capsys.readouterr()
+        exit_code = cli.main(["outcomes", "--dir", str(tmp_path),
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total records      : 1" in out
+        assert "SIX_DECK_H17_DAS_LS" in out
+
+    def test_outcomes_empty_dir(self, capsys, tmp_path):
+        exit_code = cli.main(["outcomes", "--dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total records      : 0" in out
+        assert "No saved outcomes yet" in out

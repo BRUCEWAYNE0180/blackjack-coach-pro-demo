@@ -43,6 +43,10 @@ tool relies on and the project's evolution.
   aligned key/value rows, result badges, percentages); presentation only.
 - `app/session_history.py` — Local JSON session history (summary only):
   `SessionRecord`, `HistorySummary`, save/load/list, and `summarize_history`.
+- `app/outcome_history.py` — Local outcome / win-loss history (summary only):
+  `OutcomeRecord`, `OutcomeSummary`, `build_outcome_record` (for `PlayedHand`
+  and `PlayedSplitHand`), save/load/list (with limit / profile filters), and
+  `summarize_outcomes`. No database, network, or cloud.
 - `app/deviations.py` — Educational true-count deviation study (study-only):
   `DeviationRule`, `DeviationRecommendation`, `DEFAULT_DEVIATION_RULES`,
   `find_matching_deviation`, and `recommend_with_deviation` (wraps the engine
@@ -87,8 +91,8 @@ tool relies on and the project's evolution.
 - `app/cli.py` — Terminal trainer (`python -m app.cli` or the installed
   `blackjack-coach` command, plus `count`, `simulate`, `play`, `quiz`,
   `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`,
-  `deviation-quiz`, `diagnose`, `profiles`, `split-rules`, `matrix`, and
-  `audit` subcommands).
+  `deviation-quiz`, `diagnose`, `profiles`, `split-rules`, `matrix`,
+  `audit`, and `outcomes` subcommands).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -661,7 +665,7 @@ Delivered:
 simulator's re-split tree. Per `PROJECT_RULES.md`, all re-split logic must be
 covered by deterministic tests.
 
-### v1.7.0 — Complete Strategy Matrix & Decision Audit (current)
+### v1.7.0 — Complete Strategy Matrix & Decision Audit (done)
 
 Makes the coach more confident and transparent about its decisions without
 changing basic strategy. Two new read-only layers sit on top of
@@ -692,6 +696,34 @@ soft totals, pairs, every dealer upcard, and every rule profile, and explains
 whether each play is a direct chart action or a legal fallback. Per
 `PROJECT_RULES.md`, any new decision table or matrix change needs a coverage
 audit and cell tests.
+
+### v1.8.0 — Outcome / Win-Loss History (current)
+
+Adds a local outcome history so the coach can record and review the results of
+played practice hands, complementing the v1.7.0 decision tooling. Basic
+strategy is untouched (`strategy_engine.recommend` is not modified).
+
+Delivered:
+
+- **`app/outcome_history.py`**: `OutcomeRecord` and `OutcomeSummary`, plus
+  `default_outcome_history_dir`, `ensure_outcome_history_dir`,
+  `build_outcome_record` (handles both `PlayedHand` and `PlayedSplitHand`,
+  counting per-sub-hand wins/losses/pushes/surrenders and busts),
+  `save_outcome_record`, `load_outcome_record`, `list_outcome_records` (with
+  `limit` and `profile_key`), and `summarize_outcomes`.
+- **CLI**: `play --save-outcome [--outcome-dir PATH]` records a played hand;
+  `outcomes [--limit N] [--profile KEY] [--dir PATH]` summarises the history
+  (totals, busts, split records, average split hands, most common profile and
+  outcomes).
+- **Tests**: `tests/test_outcome_history.py` (build from normal and split
+  hands, save/load roundtrip, list with limit / profile filters, summary
+  counts, no sensitive fields) plus CLI tests.
+
+**Storage policy:** summary only - profile, seed, cards, actions, and result
+counts. No money, bankroll, bets, accounts, tokens, screenshots, or sensitive
+data; no database, network, or cloud. Records live under the git-ignored
+`.blackjack_coach/outcomes/` folder. Per `PROJECT_RULES.md`, outcome history
+must remain a local summary and never store sensitive data.
 
 ### v2.0 — Possible Web UI (if decided later)
 
