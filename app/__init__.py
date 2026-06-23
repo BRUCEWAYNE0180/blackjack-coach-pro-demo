@@ -34,6 +34,17 @@ from .deviations import (
     normalize_true_count,
     recommend_with_deviation,
 )
+from .ev_history import (
+    EVReviewSummary,
+    EVSnapshotRecord,
+    build_ev_snapshot_record,
+    default_ev_history_dir,
+    ensure_ev_history_dir,
+    list_ev_snapshot_records,
+    load_ev_snapshot_record,
+    save_ev_snapshot_record,
+    summarize_ev_snapshots,
+)
 from .explanations import (
     ACTION_NOTES,
     explain_action,
@@ -140,7 +151,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.16.0"
+__version__ = "1.17.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -157,6 +168,8 @@ __all__ = [
     "DEFAULT_DEVIATION_RULES",
     "EIGHT_DECK_H17_DAS_LS",
     "EIGHT_DECK_S17_DAS_LS",
+    "EVReviewSummary",
+    "EVSnapshotRecord",
     "FOUR_DECK_H17_DAS_LS",
     "HandEvaluation",
     "HandOutcome",
@@ -186,6 +199,7 @@ __all__ = [
     "build_strategy_questions",
     "build_history_context",
     "build_learning_summary",
+    "build_ev_snapshot_record",
     "can_double_after_split",
     "can_hit_split_aces",
     "can_resplit",
@@ -202,6 +216,12 @@ __all__ = [
     "describe_rule_profile",
     "draw_card",
     "ensure_history_dir",
+    "default_ev_history_dir",
+    "ensure_ev_history_dir",
+    "list_ev_snapshot_records",
+    "load_ev_snapshot_record",
+    "save_ev_snapshot_record",
+    "summarize_ev_snapshots",
     "evaluate_hand",
     "explain_action",
     "explain_decision_factors",

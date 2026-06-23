@@ -210,6 +210,21 @@ As of v0.9 the project enforces these gates on every change:
   exactness via `is_exact_for_supported_rules`, and must not change
   `strategy_engine.recommend` or the Hi-Lo counting math. It must stay
   deterministic / memoised (no Monte Carlo) and dependency-free.
+- **EV snapshots are a local advisory audit.** The EV-snapshot history and
+  Strategy-vs-EV review (v1.17.0: `app/ev_history.py`) must never change the
+  main strategy recommendation, never override `strategy_engine.recommend`, and
+  never modify the Hi-Lo counting math, the probability / EV advisor, adaptive
+  learning, guided coaching, outcome history, or session history. When the
+  advisory best-EV action differs from the recommendation, the review only
+  *reports* it - it is never applied. Snapshots store only a safe local summary
+  (profile, cards, dealer upcard, decks, optional true count / seen cards, the
+  recommended and best-EV actions, per-action EVs, the EV gap, agreement, and
+  documentation notes) and must never store money, bankroll, real bets, wagers,
+  balances, accounts, tokens, screenshots, or any sensitive/personal data, with
+  no database, network, or cloud. Saved files live under the git-ignored
+  `.blackjack_coach/ev_snapshots` directory (unless the user passes `--ev-dir`)
+  and are never committed. It must stay dependency-free with no large/slow
+  simulations.
 
 ## 8. Release Rules
 

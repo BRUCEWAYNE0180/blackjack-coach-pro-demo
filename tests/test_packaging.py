@@ -7,8 +7,8 @@ from app import cli
 
 
 class TestVersion:
-    def test_version_is_1_16_0(self):
-        assert app.__version__ == "1.16.0"
+    def test_version_is_1_17_0(self):
+        assert app.__version__ == "1.17.0"
 
 
 class TestCliBackwardCompatibility:
@@ -70,13 +70,13 @@ class TestCliVersionFlag:
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.16.0"
+        assert out.strip() == "blackjack-coach 1.17.0"
 
     def test_short_version_flag(self, capsys):
         exit_code = cli.main(["-V"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.16.0"
+        assert out.strip() == "blackjack-coach 1.17.0"
 
     def test_usage_uses_console_command_name(self, capsys):
         # A usage error (no required args) must reference the installed command

@@ -393,7 +393,9 @@ player's bust-if-hit chance, the dealer bust chance, the dealer's final-total
 probabilities (17/18/19/20/21/bust), a per-action EV estimate (with win / loss /
 push / bust), the best estimated action, and an approximation note. Flags:
 `--decks` (idealised model size), `--true-count` (for the recommended action),
-plus the global `--no-color` / `--plain-cards`.
+`--save-ev-snapshot` and `--ev-dir <path>` (save a local EV snapshot for review;
+see "EV snapshot history & review" below), plus the global `--no-color` /
+`--plain-cards`.
 
 ### coach --show-odds
 
@@ -573,6 +575,67 @@ always comes from basic strategy and the count math. Confidence is LOW with
 fewer than 10 total records, and a spot with fewer than 5 records is flagged as
 a small sample. If there is no saved history, the block prints a clear message
 and the coach continues normally.
+
+## EV snapshot history & review (v1.17.0)
+
+The probability / EV advisor is advisory only. v1.17.0 lets you save a **local
+EV snapshot** of the advisory for a hand and later review when the coach's main
+recommendation agreed with the advisory best-EV action and when it differed. It
+never changes the recommendation, `strategy_engine.recommend()`, or the Hi-Lo
+math.
+
+### odds --save-ev-snapshot
+
+```bash
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware --save-ev-snapshot
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware --save-ev-snapshot --ev-dir ./my_ev
+```
+
+Computes the odds / EV advisory exactly as before, then saves a local
+`EVSnapshotRecord` as JSON and prints the saved path. The snapshot stores the
+profile, cards, dealer upcard, decks, optional true count / seen cards, the
+recommended and best-EV actions, the per-action EVs, the recommended action's EV
+and the best EV, the EV gap, whether they agree, and documentation notes.
+`--ev-dir <path>` chooses the directory (default `./.blackjack_coach/ev_snapshots`).
+
+### coach --save-ev-snapshot
+
+```bash
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware --save-ev-snapshot
+```
+
+Saves the odds advisory snapshot while keeping the coach's main decision intact.
+It **requires `--show-odds`** (there is no advisory to snapshot otherwise);
+`--save-ev-snapshot` without `--show-odds` prints a clear error
+(`--save-ev-snapshot requires --show-odds`). `--ev-dir <path>` chooses the
+directory.
+
+### ev-review
+
+```bash
+blackjack-coach ev-review
+blackjack-coach ev-review --limit 20
+blackjack-coach ev-review --profile SIX_DECK_H17_DAS_LS
+blackjack-coach ev-review --disagreements-only
+blackjack-coach ev-review --min-gap 0.05
+```
+
+Prints an "EV Snapshot Review": total snapshots, agreement count, disagreement
+count, agreement rate, the most common profile, the most common recommended
+actions, the most common best-EV actions, the largest EV gaps, the disagreement
+spots, practice recommendations, a data-quality note, and warnings. Flags:
+`--dir <path>` (snapshot directory, default `./.blackjack_coach/ev_snapshots`),
+`--limit N`, `--profile <KEY>`, `--disagreements-only` (only snapshots where
+strategy and the advisory best-EV action differed), and `--min-gap <ev>` (only
+count disagreements whose EV gap is at least that size when detecting gaps /
+spots). With fewer than 10 snapshots the data-quality note flags a **LOW
+sample**. With no saved data it prints: *"No saved EV snapshots yet. Use
+odds/coach with --save-ev-snapshot first."*
+
+A handy local self-study loop is: `coach`/`odds --save-ev-snapshot` →
+`ev-review` → `learn`. Snapshots are a safe local summary only - no money,
+bankroll, bets, accounts, tokens, screenshots, or personal data - stored under
+the git-ignored `.blackjack_coach/` tree and never committed.
 
 
 

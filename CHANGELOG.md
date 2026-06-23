@@ -7,6 +7,73 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.17.0] - 2026-06-23
+
+EV snapshot history & Strategy-vs-EV review. The probability / EV advisor stays
+advisory only, but you can now save a **local snapshot** of the advisory for a
+hand and later review when the coach's main recommendation *agreed* with the
+advisory best-EV action and when it *differed*. This improves local self-study
+and the transparency of the advisor. It never changes the main recommendation,
+never overrides `strategy_engine.recommend`, and never touches the Hi-Lo math.
+
+### Added
+
+- `app/ev_history.py`: dataclasses `EVSnapshotRecord` and `EVReviewSummary`,
+  plus `default_ev_history_dir`, `ensure_ev_history_dir`,
+  `build_ev_snapshot_record` (accepts a `ProbabilityAdvice` or a
+  `CompositionAwareProbabilityAdvice`; extracts the recommended action, the
+  advisory best-EV action, the per-action EVs, the recommended action's EV, the
+  best EV, and the gap, and flags agreement, split EV, decision tree, and
+  composition-aware status), `save_ev_snapshot_record`,
+  `load_ev_snapshot_record`, `list_ev_snapshot_records` (with `limit`,
+  `profile_key`, and `disagreements_only` filters), and
+  `summarize_ev_snapshots` (agreement / disagreement counts, largest EV gaps,
+  disagreement spots, practice recommendations, and a data-quality note that
+  flags a LOW sample below 10 snapshots).
+- CLI `odds` flags `--save-ev-snapshot` and `--ev-dir`: compute the advisory as
+  before, save a local EV snapshot, and print the saved path.
+- CLI `coach` flags `--save-ev-snapshot` and `--ev-dir` (only with
+  `--show-odds`): save the odds snapshot while keeping the main decision intact.
+  `--save-ev-snapshot` without `--show-odds` prints a clear error.
+- CLI `ev-review` command (`--dir`, `--limit`, `--profile`,
+  `--disagreements-only`, `--min-gap`): an "EV Snapshot Review" - total
+  snapshots, agreement / disagreement counts and rate, most common profile and
+  recommended / best-EV actions, largest EV gaps, disagreement spots, practice
+  recommendations, a data-quality note, and warnings. With no saved data it
+  prints a clear "use `--save-ev-snapshot` first" message.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.17.0**.
+
+### Quality
+
+- New suite `tests/test_ev_history.py` (build a snapshot from a
+  composition-aware advisory and from the idealised advisory; agreement and EV
+  gap computation; save / load JSON roundtrip; `list` with `limit`,
+  `profile_key`, and `disagreements_only`; empty summary; agreement /
+  disagreement counts; largest EV gap detection; `min_gap` filtering; LOW-sample
+  note; no sensitive fields persisted; building a snapshot never changes
+  `recommend()`) plus CLI tests for `odds --save-ev-snapshot`,
+  `coach --show-odds --save-ev-snapshot`, the `coach --save-ev-snapshot`
+  requires-`--show-odds` error, and `ev-review` (empty, with snapshots,
+  `--disagreements-only`, `--profile`, and `--version` = 1.17.0). Full suite
+  passing; ruff clean.
+
+### Safety
+
+- EV snapshots are a **local advisory audit only**: they store a safe summary
+  (profile, cards, dealer upcard, decks, optional true count / seen cards, the
+  recommended and best-EV actions, per-action EVs, the EV gap, agreement, and
+  documentation notes) and never store money, bankroll, real bets, accounts,
+  tokens, screenshots, or any sensitive/personal data - no database, no network,
+  no cloud. Saved files live under the git-ignored `.blackjack_coach/` tree and
+  are never committed. The review never overrides the main recommendation
+  (advisory differences are reported, not applied), and it makes no change to
+  `strategy_engine.recommend`, the Hi-Lo counting math, adaptive learning,
+  guided coaching, outcome history, or session history. No external
+  dependencies and no large/slow simulations.
+
 ## [1.16.0] - 2026-06-23
 
 Full player EV decision tree. v1.15.0 made SPLIT/re-split EV strong, but some

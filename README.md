@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.16.0 feature summary
+## v1.17.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -86,6 +86,58 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   outcomes to surface strong / weak / high-variance spots and practice tips,
   and `coach --use-history` adds a personalised local-history context block.
   It personalises context only and never changes the strategy recommendation.
+- **Composition-aware EV advisor** (v1.14.0): `odds` / `coach --show-odds` can
+  use the actual remaining-shoe composition (`--composition-aware`,
+  `--seen-cards`) for an exact finite-shoe dealer distribution and sharper EV.
+- **Exact split / re-split EV** (v1.15.0): the advisor estimates the EV of
+  splitting and re-splitting pairs against the finite-shoe dealer distribution,
+  respecting the profile's split rules.
+- **Full player EV decision tree** (v1.16.0): every legal action's EV is unified
+  in one recursive player decision tree (advisory only; never overrides the
+  recommendation).
+- **EV snapshot history & review** (v1.17.0): save a local EV snapshot of the
+  advisory (`odds` / `coach --show-odds` with `--save-ev-snapshot`) and review
+  when the coach's recommendation agreed with the advisory best-EV action - or
+  differed - using `ev-review`. Advisory audit only; it never changes the
+  recommendation and stores no sensitive data.
+
+## EV Snapshot History & Review (v1.17.0)
+
+The probability / EV advisor is **advisory only** - it never overrides the
+coach's recommendation. v1.17.0 lets you keep a **local history** of EV
+snapshots so you can later review *when the coach's main recommendation agreed
+with the advisory best-EV action and when it differed*. This improves local
+self-study and the transparency of the advisor without changing the strategy.
+
+Save a snapshot while looking at the odds (or the coach's odds block):
+
+```bash
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware --save-ev-snapshot
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware --save-ev-snapshot
+```
+
+`coach --save-ev-snapshot` requires `--show-odds` (otherwise there is no odds
+advisory to snapshot, and the CLI prints a clear error). Snapshots are written
+as local JSON under `./.blackjack_coach/ev_snapshots` (override with `--ev-dir`)
+and are never committed.
+
+Review the saved snapshots:
+
+```bash
+blackjack-coach ev-review
+blackjack-coach ev-review --disagreements-only
+blackjack-coach ev-review --profile SIX_DECK_H17_DAS_LS
+```
+
+The review reports the total snapshots, agreement / disagreement counts and
+rate, the most common profile and recommended / best-EV actions, the largest EV
+gaps, the spots where strategy and EV differed, practice recommendations, and a
+data-quality note (it flags a **LOW sample** below 10 snapshots). With no saved
+data it prints a clear "use `--save-ev-snapshot` first" message.
+
+A handy local self-study loop is: `coach`/`odds --save-ev-snapshot` →
+`ev-review` → `learn`. Each snapshot stores only a safe local summary - no
+money, bankroll, bets, accounts, tokens, screenshots, or personal data.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -159,6 +211,11 @@ blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DA
 blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
 blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --seen-cards 2♣,5♦,K♠,A♥ --composition
 blackjack-coach odds --cards 8♠,8♥ --dealer 6♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware --save-ev-snapshot
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware --save-ev-snapshot
+blackjack-coach ev-review
+blackjack-coach ev-review --disagreements-only
+blackjack-coach ev-review --profile SIX_DECK_H17_DAS_LS
 ```
 
 Without installing, run it as a module from the repository root:
