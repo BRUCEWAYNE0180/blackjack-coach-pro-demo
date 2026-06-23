@@ -7,7 +7,7 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
 > any camera/video at a real table, and makes **no** promise of winnings.
 > See [`docs/PROJECT_RULES.md`](docs/PROJECT_RULES.md).
 
-## What it does (v0.3)
+## What it does (v0.4)
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -16,6 +16,8 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
   (insurance recommendation is always **NO**).
 - Includes a **Hi-Lo counting trainer** (running count + true count) for
   **local / simulated practice only**.
+- Includes a **local shoe simulator** that deals hands from a virtual shoe so
+  you can practise basic strategy and counting together, fully offline.
 - Ships a simple **command-line trainer**.
 
 ## Requirements
@@ -92,6 +94,35 @@ Note:             Running count +0, true count +0.00 ... educational practice ..
 simulated only**: no real tables, no camera/video, no real-money betting, and
 no promise of winnings.
 
+## Local shoe simulator (v0.4)
+
+Deal a training hand from a **local virtual shoe**. The simulator shuffles a
+multi-deck shoe, deals the player two cards plus the dealer's up and hole
+cards, recommends the basic-strategy play, and updates the Hi-Lo count from the
+visible cards (the face-down hole card is not counted).
+
+```bash
+python -m app.cli simulate --decks 6 --seed 42
+```
+
+Example output:
+
+```text
+Simulated training hand (local / simulated practice only)
+Player cards:         3, 5
+Dealer upcard:        J
+Recommendation:       HIT
+  Why:                Hard 8 vs dealer 10 [MULTI_DECK_H17_DAS_LS]: HIT. ...
+Running count before: +0
+Running count after:  +1
+True count after:     +0.17
+Note:                 ... educational practice ...
+```
+
+Pass `--seed` for a reproducible shuffle and `--decks` to size the shoe
+(`--decks` must be a positive integer). This is **local / simulated practice
+only** — never for real tables, betting, camera/video, or screen scraping.
+
 ## Library usage
 
 ```python
@@ -114,9 +145,9 @@ ruff check app tests   # lint (if ruff is installed)
 
 ## Scope and roadmap
 
-v0.3 adds an educational **Hi-Lo counting trainer** (running count + true
-count) on top of the v0.2 basic-strategy coach, explanations, and CLI.
-**Out of scope** for now: betting spread, the Illustrious 18, insurance index
-plays, Kelly bet sizing, a simulator, and a web app. See
+v0.4 adds a **local shoe simulator** (virtual shoe + training hands) on top of
+the v0.3 Hi-Lo counting trainer and the v0.2 basic-strategy coach. **Out of
+scope** for now: betting spread, Kelly bet sizing, the Illustrious 18,
+insurance index plays, and a web app. See
 [`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
 for the full v0.1-v0.6 roadmap.

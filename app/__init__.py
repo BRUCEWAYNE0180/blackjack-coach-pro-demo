@@ -30,6 +30,20 @@ from .rules import (
     RuleProfile,
     get_profile,
 )
+from .shoe import (
+    build_shoe,
+    cards_remaining,
+    decks_remaining,
+    draw_card,
+    penetration,
+    shuffle_shoe,
+    validate_decks,
+)
+from .simulator import (
+    SimulatedHand,
+    deal_initial_hand,
+    simulate_training_hand,
+)
 from .strategy_engine import (
     Action,
     Recommendation,
@@ -37,7 +51,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -50,8 +64,14 @@ __all__ = [
     "PROFILES",
     "Recommendation",
     "RuleProfile",
+    "SimulatedHand",
+    "build_shoe",
     "card_value",
+    "cards_remaining",
     "counting_summary",
+    "deal_initial_hand",
+    "decks_remaining",
+    "draw_card",
     "evaluate_hand",
     "explain_action",
     "explain_insurance_no",
@@ -60,9 +80,13 @@ __all__ = [
     "hilo_value",
     "is_counting_allowed_context",
     "normalize_rank",
+    "penetration",
     "recommend",
     "should_take_insurance",
+    "shuffle_shoe",
+    "simulate_training_hand",
     "true_count",
     "update_running_count",
     "update_running_count_many",
+    "validate_decks",
 ]

@@ -1,12 +1,14 @@
 """Command-line interface for Blackjack Coach Pro Demo.
 
-A small terminal entry point. Two forms are supported:
+A small terminal entry point. Forms supported:
 
     python -m app.cli --cards A,7 --dealer 9 --profile MULTI_DECK_H17_DAS_LS
     python -m app.cli count --cards 2,5,K,A,9 --decks-remaining 5
+    python -m app.cli simulate --decks 6 --seed 42
 
 The first prints a basic-strategy recommendation; the second runs the Hi-Lo
-counting trainer (educational / simulated practice only).
+counting trainer; the third deals a hand from a local virtual shoe (all
+educational / simulated practice only).
 
 Educational/practice tool only: it never connects to a casino, places real
 bets, uses any camera/video, or promises winnings. See docs/PROJECT_RULES.md.
@@ -21,6 +23,7 @@ from collections.abc import Sequence
 from .counting import CountingState
 from .explanations import explain_insurance_no
 from .rules import DEFAULT_PROFILE, PROFILES, get_profile
+from .simulator import SimulatedHand, simulate_training_hand
 from .strategy_engine import Recommendation, recommend
 
 
@@ -183,16 +186,82 @@ def _run_count(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_simulate_output(hand: SimulatedHand) -> str:
+    """Render a simulated training hand as human-readable terminal output."""
+    rec = hand.recommendation
+    lines = [
+        "Simulated training hand (local / simulated practice only)",
+        f"Player cards:         {', '.join(hand.player_cards)}",
+        f"Dealer upcard:        {hand.dealer_upcard}",
+        f"Recommendation:       {rec.action.value}",
+        f"  Why:                {rec.reason}",
+        f"Running count before: {hand.running_count_before:+d}",
+        f"Running count after:  {hand.running_count_after:+d}",
+        f"True count after:     {hand.true_count_after:+.2f}",
+        f"Note:                 {hand.note}",
+    ]
+    return "\n".join(lines)
+
+
+def build_simulate_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'simulate' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli simulate",
+        description=(
+            "Local blackjack training simulator (educational / simulated only). "
+            "Not for real tables: no betting, no camera/video, no winnings."
+        ),
+    )
+    parser.add_argument(
+        "--decks",
+        type=int,
+        default=6,
+        help="Number of decks in the virtual shoe (default: 6).",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Optional seed for a reproducible shuffle.",
+    )
+    parser.add_argument(
+        "--profile",
+        default=DEFAULT_PROFILE.key,
+        choices=sorted(PROFILES),
+        help=f"Rule profile (default: {DEFAULT_PROFILE.key}).",
+    )
+    return parser
+
+
+def _run_simulate(argv: Sequence[str]) -> int:
+    """Handle the 'simulate' local-simulator subcommand."""
+    parser = build_simulate_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        profile = get_profile(args.profile)
+        hand = simulate_training_hand(decks=args.decks, seed=args.seed, profile=profile)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_simulate_output(hand))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
-    Supports two forms:
-        python -m app.cli --cards A,7 --dealer 9      (basic-strategy advice)
+    Supports three forms:
+        python -m app.cli --cards A,7 --dealer 9              (basic strategy)
         python -m app.cli count --cards 2,5,K --decks-remaining 5  (Hi-Lo)
+        python -m app.cli simulate --decks 6 --seed 42       (local simulator)
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] == "count":
         return _run_count(args[1:])
+    if args and args[0] == "simulate":
+        return _run_simulate(args[1:])
     return _run_strategy(args)
 
 
