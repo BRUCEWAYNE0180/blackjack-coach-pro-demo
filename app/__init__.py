@@ -131,7 +131,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.8.0"
+__version__ = "1.9.0"
 
 __all__ = [
     "ACTION_NOTES",

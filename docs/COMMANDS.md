@@ -301,4 +301,37 @@ reads a custom directory. The history is a summary only - no money, bankroll,
 bets, accounts, or personal data - and is never committed (the
 `.blackjack_coach/` folder is git-ignored).
 
+## Guided coach mode (v1.9.0)
+
+### coach
+
+```bash
+blackjack-coach coach --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach --cards 8,8 --dealer 6 --profile SIX_DECK_H17_DAS_LS
+```
+
+Direct advice for one hand: the coach prints the recommended action, the raw
+chart action, whether a fallback was applied, the legal actions, and a
+plain-language why. The user does not pick the action - the coach decides and
+explains.
+
+### coach-play
+
+```bash
+blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS --save-outcome
+```
+
+The coach plays a full simulated hand, choosing every action automatically. It
+shows a step-by-step recommendation (player cards, dealer upcard, recommended
+action, why) for each decision, then the final hands, outcome, result label, and
+step count. `--save-outcome` (with optional `--outcome-dir`) stores the result
+in the local outcome history (v1.8.0).
+
+How the decision commands relate: `coach` is direct advice; `coach-play` lets
+the coach play a hand; `play` is the existing auto-simulation; `audit` is the
+technical breakdown; `diagnose` is the expanded explanation. None of them change
+the strategy engine.
+
+
 
