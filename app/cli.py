@@ -28,6 +28,7 @@ import argparse
 import sys
 from collections.abc import Sequence
 
+from . import __version__
 from .counting import EDUCATIONAL_NOTE, CountingState, update_running_count_many
 from .explanations import explain_insurance_no
 from .quiz import (
@@ -49,6 +50,10 @@ from .simulator import (
     simulate_training_hand,
 )
 from .strategy_engine import Recommendation, recommend
+
+# Name of the installed console command (see [project.scripts] in
+# pyproject.toml). Used for argparse program names and the --version output.
+PROG = "blackjack-coach"
 
 
 def _parse_cards(raw: str) -> list[str]:
@@ -130,11 +135,17 @@ def build_count_parser() -> argparse.ArgumentParser:
 def build_parser() -> argparse.ArgumentParser:
     """Construct the argument parser for the CLI."""
     parser = argparse.ArgumentParser(
-        prog="python -m app.cli",
+        prog=PROG,
         description=(
             "Blackjack Coach Pro Demo - basic-strategy trainer (educational). "
             "No real betting, no casino connectivity, no promise of winnings."
         ),
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"{PROG} {__version__}",
+        help="Show the program version and exit.",
     )
     parser.add_argument(
         "--cards",
@@ -614,6 +625,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
     Supports:
+        blackjack-coach --version                            (print version)
         python -m app.cli --cards A,7 --dealer 9              (basic strategy)
         python -m app.cli count --cards 2,5,K --decks-remaining 5  (Hi-Lo)
         python -m app.cli simulate --decks 6 --seed 42       (opening hand)
@@ -624,6 +636,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli count-session --batches "2,5,K|A,9" --answers "1,0"
     """
     args = list(sys.argv[1:] if argv is None else argv)
+    if args and args[0] in ("--version", "-V"):
+        print(f"{PROG} {__version__}")
+        return 0
     if args and args[0] == "count":
         return _run_count(args[1:])
     if args and args[0] == "simulate":

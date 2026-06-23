@@ -1,5 +1,7 @@
 """Tests for packaging / release invariants."""
 
+import pytest
+
 import app
 from app import cli
 
@@ -57,3 +59,32 @@ class TestCliBackwardCompatibility:
     def test_main_is_callable_entry_point(self):
         # The console-script entry point (blackjack-coach) calls app.cli:main.
         assert callable(cli.main)
+
+
+class TestCliVersionFlag:
+    def test_version_prints_name_and_version(self, capsys):
+        exit_code = cli.main(["--version"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert out.strip() == "blackjack-coach 1.0.0"
+
+    def test_short_version_flag(self, capsys):
+        exit_code = cli.main(["-V"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert out.strip() == "blackjack-coach 1.0.0"
+
+    def test_usage_uses_console_command_name(self, capsys):
+        # A usage error (no required args) must reference the installed command
+        # name, not the "python -m app.cli" module invocation.
+        with pytest.raises(SystemExit):
+            cli.main([])
+        err = capsys.readouterr().err
+        assert "blackjack-coach" in err
+        assert "python -m app.cli" not in err
+
+    def test_help_uses_console_command_name(self, capsys):
+        with pytest.raises(SystemExit):
+            cli.main(["--help"])
+        out = capsys.readouterr().out
+        assert "blackjack-coach" in out

@@ -10,6 +10,14 @@ subcommands.
 
 ## Setup and quality
 
+### version
+
+```bash
+blackjack-coach --version
+```
+
+Prints the program name and version (e.g. `blackjack-coach 1.0.0`) and exits.
+
 ### Install (editable, with dev tools)
 
 ```bash

@@ -67,6 +67,7 @@ Once installed (see Quick start), the same trainer is available as the
 `blackjack-coach` command:
 
 ```bash
+blackjack-coach --version
 blackjack-coach --cards A,7 --dealer 9
 blackjack-coach count --cards 2,5,K,A,9 --decks-remaining 5
 blackjack-coach play --decks 6 --seed 42
