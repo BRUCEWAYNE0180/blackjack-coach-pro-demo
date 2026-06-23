@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.20.0 feature summary
+## v1.21.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -117,6 +117,11 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   to answer "where am I failing and what should I drill next?". Print it, show
   it as Markdown, or `--export` it. A practice aid only; it never changes the
   recommendation and stores no sensitive data.
+- **Weak-spot drill generator** (v1.21.0): `drill` turns your weak spots,
+  high-loss hands, and Strategy-vs-EV disagreements (or a base educational set
+  when there is no history) into focused practice drills you can answer and get
+  graded on. The correct play always comes from the strategy engine - drills
+  never change the recommendation and store no sensitive data.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -246,6 +251,30 @@ With no saved history it prints a clear message; with little data it flags a
 external dependencies, no sensitive data - and never changes the strategy
 recommendation.
 
+## Weak-Spot Drill Generator (v1.21.0)
+
+`drill` turns the coach's "what to practise" guidance into actual focused
+practice sessions. It builds drills from your **weak spots**, **high-loss
+hands**, and **Strategy-vs-EV disagreement spots** (and falls back to a small,
+well-known educational set when there is no saved history), then poses them and
+grades your answer. The correct play for every drill comes from the stable
+strategy engine - drills never change the recommendation.
+
+```bash
+blackjack-coach drill
+blackjack-coach drill --focus pairs --count 10
+blackjack-coach drill --focus ev --profile SIX_DECK_H17_DAS_LS
+blackjack-coach drill --seed 42 --spot 1 --answer HIT
+blackjack-coach drill --focus weak --count 5 --plan-only
+```
+
+`--focus` is one of `weak` / `pairs` / `soft` / `hard` / `surrender` / `ev` /
+`mixed`; `--count` caps the number of drills; `--seed` makes the order
+deterministic; `--plan-only` just prints the plan; and `--answer H/S/D/P/R`
+(with `--spot N`) grades the selected drill and explains why. `--profile`,
+`--session-dir`, `--outcome-dir`, and `--ev-dir` scope where drills come from.
+With no saved history it uses the educational set and says so clearly.
+
 ## Terminal visual polish (v1.1.0)
 
 v1.1.0 makes the CLI clearer and more pleasant to practise with. Output now has
@@ -335,6 +364,9 @@ blackjack-coach dashboard
 blackjack-coach dashboard --profile SIX_DECK_H17_DAS_LS
 blackjack-coach dashboard --markdown
 blackjack-coach dashboard --export
+blackjack-coach drill
+blackjack-coach drill --focus pairs --count 10
+blackjack-coach drill --seed 42 --spot 1 --answer HIT
 ```
 
 Without installing, run it as a module from the repository root:

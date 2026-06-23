@@ -45,6 +45,17 @@ from .deviations import (
     normalize_true_count,
     recommend_with_deviation,
 )
+from .drill_generator import (
+    DrillPlan,
+    DrillResult,
+    DrillSpot,
+    build_drill_plan,
+    build_drill_spot_from_hand,
+    classify_drill_category,
+    grade_drill_answer,
+    render_drill_plan,
+    render_drill_result,
+)
 from .ev_explainer import (
     DisagreementExplanationSummary,
     EVGapCategory,
@@ -182,7 +193,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.20.0"
+__version__ = "1.21.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -209,6 +220,9 @@ __all__ = [
     "DashboardProfileSummary",
     "DashboardSummary",
     "DashboardTrendPoint",
+    "DrillPlan",
+    "DrillResult",
+    "DrillSpot",
     "FOUR_DECK_H17_DAS_LS",
     "HandEvaluation",
     "HandOutcome",
@@ -256,6 +270,12 @@ __all__ = [
     "render_dashboard_text",
     "render_dashboard_markdown",
     "export_dashboard",
+    "build_drill_plan",
+    "build_drill_spot_from_hand",
+    "classify_drill_category",
+    "grade_drill_answer",
+    "render_drill_plan",
+    "render_drill_result",
     "can_double_after_split",
     "can_hit_split_aces",
     "can_resplit",

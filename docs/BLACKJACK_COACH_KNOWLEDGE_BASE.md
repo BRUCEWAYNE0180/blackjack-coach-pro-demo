@@ -107,6 +107,12 @@ tool relies on and the project's evolution.
   `render_dashboard_markdown`, and `export_dashboard`. Groups the local history
   by profile and suggests practice; a read-only practice aid that never changes
   the recommendation.
+- `app/drill_generator.py` — Local weak-spot drill generator: `DrillSpot`,
+  `DrillPlan`, `DrillResult`, plus `classify_drill_category`,
+  `build_drill_spot_from_hand`, `build_drill_plan`, `grade_drill_answer`,
+  `render_drill_plan`, and `render_drill_result`. Builds focused drills from
+  history (or a fallback educational set); the correct play comes from the
+  strategy engine, so it never duplicates rules or changes the recommendation.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -134,8 +140,9 @@ tool relies on and the project's evolution.
   `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`,
   `deviation-quiz`, `diagnose`, `profiles`, `split-rules`, `matrix`,
   `audit`, `outcomes`, `coach`, `coach-play`, `odds`, `learn`, `ev-review`,
-  `report`, and `dashboard` subcommands; `odds`/`coach --show-odds` accept
-  `--explain-ev` and `ev-review` accepts `--explain` / `--large-gaps-only`).
+  `report`, and `dashboard` subcommands, plus `drill`; `odds`/`coach
+  --show-odds` accept `--explain-ev` and `ev-review` accepts `--explain` /
+  `--large-gaps-only`).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -1156,7 +1163,7 @@ explanation engine. Files live under the git-ignored `.blackjack_coach/reports`
 tree (unless an explicit `--output` is given) and are never committed. No
 external dependencies; no network / cloud / database.
 
-### v1.20.0 — Profile Dashboard & Trends (current)
+### v1.20.0 — Profile Dashboard & Trends (done)
 
 Builds on the v1.19.0 exportable reports and every local-history feature behind
 them. Reports gave a flat snapshot; v1.20.0 adds a per-profile **dashboard**
@@ -1194,6 +1201,42 @@ separate sections, stores / exports no sensitive data, and never changes
 `strategy_engine.recommend`, the Hi-Lo math, adaptive learning, guided coaching,
 outcome / session history, the EV-snapshot history, the Strategy-vs-EV engine,
 or the reporting module. No external dependencies; no network / cloud / database.
+
+### v1.21.0 — Weak-Spot Drill Generator (current)
+
+Builds on adaptive learning (v1.13.0), the EV-snapshot history (v1.17.0), the
+reports (v1.19.0), and the dashboard (v1.20.0). Those features could say *what*
+to practise; v1.21.0 actually *generates and runs* focused practice drills from
+the same local signals, grading answers against the stable strategy engine. It
+stays local, read-only, and dependency-free, and never changes play.
+
+Delivered:
+
+- **`app/drill_generator.py`**: `DrillSpot` (spot id, category, cards, dealer,
+  profile, recommended action, reason, source, priority, difficulty, tags),
+  `DrillPlan` (plan id, profile, total, focus, spots, source summary, practice
+  note, warnings), and `DrillResult` (answer, correct action, correctness,
+  explanation, next-review hint). Functions: `classify_drill_category`,
+  `build_drill_spot_from_hand` (correct action from `strategy_engine.recommend`;
+  suited input via `app.cards`), `build_drill_plan` (prioritises EV
+  disagreement / weak / high-variance spots from history, with a well-known
+  educational fallback; `focus`, `count`, and `seed`), `grade_drill_answer`
+  (reuses `quiz.normalize_user_action`), `render_drill_plan`, and
+  `render_drill_result`.
+- **CLI**: new `drill` command with `--profile`, `--focus`, `--count`,
+  `--seed`, `--answer`, `--spot`, the history dirs, and `--plan-only`. The
+  `dashboard` output now points to `drill --focus weak`.
+- **Tests**: new `tests/test_drill_generator.py` and `TestCliDrill` in
+  `tests/test_cli.py`.
+
+**Limits / honesty:** drills are local practice training. The correct play
+always comes from the existing strategy engine (no duplicated rules), and the
+generator never changes `strategy_engine.recommend`, the Hi-Lo math, adaptive
+learning, guided coaching, outcome / session history, the EV-snapshot history,
+the Strategy-vs-EV engine, the reporting module, or the dashboard. Per
+`PROJECT_RULES.md` it stores no sensitive data, suggests practice without
+promising results, and uses no external dependencies, network, cloud, or
+database.
 
 ### v2.0 — Possible Web UI (if decided later)
 

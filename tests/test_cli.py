@@ -1406,11 +1406,11 @@ class TestCliEVSnapshotHistory:
         assert exit_code == 0
         assert "No saved EV snapshots yet" in out
 
-    def test_version_prints_1_20_0(self, capsys):
+    def test_version_prints_1_21_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.20.0"
+        assert out.strip() == "blackjack-coach 1.21.0"
 
 
 
@@ -1733,8 +1733,92 @@ class TestCliDashboard:
         assert out_file.exists()
         assert str(out_file) in out
 
-    def test_version_prints_1_20_0(self, capsys):
+    def test_version_prints_1_21_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.20.0"
+        assert out.strip() == "blackjack-coach 1.21.0"
+
+
+
+class TestCliDrill:
+    """v1.21.0 weak-spot drill generator."""
+
+    def test_drill_no_history_shows_plan_and_question(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "drill", "--count", "3",
+            "--session-dir", str(tmp_path / "s"),
+            "--outcome-dir", str(tmp_path / "o"),
+            "--ev-dir", str(tmp_path / "e"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Drill Plan ===" in out
+        assert "Total drills: 3" in out
+        assert "Drill 1" in out
+        # Clear fallback note when there is no history.
+        assert "educational drill set" in out
+
+    def test_drill_plan_only(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "drill", "--plan-only", "--count", "5",
+            "--session-dir", str(tmp_path / "s"),
+            "--outcome-dir", str(tmp_path / "o"),
+            "--ev-dir", str(tmp_path / "e"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Drill Plan ===" in out
+        assert "Drill 1" not in out
+
+    def test_drill_focus_pairs_count(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "drill", "--focus", "pairs", "--count", "5",
+            "--session-dir", str(tmp_path / "s"),
+            "--outcome-dir", str(tmp_path / "o"),
+            "--ev-dir", str(tmp_path / "e"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Focus       : pairs" in out
+
+    def test_drill_seed_spot_answer(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "drill", "--seed", "42", "--spot", "1", "--answer", "HIT",
+            "--session-dir", str(tmp_path / "s"),
+            "--outcome-dir", str(tmp_path / "o"),
+            "--ev-dir", str(tmp_path / "e"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Drill Result ===" in out
+        assert "Correct action" in out
+        assert "Result" in out
+
+    def test_drill_invalid_answer_errors(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "drill", "--spot", "1", "--answer", "ZZZ",
+            "--session-dir", str(tmp_path / "s"),
+            "--outcome-dir", str(tmp_path / "o"),
+            "--ev-dir", str(tmp_path / "e"),
+        ])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Invalid action" in err
+
+    def test_drill_profile_works(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "drill", "--profile", "SIX_DECK_H17_DAS_LS", "--count", "3",
+            "--session-dir", str(tmp_path / "s"),
+            "--outcome-dir", str(tmp_path / "o"),
+            "--ev-dir", str(tmp_path / "e"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Profile     : SIX_DECK_H17_DAS_LS" in out
+
+    def test_version_prints_1_21_0(self, capsys):
+        exit_code = cli.main(["--version"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert out.strip() == "blackjack-coach 1.21.0"
