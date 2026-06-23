@@ -100,6 +100,13 @@ tool relies on and the project's evolution.
   `render_report_markdown` / `render_report_json` / `render_report_csv`
   renderers, `save_report`, and `export_report`. Local and read-only; exports no
   sensitive data and never changes the recommendation.
+- `app/dashboard.py` — Local per-profile dashboard & trends:
+  `DashboardProfileSummary`, `DashboardTrendPoint`, `DashboardSummary`, plus
+  `build_profile_dashboard`, `build_dashboard_trends`,
+  `recommend_next_practice_plan`, `render_dashboard_text`,
+  `render_dashboard_markdown`, and `export_dashboard`. Groups the local history
+  by profile and suggests practice; a read-only practice aid that never changes
+  the recommendation.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -126,9 +133,9 @@ tool relies on and the project's evolution.
   `blackjack-coach` command, plus `count`, `simulate`, `play`, `quiz`,
   `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`,
   `deviation-quiz`, `diagnose`, `profiles`, `split-rules`, `matrix`,
-  `audit`, `outcomes`, `coach`, `coach-play`, `odds`, `learn`, `ev-review`, and
-  `report` subcommands; `odds`/`coach --show-odds` accept `--explain-ev` and
-  `ev-review` accepts `--explain` / `--large-gaps-only`).
+  `audit`, `outcomes`, `coach`, `coach-play`, `odds`, `learn`, `ev-review`,
+  `report`, and `dashboard` subcommands; `odds`/`coach --show-odds` accept
+  `--explain-ev` and `ev-review` accepts `--explain` / `--large-gaps-only`).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -1108,7 +1115,7 @@ gap size, the model limitations, and the final decision. No change to
 outcome / session history, or the EV-snapshot history; no external dependencies;
 no network / cloud / database; no sensitive data.
 
-### v1.19.0 — Exportable Learning Reports (current)
+### v1.19.0 — Exportable Learning Reports (done)
 
 Builds on every local-history feature so far (session history v1.2.0, outcome
 history v1.8.0, adaptive learning v1.13.0, EV-snapshot history v1.17.0, and the
@@ -1148,6 +1155,45 @@ outcome / session history, the EV-snapshot history, or the Strategy-vs-EV
 explanation engine. Files live under the git-ignored `.blackjack_coach/reports`
 tree (unless an explicit `--output` is given) and are never committed. No
 external dependencies; no network / cloud / database.
+
+### v1.20.0 — Profile Dashboard & Trends (current)
+
+Builds on the v1.19.0 exportable reports and every local-history feature behind
+them. Reports gave a flat snapshot; v1.20.0 adds a per-profile **dashboard**
+that groups the history by rule profile, shows a simple recent-sample trend, and
+turns the data into a concrete next-practice plan - answering "which profile am
+I practising most, where am I failing, which spots have the most Strategy-vs-EV
+disagreements, and what should I drill next?". It stays local, read-only, and
+dependency-free, and never changes play.
+
+Delivered:
+
+- **`app/dashboard.py`**: `DashboardProfileSummary` (per-profile totals,
+  accuracy / win / loss / EV-agreement rates, top weak / strong spots, top EV
+  disagreements, largest EV gaps, recommended drills, a data-quality note), 
+  `DashboardTrendPoint` (a recent-sample bucket), and `DashboardSummary` (the
+  profile list, selected profile, global totals, best / weakest / most-practised
+  profile, trend points, global weak spots and EV disagreements, the
+  next-practice plan, and a data-quality note). Functions:
+  `build_profile_dashboard`, `build_dashboard_trends` (simple `recent_1..3`
+  buckets; no fragile date parsing), `recommend_next_practice_plan`,
+  `render_dashboard_text`, `render_dashboard_markdown`, and `export_dashboard`.
+- **CLI**: new `dashboard` command with `--profile`, `--limit`,
+  `--session-dir`, `--outcome-dir`, `--ev-dir`, `--markdown`, `--export`, and
+  `--output`. The `report` Markdown now points users to `dashboard`.
+- **Tests**: new `tests/test_dashboard.py` and `TestCliDashboard` in
+  `tests/test_cli.py`.
+
+**Limits / honesty:** the dashboard is a read-only practice aid. It combines the
+existing per-area summaries by profile, uses no external chart libraries (trends
+are plain text / Markdown tables), and only suggests practice - it never changes
+the recommendation. Sessions are not profile-scoped, so session stats are shown
+globally (with a note when several profiles are present). Per `PROJECT_RULES.md`
+it keeps training, outcomes, EV advisory, disagreements, and recommendations in
+separate sections, stores / exports no sensitive data, and never changes
+`strategy_engine.recommend`, the Hi-Lo math, adaptive learning, guided coaching,
+outcome / session history, the EV-snapshot history, the Strategy-vs-EV engine,
+or the reporting module. No external dependencies; no network / cloud / database.
 
 ### v2.0 — Possible Web UI (if decided later)
 

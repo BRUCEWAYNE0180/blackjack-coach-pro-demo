@@ -246,6 +246,20 @@ As of v0.9 the project enforces these gates on every change:
   dependency-free with no network, cloud, or database. Report files live under
   the git-ignored `.blackjack_coach/reports` tree (unless the user passes an
   explicit `--output` path) and are never committed.
+- **Dashboards are local and must not include sensitive data.** The per-profile
+  dashboards (v1.20.0: `app/dashboard.py`, the `dashboard` command) are local
+  and read-only, and must keep training, outcomes, EV advisory, Strategy-vs-EV
+  disagreements, and practice recommendations in clearly separated sections.
+  They must never include money, bankroll, real bets, accounts, tokens,
+  screenshots, or any sensitive/personal data, and no private filesystem paths
+  beyond the dashboard's own output location. They must use no external chart
+  libraries (trends are plain text / Markdown only) and must never change the
+  main strategy - they only suggest practice. Dashboards must not change
+  `strategy_engine.recommend`, the Hi-Lo counting math, or any upstream summary
+  they combine, and must stay dependency-free with no network, cloud, or
+  database. Dashboard files live under the git-ignored `.blackjack_coach/reports`
+  tree (unless the user passes an explicit `--output` path) and are never
+  committed.
 
 ## 8. Release Rules
 

@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.19.0 feature summary
+## v1.20.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -111,6 +111,12 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   and practice tips into a single **Markdown / JSON / CSV** report for reviewing
   progress or saving to Notion / GitHub. Local and read-only; it exports no
   sensitive data and never changes the recommendation.
+- **Profile dashboard & trends** (v1.20.0): `dashboard` shows a local
+  per-profile view - training / outcome / EV totals, recent-sample trends, weak
+  spots, Strategy-vs-EV disagreements, and a concrete **next-practice plan** -
+  to answer "where am I failing and what should I drill next?". Print it, show
+  it as Markdown, or `--export` it. A practice aid only; it never changes the
+  recommendation and stores no sensitive data.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -212,6 +218,34 @@ custom history folders. EV snapshots are included automatically when present.
 With no saved history the report says so clearly; with little data it flags a
 **LOW sample / limited data** note.
 
+## Profile Dashboard & Trends (v1.20.0)
+
+`dashboard` turns the exportable reports into a more useful per-profile view for
+deciding what to practise next. It groups your local **session history**,
+**outcomes**, **EV snapshots**, **Strategy-vs-EV disagreements**, **weak spots**,
+and **practice recommendations** by rule profile, adds a simple recent-sample
+**trend**, and prints a concrete **next-practice plan**. It answers: which
+profile am I practising most, where am I failing, which spots have the most
+Strategy-vs-EV disagreements, and what should I drill now.
+
+```bash
+blackjack-coach dashboard
+blackjack-coach dashboard --profile SIX_DECK_H17_DAS_LS
+blackjack-coach dashboard --markdown
+blackjack-coach dashboard --export
+blackjack-coach dashboard --profile SIX_DECK_H17_DAS_LS --export --output dashboard.md
+```
+
+By default the dashboard is printed to the terminal as compact text. `--markdown`
+prints Markdown instead (handy for Notion / GitHub); `--export` saves a Markdown
+file under `./.blackjack_coach/reports` and prints the path; `--output <path>`
+saves to an exact file; `--profile` / `--limit` scope the data; and
+`--session-dir` / `--outcome-dir` / `--ev-dir` point at custom history folders.
+With no saved history it prints a clear message; with little data it flags a
+**LOW sample / limited data** note. It is a practice aid only - no charts, no
+external dependencies, no sensitive data - and never changes the strategy
+recommendation.
+
 ## Terminal visual polish (v1.1.0)
 
 v1.1.0 makes the CLI clearer and more pleasant to practise with. Output now has
@@ -297,6 +331,10 @@ blackjack-coach report
 blackjack-coach report --format markdown --print
 blackjack-coach report --format json --output report.json
 blackjack-coach report --format csv --profile SIX_DECK_H17_DAS_LS
+blackjack-coach dashboard
+blackjack-coach dashboard --profile SIX_DECK_H17_DAS_LS
+blackjack-coach dashboard --markdown
+blackjack-coach dashboard --export
 ```
 
 Without installing, run it as a module from the repository root:

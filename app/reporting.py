@@ -281,6 +281,8 @@ def render_report_markdown(summary: ReportSummary) -> str:
         "",
         "---",
         "",
+        "_For an interactive-style CLI summary, run `blackjack-coach dashboard`._",
+        "",
         "_Educational / local practice only - no real bets, no winnings._",
         "",
     ]
