@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.24.0 feature summary
+## v1.25.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -137,6 +137,11 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   disagreement spots, and an educational mix (with a starter set when there is
   no history). Reproducible with `--seed`, exportable to Markdown. Local and
   read-only; it never changes the correct answers or the recommendation.
+- **Practice pack completion history** (v1.25.0): `practice-pack --complete`
+  saves whether you finished a pack (items done, correct / missed / skipped,
+  completion rate, accuracy), and `practice-pack --progress` summarises pack
+  **streaks** and progress over time. Local and read-only; it never changes the
+  correct answers or the recommendation.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -370,6 +375,31 @@ every item comes from the strategy engine - the pack never changes it. (After
 practising, save progress with `drill --answer ... --save` and re-run
 `review-queue`.)
 
+## Practice Pack Completion History (v1.25.0)
+
+Record whether you actually finished today's pack and track progress over time.
+`practice-pack --complete` saves a local completion record (items done, correct
+/ missed / skipped, completion rate, accuracy), and `practice-pack --progress`
+summarises your pack **streaks**, completion rate, accuracy, and weak / strong
+pack spots. It is built on the v1.24.0 generator and never changes the correct
+answers or the recommendation.
+
+```bash
+blackjack-coach practice-pack --complete
+blackjack-coach practice-pack --complete --correct-spots hard_16_vs_10,soft_18_vs_9 --missed-spots pair_8_vs_6
+blackjack-coach practice-pack --progress
+blackjack-coach practice-pack --progress --profile SIX_DECK_H17_DAS_LS
+```
+
+`--complete` marks the generated pack practised (whole pack complete with no
+accuracy unless you pass detail); add `--correct-spots`, `--missed-spots`, and
+`--skipped-spots` (comma-separated spot ids) to record accuracy. `--pack-dir`
+chooses where completions are stored (default
+`./.blackjack_coach/practice_packs`). `--progress` shows the completion summary
+(optionally scoped with `--profile`); with no saved completions it says so
+clearly. Completion records are a local summary only - no money, accounts, or
+sensitive data - and are never committed.
+
 ## Terminal visual polish (v1.1.0)
 
 v1.1.0 makes the CLI clearer and more pleasant to practise with. Output now has
@@ -471,6 +501,8 @@ blackjack-coach review-queue --streaks
 blackjack-coach practice-pack
 blackjack-coach practice-pack --focus due --count 10
 blackjack-coach practice-pack --markdown
+blackjack-coach practice-pack --complete
+blackjack-coach practice-pack --progress
 ```
 
 Without installing, run it as a module from the repository root:

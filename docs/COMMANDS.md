@@ -920,6 +920,33 @@ answers or the strategy recommendation, and is never committed. After
 practising, save progress with `drill --answer ... --save` and re-run
 `review-queue`.
 
+### practice-pack --complete / --progress (v1.25.0)
+
+```bash
+blackjack-coach practice-pack --complete
+blackjack-coach practice-pack --complete --correct-spots hard_16_vs_10,soft_18_vs_9 --missed-spots pair_8_vs_6
+blackjack-coach practice-pack --progress
+blackjack-coach practice-pack --progress --profile SIX_DECK_H17_DAS_LS
+```
+
+v1.25.0 adds a local completion history for daily packs:
+
+- `--complete` (with `--pack-dir <path>`): generate today's pack and save a
+  completion record. With no per-spot detail the whole pack is marked complete
+  (no accuracy). Combine with `--correct-spots`, `--missed-spots`,
+  `--skipped-spots`, or `--completed-spots` (comma-separated spot ids) to record
+  counts and accuracy. It also works alongside `--export`. Completions are
+  stored under `./.blackjack_coach/practice_packs` by default.
+- `--progress`: show the completion summary instead of generating a pack - total
+  packs, completed vs partial, completion rate, accuracy, current / longest pack
+  streak, last pack date, weakest / strongest pack spots, and recommendations.
+  Scope it with `--profile`. With no saved completions it prints "No saved
+  practice pack completions yet. Use practice-pack --complete first."
+
+The completion history is local practice training only - it stores no sensitive
+data, never changes the correct answers or the strategy recommendation, and is
+never committed.
+
 
 
 

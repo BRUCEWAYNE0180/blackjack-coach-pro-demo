@@ -1406,11 +1406,11 @@ class TestCliEVSnapshotHistory:
         assert exit_code == 0
         assert "No saved EV snapshots yet" in out
 
-    def test_version_prints_1_24_0(self, capsys):
+    def test_version_prints_1_25_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.24.0"
+        assert out.strip() == "blackjack-coach 1.25.0"
 
 
 
@@ -1733,11 +1733,11 @@ class TestCliDashboard:
         assert out_file.exists()
         assert str(out_file) in out
 
-    def test_version_prints_1_24_0(self, capsys):
+    def test_version_prints_1_25_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.24.0"
+        assert out.strip() == "blackjack-coach 1.25.0"
 
 
 
@@ -1817,11 +1817,11 @@ class TestCliDrill:
         assert exit_code == 0
         assert "Profile     : SIX_DECK_H17_DAS_LS" in out
 
-    def test_version_prints_1_24_0(self, capsys):
+    def test_version_prints_1_25_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.24.0"
+        assert out.strip() == "blackjack-coach 1.25.0"
 
 
 
@@ -2006,11 +2006,11 @@ class TestCliReviewQueue:
         assert out_file.exists()
         assert "Saved review queue" in out
 
-    def test_version_prints_1_24_0(self, capsys):
+    def test_version_prints_1_25_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.24.0"
+        assert out.strip() == "blackjack-coach 1.25.0"
 
 
 
@@ -2080,8 +2080,97 @@ class TestCliPracticePack:
         assert out_file.exists()
         assert "Saved practice pack" in out
 
-    def test_version_prints_1_24_0(self, capsys):
+    def test_version_prints_1_25_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.24.0"
+        assert out.strip() == "blackjack-coach 1.25.0"
+
+
+
+class TestCliPracticePackHistory:
+    """v1.25.0 practice pack completion history."""
+
+    def _gen_dirs(self, tmp_path):
+        return [
+            "--drill-dir", str(tmp_path / "dr"),
+            "--session-dir", str(tmp_path / "s"),
+            "--outcome-dir", str(tmp_path / "o"),
+            "--ev-dir", str(tmp_path / "e"),
+        ]
+
+    def test_complete_creates_file(self, capsys, tmp_path):
+        pack_dir = tmp_path / "packs"
+        exit_code = cli.main([
+            "practice-pack", "--complete", "--pack-dir", str(pack_dir),
+            *self._gen_dirs(tmp_path),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Saved pack completion" in out
+        assert len(list(pack_dir.glob("practice_pack_*.json"))) == 1
+
+    def test_complete_with_detail_accuracy(self, capsys, tmp_path):
+        pack_dir = tmp_path / "packs"
+        exit_code = cli.main([
+            "practice-pack", "--complete",
+            "--correct-spots", "hard_16_vs_10,soft_18_vs_9",
+            "--missed-spots", "pair_8_vs_6",
+            "--pack-dir", str(pack_dir), *self._gen_dirs(tmp_path),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Saved pack completion" in out
+        # 2 correct of 3 completed -> 67% accuracy.
+        assert "67% accuracy" in out
+
+    def test_progress_no_data_message(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "practice-pack", "--progress", "--pack-dir", str(tmp_path / "empty"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Practice Pack Progress ===" in out
+        assert "No saved practice pack completions yet" in out
+
+    def test_progress_with_data(self, capsys, tmp_path):
+        pack_dir = tmp_path / "packs"
+        cli.main([
+            "practice-pack", "--complete", "--pack-dir", str(pack_dir),
+            *self._gen_dirs(tmp_path),
+        ])
+        capsys.readouterr()
+        exit_code = cli.main([
+            "practice-pack", "--progress", "--pack-dir", str(pack_dir),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total packs" in out
+
+    def test_progress_profile(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "practice-pack", "--progress", "--profile", "SIX_DECK_H17_DAS_LS",
+            "--pack-dir", str(tmp_path / "empty"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Practice Pack Progress ===" in out
+
+    def test_complete_export_does_not_break(self, capsys, tmp_path):
+        pack_dir = tmp_path / "packs"
+        out_file = tmp_path / "pack.md"
+        exit_code = cli.main([
+            "practice-pack", "--complete", "--export", "--output",
+            str(out_file), "--pack-dir", str(pack_dir), *self._gen_dirs(tmp_path),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert out_file.exists()
+        assert "Saved practice pack" in out
+        assert "Saved pack completion" in out
+
+    def test_version_prints_1_25_0(self, capsys):
+        exit_code = cli.main(["--version"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert out.strip() == "blackjack-coach 1.25.0"
