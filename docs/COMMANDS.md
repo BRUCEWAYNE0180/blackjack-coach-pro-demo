@@ -842,6 +842,44 @@ v1.22.0 adds a local drill-session history and a spaced-review summary:
 The drill history is local practice training only - it stores no sensitive data,
 never changes the correct answers or the recommendation, and is never committed.
 
+## Drill review queue & streaks (v1.23.0)
+
+### review-queue
+
+```bash
+blackjack-coach review-queue
+blackjack-coach review-queue --due-only
+blackjack-coach review-queue --streaks
+blackjack-coach review-queue --profile SIX_DECK_H17_DAS_LS
+blackjack-coach review-queue --today 2026-06-23 --due-only
+blackjack-coach review-queue --markdown
+blackjack-coach review-queue --export --output review_queue.md
+```
+
+Turns your saved drill sessions into a local spaced-repetition queue: which
+spots are due now, overdue, and upcoming, plus practice streaks. Review
+intervals from the last practice: NEW = today, WEAK = today/soon, LEARNING =
+~2 days, MASTERED = ~7 days; items are ordered due-first, then by priority,
+soonest due, and lowest accuracy.
+
+Flags:
+
+- `--profile <KEY>` - scope the queue / streaks to one rule profile.
+- `--limit N` - show only the most urgent N items.
+- `--drill-dir <path>` - drill session directory (default
+  `./.blackjack_coach/drill_sessions`).
+- `--today YYYY-MM-DD` - treat this date as today (deterministic scheduling).
+- `--due-only` - show only items due now or overdue.
+- `--streaks` - also show current / longest streak and active days.
+- `--markdown` - print the queue as Markdown.
+- `--export` / `--output <path>` - save a Markdown file (default under
+  `./.blackjack_coach/reports`) and print the path.
+
+With no saved drill sessions it prints "No saved drill sessions yet. Use drill
+--answer <ACTION> --save first."; with little data it flags a LOW sample. The
+scheduler is local practice only - it stores no sensitive data, never changes
+the correct answers or the strategy recommendation, and is never committed.
+
 
 
 

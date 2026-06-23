@@ -1406,11 +1406,11 @@ class TestCliEVSnapshotHistory:
         assert exit_code == 0
         assert "No saved EV snapshots yet" in out
 
-    def test_version_prints_1_22_0(self, capsys):
+    def test_version_prints_1_23_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.22.0"
+        assert out.strip() == "blackjack-coach 1.23.0"
 
 
 
@@ -1733,11 +1733,11 @@ class TestCliDashboard:
         assert out_file.exists()
         assert str(out_file) in out
 
-    def test_version_prints_1_22_0(self, capsys):
+    def test_version_prints_1_23_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.22.0"
+        assert out.strip() == "blackjack-coach 1.23.0"
 
 
 
@@ -1817,11 +1817,11 @@ class TestCliDrill:
         assert exit_code == 0
         assert "Profile     : SIX_DECK_H17_DAS_LS" in out
 
-    def test_version_prints_1_22_0(self, capsys):
+    def test_version_prints_1_23_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.22.0"
+        assert out.strip() == "blackjack-coach 1.23.0"
 
 
 
@@ -1901,3 +1901,113 @@ class TestCliDrillHistory:
         out = capsys.readouterr().out
         assert exit_code == 0
         assert "=== Drill Review ===" in out
+
+
+
+class TestCliReviewQueue:
+    """v1.23.0 drill review scheduler & streaks."""
+
+    def _seed(self, tmp_path):
+        drill_dir = tmp_path / "drills"
+        cli.main([
+            "drill", "--seed", "1", "--spot", "1", "--answer", "HIT", "--save",
+            "--drill-dir", str(drill_dir),
+            "--session-dir", str(tmp_path / "s"),
+            "--outcome-dir", str(tmp_path / "o"),
+            "--ev-dir", str(tmp_path / "e"),
+        ])
+        return drill_dir
+
+    def test_review_queue_no_data_message(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "review-queue", "--drill-dir", str(tmp_path / "empty"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Drill Review Queue ===" in out
+        assert "No saved drill sessions yet" in out
+
+    def test_review_queue_with_data(self, capsys, tmp_path):
+        drill_dir = self._seed(tmp_path)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "review-queue", "--drill-dir", str(drill_dir), "--today",
+            "2026-12-31",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Drill Review Queue ===" in out
+        assert "Total items" in out
+
+    def test_review_queue_due_only(self, capsys, tmp_path):
+        drill_dir = self._seed(tmp_path)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "review-queue", "--drill-dir", str(drill_dir), "--today",
+            "2026-12-31", "--due-only",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Due now" in out
+
+    def test_review_queue_streaks(self, capsys, tmp_path):
+        drill_dir = self._seed(tmp_path)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "review-queue", "--drill-dir", str(drill_dir), "--streaks",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Current streak" in out
+
+    def test_review_queue_profile(self, capsys, tmp_path):
+        drill_dir = self._seed(tmp_path)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "review-queue", "--drill-dir", str(drill_dir),
+            "--profile", "SIX_DECK_H17_DAS_LS",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Drill Review Queue ===" in out
+
+    def test_review_queue_today(self, capsys, tmp_path):
+        drill_dir = self._seed(tmp_path)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "review-queue", "--drill-dir", str(drill_dir), "--today",
+            "2026-06-23",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Drill Review Queue ===" in out
+
+    def test_review_queue_markdown(self, capsys, tmp_path):
+        drill_dir = self._seed(tmp_path)
+        capsys.readouterr()
+        exit_code = cli.main([
+            "review-queue", "--drill-dir", str(drill_dir), "--markdown",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "# Blackjack Coach Pro Demo - Drill Review Queue" in out
+        assert "## Due now" in out
+
+    def test_review_queue_export_output(self, capsys, tmp_path):
+        drill_dir = self._seed(tmp_path)
+        out_file = tmp_path / "review.md"
+        capsys.readouterr()
+        exit_code = cli.main([
+            "review-queue", "--drill-dir", str(drill_dir), "--export",
+            "--output", str(out_file),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert out_file.exists()
+        assert "Saved review queue" in out
+
+    def test_version_prints_1_23_0(self, capsys):
+        exit_code = cli.main(["--version"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert out.strip() == "blackjack-coach 1.23.0"

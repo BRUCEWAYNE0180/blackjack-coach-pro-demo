@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.22.0 feature summary
+## v1.23.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -127,6 +127,11 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   (NEW / WEAK / LEARNING / MASTERED) and what is **due for review** next - a
   light, local spaced-repetition layer. Local and read-only; it never changes
   the correct answers or the recommendation.
+- **Drill review queue & streaks** (v1.23.0): `review-queue` schedules your
+  saved drills into a spaced-repetition queue (what is due today, overdue, and
+  upcoming) and tracks practice **streaks**. Print it, show it as Markdown, or
+  `--export` it. Local and read-only; it never changes the correct answers or
+  the recommendation.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -306,6 +311,32 @@ it says so clearly. Mastery levels: **NEW** (< 2 attempts), **WEAK** (< 60%),
 are a local summary only - no money, accounts, or sensitive data - and are never
 committed.
 
+## Drill Review Queue & Streaks (v1.23.0)
+
+`review-queue` turns your saved drill sessions into a local spaced-repetition
+schedule: which spots are **due now**, which are **overdue**, and which are
+**upcoming** - weak spots come back soon, learning spots later, mastered spots
+much later. It also tracks your practice **streaks**. It is built on the v1.22.0
+drill history and never changes the correct answers or the recommendation.
+
+```bash
+blackjack-coach review-queue
+blackjack-coach review-queue --due-only
+blackjack-coach review-queue --streaks
+blackjack-coach review-queue --profile SIX_DECK_H17_DAS_LS
+blackjack-coach review-queue --today 2026-06-23 --due-only
+blackjack-coach review-queue --export --output review_queue.md
+```
+
+`--due-only` shows just the items due now or overdue; `--streaks` adds the
+current / longest streak and active days; `--today YYYY-MM-DD` makes scheduling
+deterministic; `--markdown` prints Markdown; `--export` (with optional
+`--output`) saves a Markdown file under `./.blackjack_coach/reports`; and
+`--profile` / `--limit` / `--drill-dir` scope the queue. Review intervals: NEW /
+WEAK -> today/soon, LEARNING -> ~2 days, MASTERED -> ~7 days. With no saved
+drill sessions it says so clearly. The scheduler is local practice only - no
+sensitive data - and is never committed.
+
 ## Terminal visual polish (v1.1.0)
 
 v1.1.0 makes the CLI clearer and more pleasant to practise with. Output now has
@@ -401,6 +432,9 @@ blackjack-coach drill --seed 42 --spot 1 --answer HIT
 blackjack-coach drill --seed 42 --spot 1 --answer HIT --save
 blackjack-coach drill --review
 blackjack-coach drill --review --due-only
+blackjack-coach review-queue
+blackjack-coach review-queue --due-only
+blackjack-coach review-queue --streaks
 ```
 
 Without installing, run it as a module from the repository root:

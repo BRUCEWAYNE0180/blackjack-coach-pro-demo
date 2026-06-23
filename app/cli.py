@@ -110,6 +110,14 @@ from .quiz import (
     run_strategy_session,
 )
 from .reporting import export_report
+from .review_scheduler import (
+    build_drill_streak_summary,
+    build_review_queue,
+    export_review_queue,
+    render_review_queue,
+    render_review_queue_markdown,
+    render_streak_summary,
+)
 from .rules import (
     DEFAULT_PROFILE,
     PROFILES,
@@ -2771,6 +2779,89 @@ def _run_drill(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_review_queue_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'review-queue' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli review-queue",
+        description=(
+            "Show a local spaced-repetition review queue from your saved drill "
+            "sessions: what is due now, what is overdue, what is upcoming, plus "
+            "practice streaks (educational / local only). Never changes the "
+            "recommendation or the correct answers."
+        ),
+    )
+    parser.add_argument("--profile", default=None, choices=sorted(PROFILES),
+                        help="Scope the queue / streaks to one rule profile.")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Only show the most urgent N items.")
+    parser.add_argument("--drill-dir", default=None, dest="drill_dir",
+                        help="Drill session directory (default: "
+                             "./.blackjack_coach/drill_sessions).")
+    parser.add_argument("--today", default=None,
+                        help="Treat this YYYY-MM-DD date as today (for "
+                             "deterministic scheduling).")
+    parser.add_argument("--due-only", action="store_true", dest="due_only",
+                        help="Only show items due now or overdue.")
+    parser.add_argument("--streaks", action="store_true",
+                        help="Also show the practice-streak summary.")
+    parser.add_argument("--markdown", action="store_true",
+                        help="Print the queue as Markdown instead of text.")
+    parser.add_argument("--export", action="store_true",
+                        help="Save the queue as a local Markdown file and print "
+                             "the path.")
+    parser.add_argument("--output", default=None,
+                        help="Exact output file path for --export (default: a "
+                             "timestamped file under ./.blackjack_coach/reports).")
+    return parser
+
+
+def _run_review_queue(argv: Sequence[str]) -> int:
+    """Handle the 'review-queue' drill review scheduler subcommand."""
+    parser = build_review_queue_parser()
+    args = parser.parse_args(argv)
+
+    if args.limit is not None and args.limit < 0:
+        print("Error: --limit must be >= 0.", file=sys.stderr)
+        return 2
+
+    try:
+        queue = build_review_queue(
+            drill_dir=args.drill_dir,
+            profile_key=args.profile,
+            limit=args.limit,
+            today=args.today,
+            due_only=args.due_only,
+        )
+        streak = (
+            build_drill_streak_summary(
+                drill_dir=args.drill_dir, profile_key=args.profile,
+                today=args.today)
+            if (args.streaks or args.export or args.markdown) else None
+        )
+    except (ValueError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    if args.markdown:
+        print(render_review_queue_markdown(queue, streak=streak))
+    else:
+        print(render_review_queue(queue))
+        if args.streaks and streak is not None:
+            print("")
+            print(render_streak_summary(streak))
+
+    if args.export or args.output:
+        try:
+            path = export_review_queue(queue, streak=streak,
+                                       output_path=args.output)
+        except OSError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print("")
+        print(format_kv("Saved review queue", str(path)))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -2798,6 +2889,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli report --format markdown --print   (exportable report)
         python -m app.cli dashboard --profile SIX_DECK_H17_DAS_LS (profile dashboard)
         python -m app.cli drill --focus weak --count 5         (practice drills)
+        python -m app.cli review-queue --due-only             (scheduled reviews)
         python -m app.cli coach --cards A,7 --dealer 9       (direct advice)
         python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
         python -m app.cli odds --cards 10,6 --dealer 10      (probability advisor)
@@ -2864,6 +2956,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_dashboard(args[1:])
     if args and args[0] == "drill":
         return _run_drill(args[1:])
+    if args and args[0] == "review-queue":
+        return _run_review_queue(args[1:])
     if args and args[0] == "coach":
         return _run_coach(args[1:])
     if args and args[0] == "coach-play":

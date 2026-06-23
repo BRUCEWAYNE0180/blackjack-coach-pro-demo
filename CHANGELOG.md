@@ -7,6 +7,58 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.23.0] - 2026-06-23
+
+Local drill review scheduler & streaks. The v1.22.0 drill history is now turned
+into a practical spaced-repetition queue: a new `review-queue` command shows
+which spots are due today, overdue, and upcoming, and tracks practice streaks.
+Weak spots come back soon, learning spots later, mastered spots much later. It
+never re-derives the correct play (that comes from the saved drill results /
+strategy engine) and never changes the recommendation or the Hi-Lo math.
+
+### Added
+
+- `app/review_scheduler.py`: dataclasses `ReviewScheduleItem`, `ReviewQueue`,
+  and `DrillStreakSummary`, plus `parse_date_or_today`, `calculate_due_date`
+  (NEW = today, WEAK = soon, LEARNING = ~2 days, MASTERED = ~7 days),
+  `build_review_queue` (loads drill history, schedules each spot, sorts by due /
+  priority / soonest / accuracy, with `profile_key` / `limit` / `today` /
+  `due_only`), `build_drill_streak_summary` (active days, current / longest
+  streak, last practice date), `render_review_queue`, `render_streak_summary`,
+  `render_review_queue_markdown`, and `export_review_queue`.
+- CLI `review-queue` command with `--profile`, `--limit`, `--drill-dir`,
+  `--today`, `--due-only`, `--streaks`, `--markdown`, `--export`, and
+  `--output`. With no saved drill sessions it prints a clear message.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.23.0**.
+
+### Quality
+
+- New suite `tests/test_review_scheduler.py` (explicit-date parsing; due-date by
+  mastery NEW / WEAK / LEARNING / MASTERED; empty queue; queue items from
+  sessions; profile filter; due-only filter; limit; empty + consecutive-day
+  streaks; text / Markdown renderers; export saves a file; no sensitive field
+  names; and that scheduling never changes `recommend()`) plus
+  `TestCliReviewQueue` in `tests/test_cli.py` for the `review-queue` command
+  (no-data message, with data, `--due-only`, `--streaks`, `--profile`,
+  `--today`, `--markdown`, `--export --output`, and `--version` = 1.23.0). Full
+  suite passing; ruff clean.
+
+### Safety
+
+- The review scheduler is **local practice training** only. It never re-derives
+  or changes the correct answers, and never changes `strategy_engine.recommend`,
+  the Hi-Lo math, adaptive learning, guided coaching, outcome / session history,
+  the EV-snapshot history, the Strategy-vs-EV engine, reporting, the dashboard,
+  the drill generator, or the drill history. It stores / exports no money,
+  bankroll, real bets, accounts, tokens, screenshots, or any sensitive/personal
+  data, suggests review without promising results, and uses no external
+  dependencies, network, cloud, or database. Exported queues live under the
+  git-ignored `.blackjack_coach/reports` tree (unless an explicit `--output`
+  path is given) and are never committed.
+
 ## [1.22.0] - 2026-06-23
 
 Local drill-session history & spaced review. The v1.21.0 drill generator can now

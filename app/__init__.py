@@ -129,6 +129,19 @@ from .reporting import (
     render_report_markdown,
     save_report,
 )
+from .review_scheduler import (
+    DrillStreakSummary,
+    ReviewQueue,
+    ReviewScheduleItem,
+    build_drill_streak_summary,
+    build_review_queue,
+    calculate_due_date,
+    export_review_queue,
+    parse_date_or_today,
+    render_review_queue,
+    render_review_queue_markdown,
+    render_streak_summary,
+)
 from .rules import (
     DEFAULT_PROFILE,
     DOUBLE_DECK_H17_DAS_NS,
@@ -206,7 +219,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.22.0"
+__version__ = "1.23.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -239,6 +252,9 @@ __all__ = [
     "DrillReviewSummary",
     "DrillSessionRecord",
     "DrillSpotHistory",
+    "DrillStreakSummary",
+    "ReviewQueue",
+    "ReviewScheduleItem",
     "FOUR_DECK_H17_DAS_LS",
     "HandEvaluation",
     "HandOutcome",
@@ -300,6 +316,14 @@ __all__ = [
     "load_drill_session_record",
     "save_drill_session_record",
     "summarize_drill_history",
+    "build_review_queue",
+    "build_drill_streak_summary",
+    "calculate_due_date",
+    "parse_date_or_today",
+    "export_review_queue",
+    "render_review_queue",
+    "render_review_queue_markdown",
+    "render_streak_summary",
     "can_double_after_split",
     "can_hit_split_aces",
     "can_resplit",
