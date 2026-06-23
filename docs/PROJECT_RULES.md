@@ -2,11 +2,15 @@
 
 ## 1. Purpose
 
-Blackjack Coach Pro Demo is an **educational and practice** tool. Its goal is
-to help a user learn and drill blackjack **basic strategy** (and, in later
-versions, the math behind it) in a safe, offline, simulated environment.
+Blackjack Coach Pro Demo is a **professional blackjack coach** for **local
+practice, demo money, video games, recreational tournaments, and training**.
+Its focus is **decision intelligence**: it recommends the correct play, explains
+the rule factors behind it, drills it with quizzes and scored sessions, and
+offers true-count deviation study and decision diagnostics.
 
-It is a study aid, not a gambling product.
+It is a coaching and practice tool, not a real-money gambling product. The
+hard constraints below define the responsible scope; within that scope, the
+product should behave like a sharp, helpful coach.
 
 ## 2. Hard Constraints (Non-Negotiable)
 

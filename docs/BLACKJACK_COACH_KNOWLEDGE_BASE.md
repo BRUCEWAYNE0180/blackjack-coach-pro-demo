@@ -1,11 +1,12 @@
 # Blackjack Coach — Knowledge Base & Roadmap
 
-This is the central design document for Blackjack Coach Pro Demo. It captures
-the domain knowledge the tool relies on and the planned evolution from v0.1
-through v0.6.
+This is the central design document for Blackjack Coach Pro Demo, a
+**professional blackjack coach** for local practice, demo money, video games,
+recreational tournaments, and training. It captures the domain knowledge the
+tool relies on and the project's evolution.
 
-> Educational/practice tool only. No casino connectivity, no real-money
-> betting/automation, no casino camera/video, no promise of winnings.
+> Responsible scope: a coaching and practice tool, not a real-money gambling
+> product (no casino connectivity, camera/video, or promise of winnings).
 > See `PROJECT_RULES.md`.
 
 ## Domain Glossary
@@ -43,6 +44,9 @@ through v0.6.
   `DeviationRule`, `DeviationRecommendation`, `DEFAULT_DEVIATION_RULES`,
   `find_matching_deviation`, and `recommend_with_deviation` (wraps the engine
   without modifying it).
+- `app/decision_diagnostics.py` — Decision intelligence: `DecisionDiagnostic`
+  and `explain_decision_factors`, which break a recommended play into plain
+  factors (hand shape, dealer strength, available options, rule context).
 - `app/counting.py` — Hi-Lo counting trainer: tag values, running count, true
   count, and `CountingState` (educational / simulated practice only).
 - `app/shoe.py` — Virtual multi-deck shoe: build, shuffle (seedable), draw,
@@ -62,8 +66,8 @@ through v0.6.
   `run_count_session`).
 - `app/cli.py` — Terminal trainer (`python -m app.cli` or the installed
   `blackjack-coach` command, plus `count`, `simulate`, `play`, `quiz`,
-  `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`, and
-  `deviation-quiz` subcommands).
+  `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`,
+  `deviation-quiz`, and `diagnose` subcommands).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -506,10 +510,11 @@ accuracy, weak spots, timestamp, id). It never stores money, bankroll, bets,
 accounts, personal data, secrets, screenshots, or casino data; there is no
 database, network, or cloud, and history files are never committed.
 
-### v1.3.0 — Deviation Study Mode (current)
+### v1.3.0 — Professional Rules & Decision Intelligence (current)
 
-Adds a local, educational study aid for true-count playing deviations. No
-changes to the basic-strategy engine, Hi-Lo math, simulator, split, or scoring.
+Reframes the coach around decision intelligence and adds true-count deviation
+study plus decision diagnostics. No changes to the basic-strategy engine, Hi-Lo
+math, simulator, split, or scoring.
 
 Delivered:
 
@@ -519,17 +524,26 @@ Delivered:
   `normalize_true_count`, `compare_true_count`, `find_matching_deviation`; and
   `recommend_with_deviation`, which calls `strategy_engine.recommend` and only
   overrides the action when a deviation applies.
-- **CLI**: `deviations` (`--cards/--dealer/--true-count`, `--list`) and
-  `deviation-quiz` (`--seed`, `--answer`, interactive).
-- Version bumped to **1.3.0**; tests in `tests/test_deviations.py` plus CLI
-  tests; all earlier tests pass; ruff clean.
+- **`app/decision_diagnostics.py`**: `DecisionDiagnostic` and
+  `explain_decision_factors`, a professional breakdown of *why* a play is
+  recommended (hand shape, dealer strength, double/surrender/split
+  availability and fallbacks, and H17/S17 rule context). It reads the engine
+  and never modifies it; it does not invent exact EV.
+- **CLI**: `deviations` (`--cards/--dealer/--true-count`, `--list`),
+  `deviation-quiz` (`--seed`, `--answer`, interactive), and `diagnose`
+  (`--cards`, `--dealer`).
+- Reframed product positioning (README/docs) as a professional coach for local
+  practice, demo money, video games, recreational tournaments, and training.
+- Version bumped to **1.3.0**; tests in `tests/test_deviations.py` and
+  `tests/test_decision_diagnostics.py` plus CLI tests; all earlier tests pass;
+  ruff clean.
 
-This is **study, not live assistance**: it is local-only, never connects to a
-casino, and involves no betting, bankroll, bet spread, or Kelly. The insurance
-deviation is study-only and does not change the engine's insurance
-recommendation (always NO). The deviation set is intentionally small (not the
-full Illustrious 18), and every recommendation notes its dependence on the rule
-profile, deck estimation, true-count rounding, and table context.
+Decision intelligence is **coaching, not live assistance**: local-only, no
+casino connectivity, no betting/bankroll/bet-spread/Kelly, and the insurance
+deviation never changes the engine's insurance recommendation (always NO). The
+deviation set is intentionally small (not the full Illustrious 18), and
+recommendations note their dependence on the rule profile, deck estimation,
+true-count rounding, and table context.
 
 ### v2.0 — Possible Web UI (if decided later)
 

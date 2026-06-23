@@ -30,6 +30,7 @@ from collections.abc import Sequence
 
 from . import __version__
 from .counting import EDUCATIONAL_NOTE, CountingState, update_running_count_many
+from .decision_diagnostics import explain_decision_factors
 from .deviations import (
     DEFAULT_DEVIATION_RULES,
     normalize_true_count,
@@ -855,6 +856,68 @@ def _run_deviations(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_diagnose_output(diag) -> str:
+    """Render a decision diagnostic as terminal output."""
+    lines = [format_header("Decision Diagnostic")]
+    lines += _kv_block([
+        ("Player hand", format_cards(diag.player_cards)),
+        ("Dealer upcard", diag.dealer_upcard),
+        ("Hand type", diag.hand_description),
+        ("Profile", diag.profile_key),
+        ("Recommended action", diag.recommended_action),
+    ])
+    lines.append("")
+    lines.append(format_section("Decision factors"))
+    lines.append(format_list(diag.rule_factors))
+
+    extra_warnings = [w for w in diag.warnings if w != explain_insurance_no()]
+    if extra_warnings:
+        lines.append("")
+        lines.append(format_section("Warnings"))
+        lines.append(format_list(extra_warnings))
+
+    lines.append("")
+    lines.append(format_kv("Why", diag.basic_reason))
+    lines.append(format_kv("Confidence", diag.confidence_note))
+    return "\n".join(lines)
+
+
+def build_diagnose_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'diagnose' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli diagnose",
+        description=(
+            "Explain the factors behind a basic-strategy decision (decision "
+            "intelligence for local practice, demo money, and tournaments)."
+        ),
+    )
+    parser.add_argument("--cards", required=True,
+                        help="Player cards, comma-separated, e.g. 'A,7'.")
+    parser.add_argument("--dealer", required=True,
+                        help="Dealer upcard, e.g. '9', '10', or 'A'.")
+    parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
+                        choices=sorted(PROFILES),
+                        help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
+    return parser
+
+
+def _run_diagnose(argv: Sequence[str]) -> int:
+    """Handle the 'diagnose' decision-diagnostics subcommand."""
+    parser = build_diagnose_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        cards = _parse_cards(args.cards)
+        profile = get_profile(args.profile)
+        diag = explain_decision_factors(cards, args.dealer, profile)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_diagnose_output(diag))
+    return 0
+
+
 # Representative hard-total hands for building deviation quiz questions.
 _DEVIATION_TOTAL_TO_CARDS = {
     16: ["10", "6"],
@@ -966,6 +1029,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli history                            (saved sessions)
         python -m app.cli deviations --cards 10,6 --dealer 10 --true-count 1
         python -m app.cli deviation-quiz --seed 42 --answer S
+        python -m app.cli diagnose --cards A,7 --dealer 9   (decision factors)
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] in ("--version", "-V"):
@@ -983,6 +1047,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_deviations(args[1:])
     if args and args[0] == "deviation-quiz":
         return _run_deviation_quiz(args[1:])
+    if args and args[0] == "diagnose":
+        return _run_diagnose(args[1:])
     if args and args[0] == "quiz":
         return _run_quiz(args[1:])
     if args and args[0] == "count-quiz":

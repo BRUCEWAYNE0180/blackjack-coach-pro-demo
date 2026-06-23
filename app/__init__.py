@@ -15,6 +15,7 @@ from .counting import (
     update_running_count,
     update_running_count_many,
 )
+from .decision_diagnostics import DecisionDiagnostic, explain_decision_factors
 from .deviations import (
     DEFAULT_DEVIATION_RULES,
     DeviationRecommendation,
@@ -111,6 +112,7 @@ __all__ = [
     "CountQuizResult",
     "CountingState",
     "DEFAULT_PROFILE",
+    "DecisionDiagnostic",
     "DeviationRecommendation",
     "DeviationRule",
     "DEFAULT_DEVIATION_RULES",
@@ -145,6 +147,7 @@ __all__ = [
     "ensure_history_dir",
     "evaluate_hand",
     "explain_action",
+    "explain_decision_factors",
     "explain_insurance_no",
     "explain_state",
     "find_matching_deviation",

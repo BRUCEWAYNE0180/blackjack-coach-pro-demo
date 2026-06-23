@@ -486,3 +486,41 @@ class TestCliDeviationQuiz:
         out = capsys.readouterr().out
         assert exit_code == 0
         assert "Deviation Quiz" in out
+
+
+
+class TestCliDiagnose:
+    def test_diagnose_works(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "A,7", "--dealer", "9"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Decision Diagnostic ===" in out
+
+    def test_diagnose_shows_action_and_factors(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "A,7", "--dealer", "9"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Recommended action:" in out
+        assert "Decision factors" in out
+        # The soft-hand factor is surfaced.
+        assert "soft" in out.lower()
+
+    def test_diagnose_hard_total(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "10,6", "--dealer", "10"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Hard 16" in out
+        assert "hard" in out.lower()
+
+    def test_diagnose_pair(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "8,8", "--dealer", "10"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Recommended action: SPLIT" in out
+        assert "split" in out.lower()
+
+    def test_diagnose_invalid_card_errors(self, capsys):
+        exit_code = cli.main(["diagnose", "--cards", "Z,7", "--dealer", "9"])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err
