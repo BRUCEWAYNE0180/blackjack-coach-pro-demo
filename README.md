@@ -7,7 +7,7 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
 > any camera/video at a real table, and makes **no** promise of winnings.
 > See [`docs/PROJECT_RULES.md`](docs/PROJECT_RULES.md).
 
-## What it does (v0.7)
+## What it does (v0.8)
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -23,6 +23,8 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
   single-hand model.
 - Offers an interactive/non-interactive **quiz mode** to drill basic strategy
   and the Hi-Lo running count from the terminal.
+- Runs **scored training sessions** (multiple questions) with accuracy and
+  weak-spot summaries for both strategy and counting.
 - Ships a simple **command-line trainer**.
 
 ## Requirements
@@ -218,6 +220,47 @@ Note:                 ... educational practice ...
 The quiz is **educational practice only** — no real tables, betting,
 camera/video, or promise of winnings.
 
+## Scored training sessions (v0.8)
+
+Run multiple questions at once and get a summary (total, correct, incorrect,
+accuracy, and weak spots).
+
+Strategy session (pass one answer per question):
+
+```bash
+python -m app.cli quiz-session --questions 10 --seed 42 --answers H,S,D,H,R,S,H,D,P,S
+```
+
+```text
+Strategy training session (local / educational practice only)
+Total questions:  10
+Correct:          2
+Incorrect:        8
+Accuracy:         20.0%
+Weak spots:       double, hard, hit, stand, surrender
+Note:             You answered 2/10 correctly. ...
+```
+
+Count session (one running count per batch; batches separated by `|`):
+
+```bash
+python -m app.cli count-session --batches "2,5,K|A,9,3|10,6,2" --answers "1,-1,1"
+```
+
+```text
+Hi-Lo count training session (local / educational practice only)
+Total questions:  3
+Correct:          2
+Incorrect:        1
+Accuracy:         66.7%
+Weak spots:       Q2 (A,9,3)
+Note:             You answered 2/3 running counts correctly. ...
+```
+
+Omit `--answers` in either command to be prompted per question/batch. Sessions
+are **not** saved (no files, no database, no login) and are **educational
+practice only**.
+
 ## Library usage
 
 ```python
@@ -240,9 +283,10 @@ ruff check app tests   # lint (if ruff is installed)
 
 ## Scope and roadmap
 
-v0.7 adds an educational **quiz mode** (basic-strategy trainer + Hi-Lo
-running-count trainer) on top of the v0.6 split simulator and earlier features.
-**Out of scope** for now: betting spread, Kelly bet sizing, the Illustrious 18,
-insurance index plays, and a web/UI layer. See
+v0.8 adds **scored training sessions** (multi-question strategy and count
+drills with accuracy and weak spots) on top of the v0.7 quiz mode and earlier
+features. **Out of scope** for now: saving results/files, databases, login,
+betting spread, Kelly bet sizing, the Illustrious 18, insurance index plays,
+and a web/UI layer. See
 [`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
 for the full roadmap.

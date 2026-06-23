@@ -255,3 +255,94 @@ class TestCliCountQuiz:
         err = capsys.readouterr().err
         assert exit_code == 2
         assert "Error" in err
+
+
+
+class TestCliQuizSession:
+    def test_quiz_session_with_answers(self, capsys):
+        exit_code = cli.main([
+            "quiz-session", "--questions", "10", "--seed", "42",
+            "--answers", "H,S,D,H,R,S,H,D,P,S",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total questions:  10" in out
+        assert "Correct:" in out
+        assert "Incorrect:" in out
+        assert "Accuracy:" in out
+        assert "Weak spots:" in out
+        assert "educational" in out.lower()
+
+    def test_quiz_session_all_correct(self, capsys):
+        # Build the questions to learn the correct answers, then answer them.
+        from app.quiz import build_strategy_questions
+
+        qs = build_strategy_questions(5, seed=99)
+        answers = ",".join(q.correct_action for q in qs)
+        exit_code = cli.main([
+            "quiz-session", "--questions", "5", "--seed", "99",
+            "--answers", answers,
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Correct:          5" in out
+        assert "Accuracy:         100.0%" in out
+
+    def test_quiz_session_answer_mismatch_errors(self, capsys):
+        exit_code = cli.main([
+            "quiz-session", "--questions", "3", "--seed", "1", "--answers", "H,S",
+        ])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err
+
+    def test_quiz_session_interactive(self, capsys, monkeypatch):
+        answers = iter(["H", "S", "D"])
+        monkeypatch.setattr("builtins.input", lambda *_: next(answers))
+        exit_code = cli.main(["quiz-session", "--questions", "3", "--seed", "1"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total questions:  3" in out
+
+
+class TestCliCountSession:
+    def test_count_session_with_answers(self, capsys):
+        exit_code = cli.main([
+            "count-session", "--batches", "2,5,K|A,9,3|10,6,2",
+            "--answers", "1,-1,1",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total questions:  3" in out
+        assert "Correct:          2" in out
+        assert "Incorrect:        1" in out
+        assert "Accuracy:" in out
+        assert "Q2" in out  # weak spot
+
+    def test_count_session_all_correct(self, capsys):
+        exit_code = cli.main([
+            "count-session", "--batches", "2,5,K|A,9,3|10,6,2",
+            "--answers", "1,0,1",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Correct:          3" in out
+        assert "Accuracy:         100.0%" in out
+
+    def test_count_session_interactive(self, capsys, monkeypatch):
+        answers = iter(["1", "0", "1"])
+        monkeypatch.setattr("builtins.input", lambda *_: next(answers))
+        exit_code = cli.main([
+            "count-session", "--batches", "2,5,K|A,9,3|10,6,2",
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Correct:          3" in out
+
+    def test_count_session_non_integer_answer_errors(self, capsys):
+        exit_code = cli.main([
+            "count-session", "--batches", "2,5", "--answers", "x",
+        ])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err

@@ -31,11 +31,16 @@ from .rules import (
     get_profile,
 )
 from .quiz import (
+    CountQuizResult,
     QuizQuestion,
     QuizResult,
+    QuizSessionResult,
+    build_strategy_questions,
     generate_strategy_question,
     grade_strategy_answer,
     normalize_user_action,
+    run_count_session,
+    run_strategy_session,
 )
 from .shoe import (
     build_shoe,
@@ -68,11 +73,12 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 __all__ = [
     "ACTION_NOTES",
     "Action",
+    "CountQuizResult",
     "CountingState",
     "DEFAULT_PROFILE",
     "HandEvaluation",
@@ -84,11 +90,13 @@ __all__ = [
     "PlayedSplitHand",
     "QuizQuestion",
     "QuizResult",
+    "QuizSessionResult",
     "Recommendation",
     "RuleProfile",
     "SimulatedHand",
     "SplitSubHand",
     "build_shoe",
+    "build_strategy_questions",
     "can_split_hand",
     "card_value",
     "cards_remaining",
@@ -113,6 +121,8 @@ __all__ = [
     "play_training_hand",
     "recommend",
     "resolve_outcome",
+    "run_count_session",
+    "run_strategy_session",
     "should_take_insurance",
     "shuffle_shoe",
     "simulate_training_hand",

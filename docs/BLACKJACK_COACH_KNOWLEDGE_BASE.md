@@ -46,12 +46,15 @@ through v0.6.
   `HandOutcome`, `PlayedHand`, `play_dealer_hand`, `resolve_outcome`,
   `play_training_hand`, `SplitSubHand`, `PlayedSplitHand`, `can_split_hand`,
   `split_initial_hand`, `play_split_subhand`).
-- `app/quiz.py` — Quiz mode: generate and grade basic-strategy questions and
-  normalise user actions (`QuizQuestion`, `QuizResult`,
-  `generate_strategy_question`, `grade_strategy_answer`,
-  `normalize_user_action`).
+- `app/quiz.py` — Quiz mode and scored sessions: generate/grade basic-strategy
+  questions, normalise user actions, and run multi-question strategy/count
+  sessions (`QuizQuestion`, `QuizResult`, `CountQuizResult`,
+  `QuizSessionResult`, `generate_strategy_question`, `grade_strategy_answer`,
+  `normalize_user_action`, `build_strategy_questions`, `run_strategy_session`,
+  `run_count_session`).
 - `app/cli.py` — Terminal trainer (`python -m app.cli`, plus `count`,
-  `simulate`, `play`, `quiz`, and `count-quiz` subcommands).
+  `simulate`, `play`, `quiz`, `count-quiz`, `quiz-session`, and
+  `count-session` subcommands).
 - `tests/` — Behavioural tests for the evaluator, engine, explanations,
   counting, shoe, simulator, quiz, and CLI.
 
@@ -303,7 +306,7 @@ Delivered (educational / simulated practice only):
 - Never for real tables: no casino connectivity, no real-money betting, no
   camera/video, no screen scraping, and no promise of winnings.
 
-### v0.7 — Training Quiz Mode (current)
+### v0.7 — Training Quiz Mode (done)
 
 Delivered (educational practice only):
 
@@ -342,13 +345,54 @@ Delivered (educational practice only):
 - Never for real tables: no casino connectivity, no real-money betting, no
   camera/video, no screen scraping, and no promise of winnings.
 
-### v0.8 — Visual / UI Layer
+### v0.8 — Scored Training Sessions (current)
+
+Delivered (educational practice only):
+
+- **`QuizSessionResult`** dataclass — `mode`, `total_questions`,
+  `correct_answers`, `incorrect_answers`, `accuracy` (fraction 0.0-1.0),
+  `results`, `weak_spots`, `note`.
+- **`CountQuizResult`** dataclass — one graded count batch (`cards`,
+  `user_answer`, `correct_count`, `is_correct`).
+- **`build_strategy_questions(num_questions, seed, profile)`** — reproducible
+  question list (each question uses `seed + index`).
+- **`run_strategy_session(num_questions=10, seed=None, answers=None,
+  profile=DEFAULT_PROFILE)`** — scores a strategy session; computes accuracy
+  and derives **weak spots** from the tags/actions of missed questions.
+- **`run_count_session(cards_batches, answers)`** — scores a running-count
+  session over several batches; weak spots label the missed batches.
+- **CLI `quiz-session`** — `python -m app.cli quiz-session --questions 10
+  --seed 42 --answers H,S,D,...` prints totals, correct/incorrect, accuracy,
+  weak spots, and a note. Without `--answers`, prompts per question
+  (`Q1 Your action? [H/S/D/P/R]:`).
+- **CLI `count-session`** — `python -m app.cli count-session --batches
+  "2,5,K|A,9,3|10,6,2" --answers "1,-1,1"` prints the same summary for the
+  running count. Without `--answers`, prompts per batch
+  (`Q1 Running count?:`).
+
+**Strategy session / count session / weak spots**
+
+- Strategy sessions reuse the engine for the correct action of every question,
+  so scores always match basic strategy (H17/S17).
+- Weak spots aggregate the failed questions' tags (e.g. `hard`, `stand`) for
+  strategy, and the missed batch labels for counting.
+
+**Limitations / out of scope for v0.8**
+
+- Sessions are in-memory only: no saving to files, no database, no login.
+- Strategy questions grade the opening two-card decision only.
+- No betting spread, no Kelly, no Illustrious 18, no insurance index, no
+  web/UI.
+- Never for real tables: no casino connectivity, no real-money betting, no
+  camera/video, no screen scraping, and no promise of winnings.
+
+### v0.9 — Visual / UI Layer
 
 - Interactive strategy charts and quiz/flashcard UX.
 - Progress tracking and accuracy stats per hand category.
 - Groundwork for a web app front end.
 
-### v0.9 — Web App & Polish
+### v1.0 — Web App & Polish
 
 - Browser-based practice app over the existing engine and simulator.
 - Profile selection, drill history, and shareable practice sessions.

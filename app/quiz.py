@@ -11,6 +11,7 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
+from .counting import EDUCATIONAL_NOTE, update_running_count_many
 from .hand_evaluator import evaluate_hand
 from .rules import DEFAULT_PROFILE, RuleProfile
 from .shoe import RANKS
@@ -132,4 +133,180 @@ def grade_strategy_answer(question: QuizQuestion, user_action: str) -> QuizResul
         is_correct=normalized == question.correct_action,
         correct_action=question.correct_action,
         explanation=question.explanation,
+    )
+
+
+
+@dataclass(frozen=True)
+class CountQuizResult:
+    """The graded result of a single Hi-Lo running-count batch."""
+
+    cards: tuple[str, ...]
+    user_answer: int
+    correct_count: int
+    is_correct: bool
+
+
+@dataclass(frozen=True)
+class QuizSessionResult:
+    """The summary of a multi-question training session.
+
+    Attributes:
+        mode: ``"strategy"`` or ``"count"``.
+        total_questions: Number of questions in the session.
+        correct_answers: How many were answered correctly.
+        incorrect_answers: How many were answered incorrectly.
+        accuracy: Fraction correct in ``[0.0, 1.0]`` (``0.0`` for an empty
+            session).
+        results: The per-question results (``QuizResult`` for strategy,
+            ``CountQuizResult`` for count).
+        weak_spots: Descriptive labels for the missed questions (failed tags /
+            actions for strategy; batch labels for count).
+        note: Short educational note.
+    """
+
+    mode: str
+    total_questions: int
+    correct_answers: int
+    incorrect_answers: int
+    accuracy: float
+    results: list
+    weak_spots: list[str]
+    note: str = ""
+
+
+def _accuracy(correct: int, total: int) -> float:
+    """Return correct/total as a fraction, or 0.0 for an empty session."""
+    return correct / total if total else 0.0
+
+
+def build_strategy_questions(
+    num_questions: int = 10,
+    seed: int | None = None,
+    profile: RuleProfile = DEFAULT_PROFILE,
+) -> list[QuizQuestion]:
+    """Build a reproducible list of strategy questions.
+
+    Each question ``i`` is generated with ``seed + i`` (or randomly when
+    ``seed`` is ``None``), so a given seed always yields the same session.
+
+    Raises:
+        ValueError: If ``num_questions`` is negative.
+    """
+    if num_questions < 0:
+        raise ValueError(f"num_questions must be >= 0 (got {num_questions}).")
+    questions: list[QuizQuestion] = []
+    for i in range(num_questions):
+        qseed = None if seed is None else seed + i
+        questions.append(generate_strategy_question(seed=qseed, profile=profile))
+    return questions
+
+
+
+def run_strategy_session(
+    num_questions: int = 10,
+    seed: int | None = None,
+    answers: list[str] | None = None,
+    profile: RuleProfile = DEFAULT_PROFILE,
+) -> QuizSessionResult:
+    """Run a scored basic-strategy session over ``num_questions`` questions.
+
+    Args:
+        num_questions: How many questions to pose.
+        seed: Optional seed for reproducible questions (``seed + index``).
+        answers: The user's answers (one per question). Required to score the
+            session; the CLI collects these interactively when not supplied.
+        profile: The rule profile to quiz under.
+
+    Raises:
+        ValueError: If ``answers`` is missing or its length does not match
+            ``num_questions``, or an answer is invalid.
+    """
+    if answers is None:
+        raise ValueError("answers are required to score a strategy session.")
+    if len(answers) != num_questions:
+        raise ValueError(
+            f"Expected {num_questions} answers, got {len(answers)}."
+        )
+
+    questions = build_strategy_questions(num_questions, seed=seed, profile=profile)
+    results = [grade_strategy_answer(q, a) for q, a in zip(questions, answers)]
+
+    correct = sum(1 for r in results if r.is_correct)
+    incorrect = len(results) - correct
+
+    weak: list[str] = []
+    for r in results:
+        if not r.is_correct:
+            for tag in r.question.tags:
+                if tag not in weak:
+                    weak.append(tag)
+
+    note = (
+        f"You answered {correct}/{len(results)} correctly. "
+        "This is educational practice only and never guarantees winnings."
+    )
+    return QuizSessionResult(
+        mode="strategy",
+        total_questions=len(results),
+        correct_answers=correct,
+        incorrect_answers=incorrect,
+        accuracy=_accuracy(correct, len(results)),
+        results=results,
+        weak_spots=sorted(weak),
+        note=note,
+    )
+
+
+def run_count_session(
+    cards_batches: list[list[str]],
+    answers: list[int],
+) -> QuizSessionResult:
+    """Run a scored Hi-Lo running-count session over several card batches.
+
+    Args:
+        cards_batches: A list of card batches; each batch is graded as its own
+            running count (starting from 0).
+        answers: The user's running-count answer for each batch.
+
+    Raises:
+        ValueError: If the number of answers does not match the batches, or a
+            card rank is invalid.
+    """
+    if len(cards_batches) != len(answers):
+        raise ValueError(
+            f"Expected {len(cards_batches)} answers, got {len(answers)}."
+        )
+
+    results: list[CountQuizResult] = []
+    weak: list[str] = []
+    for i, (batch, answer) in enumerate(zip(cards_batches, answers), start=1):
+        correct_count = update_running_count_many(0, batch)
+        is_correct = answer == correct_count
+        results.append(
+            CountQuizResult(
+                cards=tuple(batch),
+                user_answer=answer,
+                correct_count=correct_count,
+                is_correct=is_correct,
+            )
+        )
+        if not is_correct:
+            weak.append(f"Q{i} ({','.join(batch)})")
+
+    correct = sum(1 for r in results if r.is_correct)
+    incorrect = len(results) - correct
+    note = (
+        f"You answered {correct}/{len(results)} running counts correctly. "
+        f"{EDUCATIONAL_NOTE}"
+    )
+    return QuizSessionResult(
+        mode="count",
+        total_questions=len(results),
+        correct_answers=correct,
+        incorrect_answers=incorrect,
+        accuracy=_accuracy(correct, len(results)),
+        results=results,
+        weak_spots=weak,
+        note=note,
     )
