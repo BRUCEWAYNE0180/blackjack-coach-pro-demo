@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.11.0 feature summary
+## v1.12.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -79,6 +79,9 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   `coach` / `coach-play` and the coach compares basic strategy with the
   educational deviation study, showing the basic action, the count-adjusted
   action, and the final recommendation.
+- **Probability & EV advisor** (v1.12.0): `odds` (and `coach --show-odds`) show
+  approximate player bust chance, the dealer's final-total distribution, and a
+  rough EV per action - advisory only; never overrides the recommendation.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -144,6 +147,7 @@ blackjack-coach outcomes
 blackjack-coach coach --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
 blackjack-coach coach --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS
 blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS
 ```
 
 Without installing, run it as a module from the repository root:
@@ -738,6 +742,41 @@ The deviation set is intentionally small (study only). The insurance deviation
 is never the coach's final action - insurance advice stays NO. The basic engine
 recommendation is always preserved and never modified.
 
+## Probability & EV advisor (v1.12.0)
+
+See the risk behind a decision, not just the recommended play. `odds` shows the
+approximate player bust chance, the dealer's final-total distribution, and a
+rough EV per action; `coach --show-odds` adds a compact version to the coach
+output.
+
+```bash
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS
+blackjack-coach odds --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --true-count 1 --show-odds
+```
+
+```text
+=== Probability Advisor ===
+Cards             : 10♠, 6♥
+Dealer upcard     : 10♦
+Recommended action: SURRENDER
+Bust if hit       : 61.5%
+Dealer bust       : 21.2%
+
+-- Action EV estimates --
+HIT       : EV -0.569 | win 18.5% loss 75.4% push 6.1% bust 61.5%
+STAND     : EV -0.576 | ...
+SURRENDER : EV -0.500 | ...
+Best estimated action: SURRENDER
+```
+
+These figures are **approximate** (an idealised shoe with a one-card
+look-ahead) and are for understanding risk only. They **never override** the
+strategy recommendation - if the best-EV action differs, the coach says so and
+keeps the recommendation. `--true-count` and `--decks` are accepted; the global
+`--no-color` / `--plain-cards` flags apply.
+
 ## Professional card display (v1.10.0)
 
 Enter and see cards with figures, suits, and colour, so the coach feels like a
@@ -793,14 +832,13 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.11.0 makes the guided coach count-aware: an optional `--true-count` on
-`coach` / `coach-play` folds in the educational deviation study, keeping basic
-action, count-adjusted action, and final recommendation separate (and the
-insurance study rule never becomes a final action). Without a true count the
-coach uses basic strategy as before. No changes to `strategy_engine.recommend`,
-Hi-Lo counting math, the simulator, outcome history, or session history. It is a
-professional coach for local practice, demo money, video games, recreational
-tournaments, and training.
+v1.12.0 adds an approximate probability & EV advisor (`app/probability_advisor.py`,
+the `odds` command, and `coach --show-odds`): player bust chance, the dealer's
+final-total distribution, and a rough EV per action. It is clearly labelled
+approximate and never overrides the strategy recommendation. No changes to
+`strategy_engine.recommend`, Hi-Lo counting math, guided coaching, outcome
+history, or session history. It is a professional coach for local practice,
+demo money, video games, recreational tournaments, and training.
 
 Planned next (educational/local only): a possible v2.0 web UI if decided later.
 See

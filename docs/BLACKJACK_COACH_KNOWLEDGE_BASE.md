@@ -75,6 +75,12 @@ tool relies on and the project's evolution.
   `build_coach_step`, `explain_next_best_action`, `build_guided_result`, and
   `play_guided_coach_hand`. The coach picks and explains each action; built on
   `decision_audit` and the simulator, reusing outcome records for labels.
+- `app/probability_advisor.py` — Approximate probability & EV advisor:
+  `PlayerBustEstimate`, `DealerOutcomeEstimate`, `ActionEVEstimate`,
+  `ProbabilityAdvice`, plus `estimate_player_bust_probability`,
+  `estimate_dealer_outcomes`, `estimate_action_ev`, and
+  `build_probability_advice`. Approximate / advisory only; never overrides the
+  recommendation and never changes the engine or counting math.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -786,7 +792,7 @@ scoring. Card input accepts `A♠`, `AS`, `A spades`, `10H`, `Q clubs`, `Kd`, an
 suitless `A,7`; the engine always receives plain ranks (`cards_to_ranks`). Per
 `PROJECT_RULES.md`, the card display layer must preserve ranks for the engine.
 
-### v1.11.0 — Count-Aware Coach Advisor (current)
+### v1.11.0 — Count-Aware Coach Advisor (done)
 
 Connects the educational true-count deviation study to the guided coach. The
 user can supply an optional true count and the coach compares basic strategy
@@ -814,6 +820,33 @@ recommended action distinct and explains any deviation. The deviation study is
 study-only - the insurance rule never becomes a final action, and without a
 true count the coach uses basic strategy. Per `PROJECT_RULES.md`, deviation
 study must not be silently mixed into the base engine.
+
+### v1.12.0 — Probability & EV Advisor (current)
+
+Adds an approximate probability / EV layer so the coach can explain risk, not
+just the recommended play. Approximate and advisory only - it never overrides
+the recommendation and does not change the engine or counting math.
+
+Delivered:
+
+- **`app/probability_advisor.py`**: `PlayerBustEstimate`,
+  `DealerOutcomeEstimate`, `ActionEVEstimate`, `ProbabilityAdvice`, and
+  `estimate_player_bust_probability`, `estimate_dealer_outcomes` (deterministic
+  recursive enumeration honouring H17/S17), `estimate_action_ev`,
+  `build_probability_advice`. Idealised 13-rank shoe with a one-card
+  look-ahead; fast and dependency-free.
+- **CLI**: `odds` (full advisory: bust-if-hit, dealer 17-21/bust distribution,
+  per-action EV, best estimated action) and `coach --show-odds` (compact
+  summary).
+- **Tests**: `tests/test_probability_advisor.py` (bust estimates, dealer
+  distribution sums to ~1, surrender EV -0.5, illegal-action warning, advice
+  assembly, engine unchanged) plus CLI tests.
+
+**Approximate & advisory:** estimates are clearly labelled approximate and never
+override the strategy recommendation; if the best-EV action differs, the advisor
+says so and keeps the recommendation. Per `PROJECT_RULES.md`, the probability/EV
+layer must label approximations and must not override the main recommendation
+without explicit validation and tests.
 
 ### v2.0 — Possible Web UI (if decided later)
 

@@ -379,6 +379,37 @@ Colour is used only on a real terminal; captured or piped output is plain text.
 The display layer never changes strategy, counting, outcomes, or scoring - the
 engine always receives plain ranks.
 
+## Probability & EV advisor (v1.12.0)
+
+### odds
+
+```bash
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS
+blackjack-coach odds --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS
+```
+
+Prints an approximate probability / EV advisory: the recommended action, the
+player's bust-if-hit chance, the dealer bust chance, the dealer's final-total
+probabilities (17/18/19/20/21/bust), a per-action EV estimate (with win / loss /
+push / bust), the best estimated action, and an approximation note. Flags:
+`--decks` (idealised model size), `--true-count` (for the recommended action),
+plus the global `--no-color` / `--plain-cards`.
+
+### coach --show-odds
+
+```bash
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --true-count 1 --show-odds
+```
+
+Adds a compact approximate odds summary (bust if hit, dealer bust, best
+estimated action) to the coach output.
+
+These figures are **approximate** (idealised shoe, one-card look-ahead) and
+never override the recommendation: if the best-EV action differs from the
+strategy recommendation, the advisor says so and keeps the recommendation.
+
+
 
 
 

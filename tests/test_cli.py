@@ -949,3 +949,55 @@ class TestCliCountAwareCoach:
         assert exit_code == 0
         assert "True count (advisory): 1" in out
         assert "True count" in out
+
+
+class TestCliOdds:
+    def test_odds_works(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Probability Advisor ===" in out
+        assert "Bust if hit" in out
+        assert "Dealer bust" in out
+        assert "Action EV estimates" in out
+        assert "Best estimated action" in out
+        assert "Recommended action" in out
+
+    def test_odds_soft_hand(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "A\u2660,7\u2665",
+                              "--dealer", "9\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        # Soft 18 cannot bust on one card.
+        assert "Bust if hit       : 0.0%" in out
+
+    def test_odds_invalid_card_errors(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "Z,7", "--dealer", "9"])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err
+
+    def test_coach_show_odds(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666", "--show-odds",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Odds (approximate)" in out
+        assert "Bust if hit" in out
+        assert "Best estimated action" in out
+        # The final recommendation is still shown and not overridden.
+        assert "Recommended action" in out
+
+    def test_coach_show_odds_with_true_count(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666", "--show-odds",
+                              "--true-count", "1",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Odds (approximate)" in out
+        assert "Count-aware advisory" in out
