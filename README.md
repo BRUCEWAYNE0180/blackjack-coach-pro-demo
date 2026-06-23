@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.18.0 feature summary
+## v1.19.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -106,6 +106,11 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   best-EV action and *when/why* it differs (tiny / small / medium / large EV
   gap, shoe composition, true count, split / re-split, surrender, or model
   limits). Explanation only - it never overrides the recommendation.
+- **Exportable learning reports** (v1.19.0): `report` combines your local
+  session history, outcomes, EV snapshots, Strategy-vs-EV review, weak spots,
+  and practice tips into a single **Markdown / JSON / CSV** report for reviewing
+  progress or saving to Notion / GitHub. Local and read-only; it exports no
+  sensitive data and never changes the recommendation.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -181,6 +186,31 @@ EV gap is **LARGE** (or **MEDIUM** when there is no LARGE gap). EV gap bands:
 `TINY` `[0, 0.02)`, `SMALL` `[0.02, 0.05)`, `MEDIUM` `[0.05, 0.15)`, `LARGE`
 `[0.15, ∞)`; a tiny / small gap is probably not a strong difference, while a
 large gap is worth reviewing with `odds` and `audit`.
+
+## Exportable Learning Reports (v1.19.0)
+
+Once you have practised a little, `report` combines your local **session
+history**, **outcome / win-loss history**, **EV snapshots**, **Strategy-vs-EV
+review**, **weak / strong spots**, and **practice recommendations** into a
+single report you can review, save to Notion / GitHub, or share as a training
+summary. It is local and read-only - no network, no cloud, and it exports no
+sensitive data (no money, bankroll, bets, accounts, or tokens).
+
+```bash
+blackjack-coach report
+blackjack-coach report --format markdown --print
+blackjack-coach report --format json --output report.json
+blackjack-coach report --format csv --profile SIX_DECK_H17_DAS_LS
+```
+
+By default a timestamped Markdown report is written under
+`./.blackjack_coach/reports` and the saved path is printed. Use `--format`
+(`markdown` / `json` / `csv`), `--output <path>` to choose an exact file,
+`--print` to also echo the content to the terminal, `--profile` / `--limit` to
+scope the data, and `--session-dir` / `--outcome-dir` / `--ev-dir` to point at
+custom history folders. EV snapshots are included automatically when present.
+With no saved history the report says so clearly; with little data it flags a
+**LOW sample / limited data** note.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -263,6 +293,10 @@ blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DA
 blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware --explain-ev
 blackjack-coach ev-review --disagreements-only --explain
 blackjack-coach ev-review --large-gaps-only --explain
+blackjack-coach report
+blackjack-coach report --format markdown --print
+blackjack-coach report --format json --output report.json
+blackjack-coach report --format csv --profile SIX_DECK_H17_DAS_LS
 ```
 
 Without installing, run it as a module from the repository root:

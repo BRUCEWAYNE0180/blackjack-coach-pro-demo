@@ -7,6 +7,59 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.19.0] - 2026-06-23
+
+Exportable local-learning reports. A new `report` command combines the local
+session history, outcome / win-loss history, EV-snapshot history,
+Strategy-vs-EV review, weak / strong spots, and practice recommendations into a
+single **Markdown / JSON / CSV** report - handy for reviewing progress or saving
+to Notion / GitHub. Everything stays local and read-only; it never changes the
+strategy recommendation or the Hi-Lo math and exports no sensitive data.
+
+### Added
+
+- `app/reporting.py`: dataclasses `ReportSummary` and `ExportedReport`, plus
+  `build_report_summary` (combines `summarize_history`, `summarize_outcomes`,
+  `summarize_ev_snapshots`, `build_learning_summary`, and - when EV snapshots
+  exist - `summarize_disagreement_explanations`, with `profile_key` / `limit`
+  filters), `render_report_markdown`, `render_report_json`, `render_report_csv`
+  (stdlib `csv`, key/value rows; no pandas), `save_report`, and `export_report`
+  (defaults to a timestamped file under `./.blackjack_coach/reports`).
+- CLI `report` command with `--format` (markdown / json / csv), `--output`,
+  `--profile`, `--limit`, `--session-dir`, `--outcome-dir`, `--ev-dir`, and
+  `--print`. By default it saves a local Markdown report and prints the path;
+  EV snapshots are included automatically when present. An unknown `--format`
+  produces a clear error.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.19.0**.
+
+### Quality
+
+- New suite `tests/test_reporting.py` (empty history -> zeros and a clear note;
+  totals counted from sessions / outcomes / EV snapshots; Markdown contains the
+  Overview / Practice recommendations / Strategy-vs-EV sections; valid JSON;
+  key,value CSV; Markdown / JSON / CSV export saves a file; custom output path;
+  unknown format raises; no sensitive field names exported; and export never
+  changes `recommend()`) plus `TestCliReport` in `tests/test_cli.py` for the
+  `report` command (no-data file, `--print`, json, csv, custom `--output`,
+  profile filter, invalid format error, and counts with history). Full suite
+  passing; ruff clean.
+
+### Safety
+
+- Reports are a **local, read-only summary** only: they store no money,
+  bankroll, real bets, accounts, tokens, screenshots, or any sensitive/personal
+  data, and no private filesystem paths beyond the report's own output location.
+  They keep training, outcomes, EV advisory, and practice recommendations in
+  clearly separated sections, and never change `strategy_engine.recommend`, the
+  Hi-Lo math, adaptive learning, guided coaching, outcome / session history, the
+  EV-snapshot history, or the Strategy-vs-EV explanation engine. Reports live
+  under the git-ignored `.blackjack_coach/reports` tree (unless an explicit
+  `--output` path is given) and are never committed. No external dependencies,
+  no network / cloud / database.
+
 ## [1.18.0] - 2026-06-23
 
 Strategy-vs-EV explanation engine. The probability / EV advisor stays advisory

@@ -94,6 +94,12 @@ tool relies on and the project's evolution.
   `explain_ev_snapshot_record`, and `summarize_disagreement_explanations`.
   Explanation layer only; it never overrides the recommendation or turns the
   advisory EV into the final decision.
+- `app/reporting.py` — Exportable local-learning reports: `ReportSummary`,
+  `ExportedReport`, `build_report_summary` (combines the session / outcome /
+  EV-snapshot / adaptive-learning / Strategy-vs-EV summaries), the
+  `render_report_markdown` / `render_report_json` / `render_report_csv`
+  renderers, `save_report`, and `export_report`. Local and read-only; exports no
+  sensitive data and never changes the recommendation.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -120,9 +126,9 @@ tool relies on and the project's evolution.
   `blackjack-coach` command, plus `count`, `simulate`, `play`, `quiz`,
   `count-quiz`, `quiz-session`, `count-session`, `history`, `deviations`,
   `deviation-quiz`, `diagnose`, `profiles`, `split-rules`, `matrix`,
-  `audit`, `outcomes`, `coach`, `coach-play`, `odds`, `learn`, and `ev-review`
-  subcommands; `odds`/`coach --show-odds` accept `--explain-ev` and `ev-review`
-  accepts `--explain` / `--large-gaps-only`).
+  `audit`, `outcomes`, `coach`, `coach-play`, `odds`, `learn`, `ev-review`, and
+  `report` subcommands; `odds`/`coach --show-odds` accept `--explain-ev` and
+  `ev-review` accepts `--explain` / `--large-gaps-only`).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -1058,7 +1064,7 @@ bankroll, bets, accounts, tokens, screenshots, or personal data - no database,
 no network, no cloud. Saved files live under the git-ignored `.blackjack_coach/`
 tree and are never committed. No external dependencies and no slow simulations.
 
-### v1.18.0 — Strategy-vs-EV Explanation Engine (current)
+### v1.18.0 — Strategy-vs-EV Explanation Engine (done)
 
 Builds on the v1.12.0-v1.17.0 probability / EV advisor and the v1.17.0
 EV-snapshot history. The advisor could compute EV, save snapshots, and review
@@ -1101,6 +1107,47 @@ gap size, the model limitations, and the final decision. No change to
 `strategy_engine.recommend`, the Hi-Lo math, adaptive learning, guided coaching,
 outcome / session history, or the EV-snapshot history; no external dependencies;
 no network / cloud / database; no sensitive data.
+
+### v1.19.0 — Exportable Learning Reports (current)
+
+Builds on every local-history feature so far (session history v1.2.0, outcome
+history v1.8.0, adaptive learning v1.13.0, EV-snapshot history v1.17.0, and the
+Strategy-vs-EV explanation engine v1.18.0). Those summaries lived behind
+separate commands; v1.19.0 combines them into a single **exportable report**
+(Markdown / JSON / CSV) for reviewing progress or saving to Notion / GitHub. It
+stays local, read-only, and dependency-free, and never changes play.
+
+Delivered:
+
+- **`app/reporting.py`**: `ReportSummary` (created_at, profile scope, totals for
+  sessions / outcomes / EV snapshots, session accuracy, outcome win / loss rate,
+  EV agreement rate, weakest / strongest spots, largest EV gaps, combined
+  practice recommendations, a data-quality note, and warnings) and
+  `ExportedReport` (report id, created_at, format, output path, summary, note).
+  Functions: `build_report_summary` (loads session / outcome / EV history with
+  `profile_key` / `limit` filters and combines `summarize_history`,
+  `summarize_outcomes`, `summarize_ev_snapshots`, `build_learning_summary`, and
+  `summarize_disagreement_explanations`), `render_report_markdown` /
+  `render_report_json` / `render_report_csv` (stdlib `csv`, key/value rows),
+  `save_report`, and `export_report` (defaults to a timestamped file under
+  `./.blackjack_coach/reports`; raises `ValueError` for an unknown format).
+- **CLI**: new `report` command with `--format`, `--output`, `--profile`,
+  `--limit`, `--session-dir`, `--outcome-dir`, `--ev-dir`, and `--print`. EV
+  snapshots are included automatically when present (no `--include-ev` flag is
+  added in v1.19.0).
+- **Tests**: new `tests/test_reporting.py` and `TestCliReport` in
+  `tests/test_cli.py`.
+
+**Limits / honesty:** reports are a local, read-only summary only. They keep
+training, outcomes, EV advisory, and practice recommendations in clearly
+separated sections, store no money / bankroll / bets / accounts / tokens /
+screenshots / personal data, and include no private filesystem paths beyond the
+report's own output location. Per `PROJECT_RULES.md`, the report never changes
+`strategy_engine.recommend`, the Hi-Lo math, adaptive learning, guided coaching,
+outcome / session history, the EV-snapshot history, or the Strategy-vs-EV
+explanation engine. Files live under the git-ignored `.blackjack_coach/reports`
+tree (unless an explicit `--output` is given) and are never committed. No
+external dependencies; no network / cloud / database.
 
 ### v2.0 — Possible Web UI (if decided later)
 

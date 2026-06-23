@@ -1406,11 +1406,11 @@ class TestCliEVSnapshotHistory:
         assert exit_code == 0
         assert "No saved EV snapshots yet" in out
 
-    def test_version_prints_1_18_0(self, capsys):
+    def test_version_prints_1_19_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 1.18.0"
+        assert out.strip() == "blackjack-coach 1.19.0"
 
 
 
@@ -1530,3 +1530,89 @@ class TestCliStrategyVsEVExplanation:
         out = capsys.readouterr().out
         assert exit_code == 0
         assert "Strategy vs EV explanations" in out
+
+
+
+class TestCliReport:
+    """v1.19.0 exportable learning reports."""
+
+    def test_report_no_data_creates_file(self, capsys, tmp_path):
+        out = tmp_path / "report.md"
+        exit_code = cli.main(["report", "--output", str(out)])
+        printed = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Learning Report ===" in printed
+        assert "Saved" in printed
+        assert out.exists()
+
+    def test_report_markdown_print_shows_overview(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "report", "--format", "markdown", "--print",
+            "--output", str(tmp_path / "r.md"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "## Overview" in out
+        assert "## Practice recommendations" in out
+
+    def test_report_json_creates_json(self, capsys, tmp_path):
+        out = tmp_path / "r.json"
+        exit_code = cli.main(["report", "--format", "json", "--output", str(out)])
+        capsys.readouterr()
+        assert exit_code == 0
+        import json
+        json.loads(out.read_text(encoding="utf-8"))
+
+    def test_report_csv_creates_csv(self, capsys, tmp_path):
+        out = tmp_path / "r.csv"
+        exit_code = cli.main(["report", "--format", "csv", "--output", str(out)])
+        capsys.readouterr()
+        assert exit_code == 0
+        assert out.read_text(encoding="utf-8").startswith("key,value")
+
+    def test_report_output_path_is_used(self, capsys, tmp_path):
+        out = tmp_path / "sub" / "my_report.md"
+        exit_code = cli.main(["report", "--output", str(out)])
+        printed = capsys.readouterr().out
+        assert exit_code == 0
+        assert out.exists()
+        assert str(out) in printed
+
+    def test_report_profile_filter_works(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "report", "--profile", "SIX_DECK_H17_DAS_LS",
+            "--output", str(tmp_path / "r.md"),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Saved" in out
+
+    def test_report_invalid_format_errors(self, capsys, tmp_path):
+        exit_code = cli.main([
+            "report", "--format", "xml", "--output", str(tmp_path / "r.xml"),
+        ])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Unknown report format" in err
+
+    def test_report_with_history_counts(self, capsys, tmp_path):
+        session_dir = tmp_path / "history"
+        outcome_dir = tmp_path / "outcomes"
+        cli.main([
+            "quiz-session", "--questions", "3", "--seed", "1",
+            "--answers", "H,S,D", "--save", "--history-dir", str(session_dir),
+        ])
+        cli.main([
+            "coach-play", "--decks", "6", "--seed", "5",
+            "--profile", "SIX_DECK_H17_DAS_LS", "--save-outcome",
+            "--outcome-dir", str(outcome_dir),
+        ])
+        capsys.readouterr()
+        exit_code = cli.main([
+            "report", "--print", "--output", str(tmp_path / "r.md"),
+            "--session-dir", str(session_dir), "--outcome-dir", str(outcome_dir),
+        ])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Sessions: 1" in out
+        assert "Outcomes: 1" in out

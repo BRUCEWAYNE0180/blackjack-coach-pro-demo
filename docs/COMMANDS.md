@@ -692,6 +692,45 @@ Narrows the review to snapshots whose EV gap is **LARGE**, or **MEDIUM** when
 there is no LARGE gap. Pair it with `--explain` to see why those spots differ;
 review them with `odds` and `audit`.
 
+## Exportable learning reports (v1.19.0)
+
+### report
+
+```bash
+blackjack-coach report
+blackjack-coach report --format markdown --print
+blackjack-coach report --format json --output report.json
+blackjack-coach report --format csv --profile SIX_DECK_H17_DAS_LS
+blackjack-coach report --profile SIX_DECK_H17_DAS_LS --limit 20
+```
+
+Builds a single local report that combines your session history, outcome /
+win-loss history, EV snapshots, the Strategy-vs-EV review, weak / strong spots,
+and practice recommendations. The Markdown report has these sections: Overview,
+Session training, Outcome history, EV snapshots, Strategy-vs-EV review, Weak
+spots, Practice recommendations, and Data quality / warnings.
+
+Flags:
+
+- `--format markdown|json|csv` - output format (default `markdown`; an unknown
+  format prints a clear error). CSV is a compact `key,value` layout (stdlib
+  `csv`, no pandas).
+- `--output <path>` - write to an exact file. Without it, a timestamped file is
+  written under `./.blackjack_coach/reports` and the saved path is printed.
+- `--print` - also echo the report content to the terminal.
+- `--profile <KEY>` - scope outcomes / EV snapshots to one rule profile
+  (sessions are not profile-scoped).
+- `--limit N` - use only the most recent N records per area.
+- `--session-dir` / `--outcome-dir` / `--ev-dir` - read from custom history
+  folders.
+
+EV snapshots are included automatically when present (there is no
+`--include-ev` flag). With no saved history the report says "No saved local
+history yet"; with little data it flags a **LOW sample / limited data** note.
+Reports are a local, read-only summary only - no money, bankroll, bets,
+accounts, tokens, or personal data - and live under the git-ignored
+`.blackjack_coach/reports` tree (unless `--output` is given), never committed.
+
 
 
 
