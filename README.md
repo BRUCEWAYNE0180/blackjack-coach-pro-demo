@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.12.0 feature summary
+## v1.13.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -82,6 +82,10 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 - **Probability & EV advisor** (v1.12.0): `odds` (and `coach --show-odds`) show
   approximate player bust chance, the dealer's final-total distribution, and a
   rough EV per action - advisory only; never overrides the recommendation.
+- **Adaptive local learning** (v1.13.0): `learn` reviews your saved outcome
+  history for patterns and weak spots, and `coach --use-history` adds local
+  context to a hand - personalised practice guidance that never changes the
+  base strategy.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -148,6 +152,7 @@ blackjack-coach coach --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
 blackjack-coach coach --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS
 blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS
 blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS
+blackjack-coach learn
 ```
 
 Without installing, run it as a module from the repository root:
@@ -742,6 +747,33 @@ The deviation set is intentionally small (study only). The insurance deviation
 is never the coach's final action - insurance advice stays NO. The basic engine
 recommendation is always preserved and never modified.
 
+## Adaptive local learning (v1.13.0)
+
+The coach gets more useful with use: it reads your locally saved outcome
+history to surface patterns, weak spots, and practice ideas - without ever
+changing the mathematical strategy. The typical loop is **play with
+`--save-outcome` → review with `learn` → revisit with `coach --use-history`**.
+
+```bash
+blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS --save-outcome
+blackjack-coach learn
+blackjack-coach learn --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --use-history
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --true-count 1 --show-odds --use-history
+```
+
+`learn` summarises totals, profiles seen, the strongest / weakest /
+high-variance spots (e.g. `hard_16_vs_10`), the most common outcomes, and
+practice recommendations. `coach --use-history` adds a "Local history context"
+block (matching records, local win/loss/push rates, a practice note, and a
+caution note).
+
+Guardrails: the recommendation always comes from basic strategy, never from
+results. Confidence is **LOW** under 10 saved records, and spots with under 5
+records are flagged "small sample". Learning is local, transparent, and
+reversible (it reads JSON under the git-ignored `.blackjack_coach/` tree) - no
+network, database, money, bankroll, or accounts.
+
 ## Probability & EV advisor (v1.12.0)
 
 See the risk behind a decision, not just the recommended play. `odds` shows the
@@ -832,13 +864,15 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.12.0 adds an approximate probability & EV advisor (`app/probability_advisor.py`,
-the `odds` command, and `coach --show-odds`): player bust chance, the dealer's
-final-total distribution, and a rough EV per action. It is clearly labelled
-approximate and never overrides the strategy recommendation. No changes to
-`strategy_engine.recommend`, Hi-Lo counting math, guided coaching, outcome
-history, or session history. It is a professional coach for local practice,
-demo money, video games, recreational tournaments, and training.
+v1.13.0 adds adaptive local learning (`app/adaptive_learning.py`, the `learn`
+command, and `coach --use-history`): the coach reads saved outcome history to
+surface patterns, weak spots, and practice ideas, and adds local context to a
+hand. It is descriptive only - it never changes the base strategy, promises an
+edge, or makes predictions, and short-run results never alter the
+recommendation. No changes to `strategy_engine.recommend`, Hi-Lo counting math,
+the probability advisor, guided coaching, outcome history, or session history.
+It is a professional coach for local practice, demo money, video games,
+recreational tournaments, and training.
 
 Planned next (educational/local only): a possible v2.0 web UI if decided later.
 See

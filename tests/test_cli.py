@@ -1001,3 +1001,85 @@ class TestCliOdds:
         assert exit_code == 0
         assert "Odds (approximate)" in out
         assert "Count-aware advisory" in out
+
+
+class TestCliLearn:
+    def test_learn_no_data(self, capsys, tmp_path):
+        exit_code = cli.main(["learn", "--dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Adaptive Learning ===" in out
+        assert "Total records      : 0" in out
+        assert "No saved outcome history yet" in out
+
+    def test_learn_with_data(self, capsys, tmp_path):
+        for seed in (42, 5, 428):
+            cli.main(["coach-play", "--decks", "6", "--seed", str(seed),
+                      "--profile", "SIX_DECK_H17_DAS_LS",
+                      "--save-outcome", "--outcome-dir", str(tmp_path)])
+        capsys.readouterr()
+        exit_code = cli.main(["learn", "--dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total records      : 3" in out
+        assert "Most common profile" in out
+        assert "Practice recommendations" in out
+
+    def test_learn_profile_filter(self, capsys, tmp_path):
+        cli.main(["coach-play", "--decks", "6", "--seed", "42",
+                  "--profile", "MULTI_DECK_H17_DAS_LS",
+                  "--save-outcome", "--outcome-dir", str(tmp_path)])
+        cli.main(["coach-play", "--decks", "6", "--seed", "428",
+                  "--profile", "SIX_DECK_H17_DAS_LS",
+                  "--save-outcome", "--outcome-dir", str(tmp_path)])
+        capsys.readouterr()
+        exit_code = cli.main(["learn", "--dir", str(tmp_path),
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Total records      : 1" in out
+
+
+class TestCliUseHistory:
+    def test_coach_use_history_without_history(self, capsys, tmp_path):
+        exit_code = cli.main(["coach", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--use-history", "--outcome-dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Local history context" in out
+        assert "No saved outcome history yet" in out
+        # The recommendation is still present and unchanged.
+        assert "Recommended action" in out
+
+    def test_coach_use_history_with_history(self, capsys, tmp_path):
+        for seed in (42, 5, 428):
+            cli.main(["coach-play", "--decks", "6", "--seed", str(seed),
+                      "--profile", "SIX_DECK_H17_DAS_LS",
+                      "--save-outcome", "--outcome-dir", str(tmp_path)])
+        capsys.readouterr()
+        exit_code = cli.main(["coach", "--cards", "8\u2660,8\u2665",
+                              "--dealer", "4\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--use-history", "--outcome-dir", str(tmp_path)])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Local history context" in out
+        assert "Matching records" in out
+
+    def test_coach_combined_flags(self, capsys, tmp_path):
+        cli.main(["coach-play", "--decks", "6", "--seed", "42",
+                  "--profile", "SIX_DECK_H17_DAS_LS",
+                  "--save-outcome", "--outcome-dir", str(tmp_path)])
+        capsys.readouterr()
+        exit_code = cli.main(["coach", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666", "--true-count", "1",
+                              "--show-odds", "--use-history",
+                              "--outcome-dir", str(tmp_path),
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Count-aware advisory" in out
+        assert "Odds (approximate)" in out
+        assert "Local history context" in out

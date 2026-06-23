@@ -163,6 +163,14 @@ As of v0.9 the project enforces these gates on every change:
   recommended action and surfaces a clear advisory warning when the best-EV
   action differs. It must stay fast and dependency-free (no large simulations),
   and must not change `strategy_engine.recommend` or the counting math.
+- **Local learning never changes the recommendation.** Adaptive local learning
+  (v1.13.0: `app/adaptive_learning.py`) must not change the main recommendation
+  without explicit validation. It must keep history, variance, sample size, and
+  the mathematical strategy clearly separated: confidence is LOW under 10
+  records, spots under 5 records are flagged "small sample", and short-run
+  results never alter the recommended action. Learning is local, transparent,
+  and reversible (reads the git-ignored `.blackjack_coach/` tree); no network,
+  database, or sensitive data.
 
 ## 8. Release Rules
 

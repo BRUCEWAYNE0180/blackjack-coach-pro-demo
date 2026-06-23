@@ -7,6 +7,50 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.13.0] - 2026-06-23
+
+Adaptive local learning. The coach now reads the locally saved outcome history
+to detect patterns, weak spots, and practice opportunities - it becomes more
+useful with use, while the mathematical strategy stays fixed. Short-run local
+results never change the recommended action; `strategy_engine.recommend`, the
+counting math, and the probability/EV advisor are not modified.
+
+### Added
+
+- `app/adaptive_learning.py`: `LearningSpot`, `LearningSummary`,
+  `CoachHistoryContext`, and the helpers `classify_hand_spot`,
+  `build_learning_summary`, `build_history_context`, and
+  `format_learning_summary`. Groups saved outcomes by hand spot (e.g.
+  `hard_16_vs_10`, `pair_A_vs_6`), ranks strongest / weakest / high-variance
+  spots, and generates practice recommendations.
+- CLI `learn` command (`--dir`, `--profile`, `--limit`, `--spot`): a local
+  learning summary (totals, profiles, strongest / weakest / high-variance
+  spots, most common outcomes, practice ideas, data-quality note).
+- CLI `coach --use-history` (with `--outcome-dir`): appends a "Local history
+  context" block (matching records, local win/loss/push rates, practice note,
+  caution note) without changing the recommendation.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.13.0**.
+
+### Quality
+
+- New suite `tests/test_adaptive_learning.py` (spot classification, summary
+  with empty / populated history, weak/strong spot detection, LOW confidence
+  with few records, history context with and without data, engine unchanged)
+  plus CLI tests for `learn` and `coach --use-history`. Full suite passing;
+  ruff clean; CI on Python 3.9-3.12.
+
+### Safety
+
+- Learning is local, transparent, and reversible (reads JSON under the
+  git-ignored `.blackjack_coach/` tree). It personalises explanations and
+  suggests practice but never changes the base strategy, promises an edge, or
+  makes exact predictions. Confidence is LOW under 10 records and spots under 5
+  records are flagged "small sample". No network, cloud, database, external
+  dependencies, money, bankroll, accounts, tokens, or sensitive data.
+
 ## [1.12.0] - 2026-06-23
 
 Approximate probability & EV advisor. The coach can now explain risk - player

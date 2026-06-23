@@ -81,6 +81,11 @@ tool relies on and the project's evolution.
   `estimate_dealer_outcomes`, `estimate_action_ev`, and
   `build_probability_advice`. Approximate / advisory only; never overrides the
   recommendation and never changes the engine or counting math.
+- `app/adaptive_learning.py` — Adaptive local learning: `LearningSpot`,
+  `LearningSummary`, `CoachHistoryContext`, plus `classify_hand_spot`,
+  `build_learning_summary`, `build_history_context`, and
+  `format_learning_summary`. Reads saved outcome history to surface patterns /
+  weak spots / practice ideas; descriptive only, never changes strategy.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -821,7 +826,7 @@ study-only - the insurance rule never becomes a final action, and without a
 true count the coach uses basic strategy. Per `PROJECT_RULES.md`, deviation
 study must not be silently mixed into the base engine.
 
-### v1.12.0 — Probability & EV Advisor (current)
+### v1.12.0 — Probability & EV Advisor (done)
 
 Adds an approximate probability / EV layer so the coach can explain risk, not
 just the recommended play. Approximate and advisory only - it never overrides
@@ -847,6 +852,34 @@ override the strategy recommendation; if the best-EV action differs, the advisor
 says so and keeps the recommendation. Per `PROJECT_RULES.md`, the probability/EV
 layer must label approximations and must not override the main recommendation
 without explicit validation and tests.
+
+### v1.13.0 — Adaptive Local Learning (current)
+
+Makes the coach more useful with use: it reads the locally saved outcome
+history to detect patterns, weak spots, and practice opportunities, and adds
+local context to a hand. It personalises explanations and suggests practice -
+it never changes the mathematical strategy.
+
+Delivered:
+
+- **`app/adaptive_learning.py`**: `LearningSpot`, `LearningSummary`,
+  `CoachHistoryContext`, plus `classify_hand_spot` (e.g. `hard_16_vs_10`,
+  `pair_A_vs_6`), `build_learning_summary` (strongest / weakest / high-variance
+  spots + practice recommendations), `build_history_context`, and
+  `format_learning_summary`. Spots are classified by the *starting* two cards.
+- **CLI**: `learn` (`--dir` / `--profile` / `--limit` / `--spot`) for a local
+  learning summary, and `coach --use-history` (`--outcome-dir`) which appends a
+  local-history context block.
+- **Tests**: `tests/test_adaptive_learning.py` (classification, summary, weak /
+  strong detection, LOW confidence, history context with/without data, engine
+  unchanged) plus CLI tests.
+
+**Guardrails:** the recommendation always comes from basic strategy, never from
+results; confidence is LOW under 10 records and spots under 5 records are
+flagged "small sample". Learning is local, transparent, and reversible (reads
+the git-ignored `.blackjack_coach/` tree). Per `PROJECT_RULES.md`, local
+learning must not change the recommendation without explicit validation and must
+separate history, variance, sample size, and the mathematical strategy.
 
 ### v2.0 — Possible Web UI (if decided later)
 

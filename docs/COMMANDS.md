@@ -409,6 +409,39 @@ These figures are **approximate** (idealised shoe, one-card look-ahead) and
 never override the recommendation: if the best-EV action differs from the
 strategy recommendation, the advisor says so and keeps the recommendation.
 
+## Adaptive local learning (v1.13.0)
+
+### learn
+
+```bash
+blackjack-coach learn
+blackjack-coach learn --profile SIX_DECK_H17_DAS_LS
+blackjack-coach learn --dir ./my_outcomes --limit 50
+blackjack-coach learn --spot hard_16_vs_10
+```
+
+Reviews the saved outcome history and prints a local-learning summary: total
+records, profiles seen, the most common profile, the strongest / weakest /
+high-variance spots, the most common outcomes, practice recommendations, and a
+data-quality note. Flags: `--dir` (history directory), `--profile` (filter),
+`--limit` (most recent N), `--spot` (a single spot id). With no data it prints a
+clear "no saved outcome history yet" message.
+
+### coach --use-history
+
+```bash
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --use-history
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --true-count 1 --show-odds --use-history
+```
+
+Appends a "Local history context" block for the hand's spot: matching records,
+local win/loss/push rates, a practice note, and a caution note. Use
+`--outcome-dir` to point at a specific history directory. The recommendation is
+never changed by local history; confidence is LOW under 10 records and small
+samples are flagged. Typical loop: `coach-play --save-outcome` → `learn` →
+`coach --use-history`.
+
+
 
 
 
