@@ -35,8 +35,12 @@ through v0.6.
 - `app/explanations.py` — Short educational notes for each action and state
   (`HIT`, `STAND`, `DOUBLE`, `SPLIT`, `SURRENDER`, `BLACKJACK`, `BUST`,
   insurance-NO).
-- `app/cli.py` — Terminal trainer (`python -m app.cli`).
-- `tests/` — Behavioural tests for the evaluator, engine, explanations, CLI.
+- `app/counting.py` — Hi-Lo counting trainer: tag values, running count, true
+  count, and `CountingState` (educational / simulated practice only).
+- `app/cli.py` — Terminal trainer (`python -m app.cli` and the `count`
+  subcommand).
+- `tests/` — Behavioural tests for the evaluator, engine, explanations,
+  counting, and CLI.
 
 ## Roadmap
 
@@ -53,7 +57,7 @@ through v0.6.
 - **Explicitly excluded:** Hi-Lo, True Count, Illustrious 18, simulator,
   web app.
 
-### v0.2 — Explanations & CLI (current)
+### v0.2 — Explanations & CLI (done)
 
 Delivered:
 
@@ -84,12 +88,52 @@ simulator, web app, real-money/casino features, and any external data
 Deferred to later versions: deeper expected-value / house-edge analysis and
 per-profile edge comparisons.
 
-### v0.3 — Card Counting (Hi-Lo) as a Learning Topic
+### v0.3 — Hi-Lo Counting Trainer (current)
 
-- Implement the Hi-Lo running count and true-count conversion.
-- Add the Illustrious 18 (and optionally Fab 4 surrenders) as count-based
-  deviations layered on top of basic strategy.
-- Strictly educational; practiced only against the built-in simulator.
+Delivered (educational / simulated practice only):
+
+- **`app/counting.py`** — the Hi-Lo system:
+  - **Tag values:** `2-6 = +1`, `7-9 = 0`, `10/J/Q/K/A = -1`
+    (`hilo_value`).
+  - **Running count:** cumulative sum of tags
+    (`update_running_count`, `update_running_count_many`).
+  - **True count:** running count divided by approximate decks remaining
+    (`true_count`); raises a clear error when `decks_remaining <= 0`.
+  - **`is_counting_allowed_context`** — guard reinforcing that counting is for
+    local/simulated practice, never a real table.
+  - **`counting_summary`** — a short, neutral educational interpretation of the
+    count (no profit claims).
+  - **`CountingState`** dataclass — `running_count`, `decks_remaining`,
+    `true_count`, `cards_seen`, `note`, and `warnings`.
+- **CLI `count` subcommand:**
+
+  ```bash
+  python -m app.cli count --cards 2,5,K,A,9 --decks-remaining 5
+  ```
+
+  Prints cards seen, running count, decks remaining, true count, and an
+  educational note. The existing basic-strategy command is unchanged.
+- **Tests** — tag values for every group, multi-card running counts, true-count
+  division, the `decks_remaining <= 0` error, and the CLI `count` flow; all
+  v0.1/v0.2 tests remain green.
+
+**Definitions**
+
+- **Running count:** the accumulated Hi-Lo tag total for all cards seen so far.
+- **True count:** the running count normalised by decks remaining, giving a
+  per-deck measure that is comparable across different shoe depths.
+
+**Limitations / out of scope for v0.3**
+
+- No betting spread, no Illustrious 18, no insurance index play, and no Kelly
+  bet sizing yet.
+- No simulator, no web app.
+- Never for real tables: no casino connectivity, no real-money betting, no
+  camera/video, and no promise of winnings. No external data
+  (PDFs/screenshots/feeds).
+
+Deferred to later versions: count-based deviations (Illustrious 18 / Fab 4),
+insurance index, and bet sizing.
 
 ### v0.4 — Simulator & Drills
 

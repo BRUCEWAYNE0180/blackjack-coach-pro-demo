@@ -7,13 +7,15 @@ An **educational / practice** tool for learning blackjack **basic strategy**.
 > any camera/video at a real table, and makes **no** promise of winnings.
 > See [`docs/PROJECT_RULES.md`](docs/PROJECT_RULES.md).
 
-## What it does (v0.2)
+## What it does (v0.3)
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
 - Gives a short **educational explanation** of *why* each action is suggested.
 - Adds **warnings**, including the insurance note when the dealer shows an Ace
   (insurance recommendation is always **NO**).
+- Includes a **Hi-Lo counting trainer** (running count + true count) for
+  **local / simulated practice only**.
 - Ships a simple **command-line trainer**.
 
 ## Requirements
@@ -65,6 +67,31 @@ Insurance advice: NO. Insurance is a side bet that the dealer has blackjack ...
 | `--no-surrender` | Treat surrender as unavailable.                     |
 | `--no-split`     | Treat splitting as unavailable.                     |
 
+## Hi-Lo counting trainer (v0.3)
+
+Practise the Hi-Lo system against a **local, simulated** shoe. Tag values are
+`2-6 = +1`, `7-9 = 0`, and `10/J/Q/K/A = -1`. The running count is the
+cumulative sum; the true count divides it by the approximate decks remaining.
+
+```bash
+python -m app.cli count --cards 2,5,K,A,9 --decks-remaining 5
+```
+
+Example output:
+
+```text
+Hi-Lo counting (educational / simulated practice)
+Cards seen:       5
+Running count:    +0
+Decks remaining:  5.0
+True count:       +0.00
+Note:             Running count +0, true count +0.00 ... educational practice ...
+```
+
+`--decks-remaining` must be greater than `0`. This trainer is **educational and
+simulated only**: no real tables, no camera/video, no real-money betting, and
+no promise of winnings.
+
 ## Library usage
 
 ```python
@@ -87,7 +114,9 @@ ruff check app tests   # lint (if ruff is installed)
 
 ## Scope and roadmap
 
-v0.2 covers basic strategy, explanations, and a CLI. Card counting (Hi-Lo),
-True Count, the Illustrious 18, a simulator, and a web app are **out of scope**
-for now. See [`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
+v0.3 adds an educational **Hi-Lo counting trainer** (running count + true
+count) on top of the v0.2 basic-strategy coach, explanations, and CLI.
+**Out of scope** for now: betting spread, the Illustrious 18, insurance index
+plays, Kelly bet sizing, a simulator, and a web app. See
+[`docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md`](docs/BLACKJACK_COACH_KNOWLEDGE_BASE.md)
 for the full v0.1-v0.6 roadmap.
