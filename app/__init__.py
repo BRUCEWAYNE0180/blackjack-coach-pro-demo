@@ -6,6 +6,12 @@ camera/video at a real table, and makes NO promise of winnings.
 See docs/PROJECT_RULES.md for the full project rules.
 """
 
+from .explanations import (
+    ACTION_NOTES,
+    explain_action,
+    explain_insurance_no,
+    explain_state,
+)
 from .hand_evaluator import HandEvaluation, card_value, evaluate_hand, normalize_rank
 from .rules import (
     DEFAULT_PROFILE,
@@ -22,9 +28,10 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
+    "ACTION_NOTES",
     "Action",
     "DEFAULT_PROFILE",
     "HandEvaluation",
@@ -35,6 +42,9 @@ __all__ = [
     "RuleProfile",
     "card_value",
     "evaluate_hand",
+    "explain_action",
+    "explain_insurance_no",
+    "explain_state",
     "get_profile",
     "normalize_rank",
     "recommend",

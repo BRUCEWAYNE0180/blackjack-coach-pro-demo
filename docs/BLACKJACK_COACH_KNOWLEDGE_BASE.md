@@ -29,12 +29,18 @@ through v0.6.
 - `app/rules.py` — `RuleProfile` definitions and the profile registry.
 - `app/hand_evaluator.py` — Normalises cards and classifies hands (hard/soft/
   pair), computing totals, blackjack, and bust.
-- `app/strategy_engine.py` — Basic-strategy tables and the `recommend()` API.
-- `tests/` — Behavioural tests for the evaluator and the engine.
+- `app/strategy_engine.py` — Basic-strategy tables and the `recommend()` API,
+  returning an enriched `Recommendation` (action, insurance, reason,
+  hand description, profile key, warnings).
+- `app/explanations.py` — Short educational notes for each action and state
+  (`HIT`, `STAND`, `DOUBLE`, `SPLIT`, `SURRENDER`, `BLACKJACK`, `BUST`,
+  insurance-NO).
+- `app/cli.py` — Terminal trainer (`python -m app.cli`).
+- `tests/` — Behavioural tests for the evaluator, engine, explanations, CLI.
 
 ## Roadmap
 
-### v0.1 — Basic Strategy Foundation (current)
+### v0.1 — Basic Strategy Foundation (done)
 
 - `RuleProfile` model with two profiles: `MULTI_DECK_H17_DAS_LS` and
   `MULTI_DECK_S17_DAS_LS`.
@@ -47,11 +53,36 @@ through v0.6.
 - **Explicitly excluded:** Hi-Lo, True Count, Illustrious 18, simulator,
   web app.
 
-### v0.2 — Math & Explanations
+### v0.2 — Explanations & CLI (current)
 
-- Add expected-value / house-edge reasoning behind each recommendation.
-- Surface a short "why" for each decision (e.g. dealer bust odds).
-- Compare house edge across rule profiles.
+Delivered:
+
+- **`app/explanations.py`** — concise, plain-language educational notes for
+  every action and for the `BLACKJACK`, `BUST`, and insurance-NO states.
+- **Enriched `Recommendation`** — now carries `action`, `take_insurance`,
+  `reason` (action + educational note), `hand_description`, `profile_key`, and
+  an optional `warnings` list.
+- **Warnings** — surfaced when the dealer shows an Ace (insurance is always
+  NO) and when the chart's preferred play (DOUBLE/SURRENDER/SPLIT) is not legal
+  in the current spot, explaining the best legal fallback.
+- **`app/cli.py`** — a simple terminal trainer:
+
+  ```bash
+  python -m app.cli --cards A,7 --dealer 9 --profile MULTI_DECK_H17_DAS_LS
+  ```
+
+  Prints the action, explanation, profile, and the insurance-NO advice when the
+  dealer shows an Ace.
+- **Tests** — explanation coverage (surrender, double, states), CLI behaviour
+  (`A,7` vs `9`), and the insurance-NO notice on a dealer Ace; all v0.1 tests
+  remain green.
+
+Still **excluded** in v0.2: Hi-Lo counting, True Count, Illustrious 18,
+simulator, web app, real-money/casino features, and any external data
+(PDFs/screenshots/feeds).
+
+Deferred to later versions: deeper expected-value / house-edge analysis and
+per-profile edge comparisons.
 
 ### v0.3 — Card Counting (Hi-Lo) as a Learning Topic
 
