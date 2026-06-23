@@ -7,6 +7,63 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.14.0] - 2026-06-23
+
+Composition-aware probability & EV. The advisor can now use the actual
+composition of the remaining shoe - the player's cards, the dealer upcard, and
+any seen / removed cards - to compute sharper numbers. The dealer final-total
+distribution is computed exactly for that finite shoe; player HIT/DOUBLE EV
+stays an approximate one-card look-ahead and SPLIT EV is simplified. It remains
+advisory only and never changes the strategy recommendation or the Hi-Lo math.
+
+### Added
+
+- `app/probability_advisor.py`: dataclasses `ShoeComposition` and
+  `CompositionAwareProbabilityAdvice`, plus `build_initial_rank_counts`
+  (ten-values aggregated, 52 cards/deck), `remove_known_cards` (accepts plain
+  and suited cards; never goes negative, warns on inconsistency),
+  `build_shoe_composition`, `estimate_player_bust_probability_composition`,
+  `estimate_dealer_outcomes_composition` (exact finite-shoe distribution with
+  depletion + count-vector memoisation; fast for 6-8 decks),
+  `estimate_action_ev_composition`, and `build_composition_aware_advice`.
+- CLI `odds` flags: `--seen-cards <cards>`, `--composition-aware`, and
+  `--composition` (shows the remaining-shoe summary with compact per-rank
+  counts). `--seen-cards` and `--composition` auto-enable composition-aware
+  mode.
+- CLI `coach` flags: `--seen-cards <cards>` and `--composition-aware`, applied
+  to the odds block when combined with `--show-odds` (stacks with
+  `--true-count`).
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.14.0**.
+- `odds` / `coach --show-odds` output now indicates composition-aware status
+  and (for `odds`) decks and cards remaining; the idealised (non-composition)
+  output is unchanged.
+
+### Quality
+
+- Extended `tests/test_probability_advisor.py` (rank-count totals; `remove_known_cards`
+  reduction, face collapse, suited cards, and no-negative warning; shoe
+  composition removal; composition bust for hard 20 / hard 11 / soft; dealer
+  distribution sums to ~1.0 and valid H17 vs S17; composition action EV and the
+  simplified-split warning; composition advice returns a `ShoeComposition`,
+  keeps the recommended action, warns on inconsistent input, and never changes
+  `recommend()`) plus CLI tests for `odds --composition-aware`, `--seen-cards`,
+  `--composition`, and `coach --show-odds` composition variants. Full suite
+  passing; ruff clean.
+
+### Safety
+
+- The composition-aware layer cleanly separates exact (finite-shoe dealer),
+  approximate (player HIT/DOUBLE one-card look-ahead), and simplified (SPLIT)
+  computations, and is advisory only - it never overrides the main strategy
+  recommendation without explicit validation. No change to
+  `strategy_engine.recommend`, the Hi-Lo counting math, adaptive learning,
+  guided coaching, outcome history, or session history. No external
+  dependencies, no large/slow simulations, and no money, bankroll, accounts,
+  tokens, screenshots, or sensitive data.
+
 ## [1.13.0] - 2026-06-23
 
 Adaptive local learning. The coach now grows more useful with practice: it

@@ -1003,6 +1003,76 @@ class TestCliOdds:
         assert "Count-aware advisory" in out
 
 
+class TestCliCompositionAware:
+    """v1.14.0 composition-aware probability & EV advisor."""
+
+    def test_odds_composition_aware(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--composition-aware"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "=== Probability Advisor ===" in out
+        assert "Composition-aware  : yes" in out
+        assert "Cards remaining" in out
+        assert "Action EV estimates" in out
+
+    def test_odds_seen_cards_enables_composition_aware(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--seen-cards", "2\u2663,5\u2666,K\u2660,A\u2665"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Composition-aware  : yes" in out
+        # 2 player + 1 dealer + 4 seen = 7 removed.
+        assert "Cards remaining    : 305" in out
+
+    def test_odds_composition_shows_summary(self, capsys):
+        exit_code = cli.main(["odds", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS",
+                              "--seen-cards", "2\u2663,5\u2666", "--composition"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "-- Shoe composition --" in out
+        assert "Total cards remaining" in out
+        assert "Rank counts" in out
+
+    def test_odds_plain_has_no_composition(self, capsys):
+        # Without any composition flag the original output is preserved.
+        exit_code = cli.main(["odds", "--cards", "A\u2660,7\u2665",
+                              "--dealer", "9\u2666",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Composition-aware" not in out
+        assert "Bust if hit       : 0.0%" in out
+
+    def test_coach_show_odds_composition_aware(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666", "--show-odds",
+                              "--composition-aware",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Odds (approximate)" in out
+        assert "Composition-aware    : yes" in out
+        assert "Recommended action" in out
+
+    def test_coach_show_odds_seen_cards(self, capsys):
+        exit_code = cli.main(["coach", "--cards", "10\u2660,6\u2665",
+                              "--dealer", "10\u2666", "--show-odds",
+                              "--true-count", "1",
+                              "--seen-cards", "2\u2663,5\u2666,K\u2660,A\u2665",
+                              "--profile", "SIX_DECK_H17_DAS_LS"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Composition-aware    : yes" in out
+        assert "Count-aware advisory" in out
+
+
 
 class TestCliLearn:
     """Adaptive local-learning 'learn' command and coach --use-history."""

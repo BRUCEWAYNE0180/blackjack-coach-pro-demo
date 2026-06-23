@@ -409,6 +409,57 @@ These figures are **approximate** (idealised shoe, one-card look-ahead) and
 never override the recommendation: if the best-EV action differs from the
 strategy recommendation, the advisor says so and keeps the recommendation.
 
+## Composition-aware Probability & EV (v1.14.0)
+
+### odds --composition-aware
+
+```bash
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --composition-aware
+```
+
+Uses the **finite-shoe composition** of the remaining cards instead of an
+idealised shoe. The dealer final-total distribution is computed **exactly** for
+that shoe (ten-values aggregated, with depletion as the dealer draws). Player
+HIT/DOUBLE EV is an approximate one-card look-ahead; SPLIT EV is simplified.
+
+### odds --seen-cards
+
+```bash
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --seen-cards 2♣,5♦,K♠,A♥
+blackjack-coach odds --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS --seen-cards 10♣,10♦,A♥
+```
+
+Lists other exposed/removed cards (comma-separated; plain or suited). They are
+removed from the shoe alongside the player's cards and dealer upcard, and the
+flag **auto-enables** composition-aware mode. Declaring impossible compositions
+(e.g. five aces in one deck) produces a clear warning and never negative counts.
+
+### odds --composition
+
+```bash
+blackjack-coach odds --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --seen-cards 2♣,5♦ --composition
+```
+
+Prints a remaining-shoe summary: total cards remaining, removed count, the
+known/seen cards, and compact per-rank counts. Implies `--composition-aware`.
+
+### coach --show-odds (composition-aware)
+
+```bash
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --show-odds --composition-aware
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --true-count 1 --show-odds --seen-cards 2♣,5♦,K♠,A♥
+```
+
+`coach` accepts `--composition-aware` and `--seen-cards`; they apply to the
+odds block when combined with `--show-odds` and stack with `--true-count`. The
+compact block shows the composition-aware status, cards remaining, bust if hit,
+dealer bust, and the best estimated action.
+
+This layer cleanly **separates exact, approximate, and advisory**: exact
+finite-shoe dealer distribution, approximate player HIT/DOUBLE EV, and a
+simplified SPLIT EV (a full exact split tree is future work). It is advisory
+only and never overrides `strategy_engine.recommend()` or the Hi-Lo math.
+
 ## Adaptive local learning (v1.13.0)
 
 ### learn

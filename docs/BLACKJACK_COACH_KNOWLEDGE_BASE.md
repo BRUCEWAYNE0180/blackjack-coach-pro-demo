@@ -848,7 +848,7 @@ says so and keeps the recommendation. Per `PROJECT_RULES.md`, the probability/EV
 layer must label approximations and must not override the main recommendation
 without explicit validation and tests.
 
-### v1.13.0 — Adaptive Local Learning (current)
+### v1.13.0 — Adaptive Local Learning (done)
 
 Adds a read-only adaptive-learning layer so the coach becomes more useful with
 use: it reads the locally saved outcome history to detect patterns, weak spots,
@@ -888,6 +888,44 @@ It is local, transparent, and reversible (read-only over the git-ignored
 `.blackjack_coach/` outcomes; no network, cloud, database, or external
 dependencies; no money, bankroll, accounts, tokens, screenshots, or sensitive
 data) and does not change `strategy_engine.recommend` or the counting math.
+
+### v1.14.0 — Composition-aware Probability & EV Advisor (current)
+
+Upgrades the probability / EV advisor so it can use the **composition of the
+remaining shoe / seen cards**. The user supplies their cards, the dealer
+upcard, the number of decks, the profile, an optional true count, and now also
+any seen / removed cards; the advisor uses that to produce sharper
+probabilities and EV. Ten-values (10/J/Q/K) are aggregated into a single "10"
+rank, which is exact for value-based blackjack.
+
+Delivered:
+
+- **`app/probability_advisor.py`**: `ShoeComposition`,
+  `CompositionAwareProbabilityAdvice`; `build_initial_rank_counts` (A and 2-9 =
+  4/deck, 10 = 16/deck, 52/deck total), `remove_known_cards` (accepts plain and
+  suited cards, never negative, warns on inconsistency), `build_shoe_composition`,
+  `estimate_player_bust_probability_composition`,
+  `estimate_dealer_outcomes_composition` (deterministic recursive enumeration
+  over remaining counts with depletion, honouring H17/S17, memoised on the
+  count vector so it stays fast for 6-8 decks),
+  `estimate_action_ev_composition` (STAND vs the finite-shoe dealer
+  distribution; HIT/DOUBLE one-card composition look-ahead; SURRENDER -0.5;
+  SPLIT simplified with a warning), and `build_composition_aware_advice`
+  (falls back to `build_probability_advice` when not composition-aware).
+- **CLI**: `odds` gains `--seen-cards`, `--composition-aware`, and
+  `--composition` (composition summary); `--seen-cards` / `--composition`
+  auto-enable composition-aware mode. `coach` gains `--seen-cards` and
+  `--composition-aware`, applied to the `--show-odds` block.
+- **Tests**: extended `tests/test_probability_advisor.py` and CLI tests.
+
+**Honest about exactness:** the dealer distribution is exact finite-shoe; the
+player HIT/DOUBLE EV is an approximate one-card look-ahead; SPLIT EV is
+simplified. A **full exact split tree remains future work**. Per
+`PROJECT_RULES.md`, composition-aware probabilities clearly separate exact /
+finite-shoe, approximation, and advisory, and must not override the main
+strategy without explicit validation. It does not change
+`strategy_engine.recommend` or the Hi-Lo counting math, adds no external
+dependencies, and runs no large/slow simulations.
 
 ### v2.0 — Possible Web UI (if decided later)
 

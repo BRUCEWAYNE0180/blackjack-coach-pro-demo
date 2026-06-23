@@ -15,9 +15,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from .cards import RenderedCard, parse_card
 from .decision_audit import legal_actions_for_hand
 from .guided_coach import explain_next_best_action
-from .hand_evaluator import evaluate_hand
+from .hand_evaluator import card_value, evaluate_hand
 from .rules import DEFAULT_PROFILE, RuleProfile
 from .strategy_engine import Action
 
@@ -378,5 +379,504 @@ def build_probability_advice(
         best_estimated_action=best_estimated_action,
         confidence_label="approximate",
         approximation_note=APPROXIMATION_NOTE,
+        warnings=warnings,
+    )
+
+
+
+# ---------------------------------------------------------------------------
+# v1.14.0 - Composition-aware probability & EV
+#
+# These helpers refine the advisory using the *actual* composition of the
+# remaining shoe (player cards, the dealer upcard, and any seen / removed
+# cards the user knows about). Ten-values (10/J/Q/K) are aggregated into a
+# single "10" rank, which is exact for value-based blackjack.
+#
+# The dealer distribution is computed *exactly* for the finite shoe (with card
+# depletion as the dealer draws). Player HIT/DOUBLE EV uses a one-card
+# look-ahead and is therefore *approximate*; SPLIT EV is simplified. As with
+# the rest of this module, it is advisory only and never overrides the
+# strategy recommendation. See docs/PROJECT_RULES.md.
+# ---------------------------------------------------------------------------
+
+# Aggregated ranks: ten-values collapse into "10". Display order is 2..9,10,A.
+COMPOSITION_RANKS: tuple[str, ...] = (
+    "2", "3", "4", "5", "6", "7", "8", "9", "10", "A",
+)
+
+COMPOSITION_APPROXIMATION_NOTE = (
+    "Composition-aware: the dealer final-total distribution is computed exactly "
+    "for the finite shoe of remaining cards (ten-values aggregated). Player "
+    "HIT/DOUBLE EV uses a one-card look-ahead and is approximate; SPLIT EV is "
+    "simplified. Advisory only - it does not override the strategy recommendation."
+)
+_COMPOSITION_ADVISORY_WARNING = (
+    "Composition-aware EV is advisory and does not override the strategy "
+    "recommendation."
+)
+_SPLIT_SIMPLIFIED_WARNING = (
+    "Split EV is simplified (not modelled exactly); follow the strategy "
+    "recommendation for pairs."
+)
+
+
+@dataclass(frozen=True)
+class ShoeComposition:
+    """The remaining-card composition of a (finite) shoe.
+
+    ``rank_counts`` maps an aggregated rank (``"2"``..``"9"``, ``"10"`` for all
+    ten-values, ``"A"``) to how many such cards remain.
+    """
+
+    decks: int
+    rank_counts: dict[str, int]
+    total_cards: int
+    removed_cards: int
+    known_cards: tuple[str, ...]
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class CompositionAwareProbabilityAdvice:
+    """The composition-aware probability / EV advisory for a hand."""
+
+    player_cards: tuple[str, ...]
+    dealer_upcard: str
+    profile_key: str
+    decks: int
+    shoe_composition: ShoeComposition
+    recommended_action: str
+    player_bust_estimate: PlayerBustEstimate
+    dealer_outcome_estimate: DealerOutcomeEstimate
+    action_estimates: list[ActionEVEstimate]
+    best_estimated_action: str | None
+    composition_note: str
+    approximation_note: str
+    warnings: list[str] = field(default_factory=list)
+
+
+def build_initial_rank_counts(decks: int = 6) -> dict[str, int]:
+    """Build the starting per-rank counts for ``decks`` full decks.
+
+    Ten-values (10/J/Q/K) are aggregated into ``"10"`` (16 per deck); every
+    other rank has 4 per deck. The totals therefore come to 52 cards per deck.
+    """
+    if decks < 1:
+        raise ValueError("decks must be >= 1.")
+    counts: dict[str, int] = {}
+    for rank in ("2", "3", "4", "5", "6", "7", "8", "9"):
+        counts[rank] = 4 * decks
+    counts["10"] = 16 * decks
+    counts["A"] = 4 * decks
+    return counts
+
+
+def _card_label(card: RenderedCard | str) -> str:
+    """A readable label for a known/seen card (for display)."""
+    if isinstance(card, RenderedCard):
+        return card.label
+    return str(card).strip()
+
+
+def _aggregated_rank(card: RenderedCard | str) -> str:
+    """Map a card (rank string or RenderedCard, with or without suit) to an
+    aggregated rank key (``"2"``..``"9"``, ``"10"``, ``"A"``).
+
+    Raises:
+        ValueError: If the card cannot be parsed to a known rank.
+    """
+    if isinstance(card, RenderedCard):
+        rank = card.rank
+    else:
+        text = str(card).strip()
+        try:
+            rank = parse_card(text).rank
+        except ValueError:
+            rank = text
+    value = card_value(rank)  # raises ValueError for unknown ranks
+    if value == 11:
+        return "A"
+    if value == 10:
+        return "10"
+    return str(value)
+
+
+def remove_known_cards(
+    rank_counts: dict[str, int],
+    cards: list[RenderedCard | str] | tuple[RenderedCard | str, ...] | None,
+) -> tuple[dict[str, int], list[str]]:
+    """Remove known cards from a per-rank count, never going negative.
+
+    Accepts plain ranks (``"K"``, ``"10"``, ``"A"``) and suited cards
+    (``"K\u2660"``) from :mod:`app.cards`. Returns the updated counts plus a
+    list of clear warnings for any card that could not be removed (e.g. the
+    composition is inconsistent because too many of a rank were declared).
+    """
+    counts = dict(rank_counts)
+    warnings: list[str] = []
+    for card in cards or []:
+        try:
+            key = _aggregated_rank(card)
+        except ValueError:
+            warnings.append(f"Ignored unrecognised card {_card_label(card)!r}.")
+            continue
+        if counts.get(key, 0) <= 0:
+            warnings.append(
+                f"Cannot remove {_card_label(card)} ({key}); none remain in the "
+                "shoe (composition may be inconsistent)."
+            )
+            continue
+        counts[key] -= 1
+    return counts, warnings
+
+
+def _compose(
+    decks: int,
+    known_cards: list[RenderedCard | str] | None,
+    seen_cards: list[RenderedCard | str] | None,
+) -> tuple[ShoeComposition, list[str]]:
+    """Internal: build a ShoeComposition and surface any removal warnings."""
+    base = build_initial_rank_counts(decks)
+    initial_total = sum(base.values())
+    all_removed: list[RenderedCard | str] = list(known_cards or []) + list(
+        seen_cards or []
+    )
+    counts, warnings = remove_known_cards(base, all_removed)
+    total = sum(counts.values())
+    note = "Finite-shoe composition from known player/dealer and seen cards."
+    if warnings:
+        note = note + " " + " ".join(warnings)
+    composition = ShoeComposition(
+        decks=decks,
+        rank_counts=counts,
+        total_cards=total,
+        removed_cards=initial_total - total,
+        known_cards=tuple(_card_label(c) for c in all_removed),
+        note=note,
+    )
+    return composition, warnings
+
+
+def build_shoe_composition(
+    decks: int = 6,
+    known_cards: list[RenderedCard | str] | None = None,
+    seen_cards: list[RenderedCard | str] | None = None,
+) -> ShoeComposition:
+    """Build a :class:`ShoeComposition` for ``decks`` decks minus known cards.
+
+    ``known_cards`` (typically the player's cards and dealer upcard) and
+    ``seen_cards`` (other exposed cards) are removed from the starting counts.
+    """
+    composition, _ = _compose(decks, known_cards, seen_cards)
+    return composition
+
+
+def estimate_player_bust_probability_composition(
+    player_cards: list[str] | tuple[str, ...],
+    shoe_composition: ShoeComposition,
+) -> PlayerBustEstimate:
+    """Estimate the bust chance on one hit using the real remaining composition.
+
+    Soft hands cannot bust on a single card and report 0%.
+    """
+    ev = evaluate_hand(player_cards)
+    total, is_soft = ev.total, ev.is_soft
+
+    if is_soft:
+        return PlayerBustEstimate(
+            player_cards=tuple(player_cards),
+            hand_total=total,
+            is_soft=True,
+            bust_cards=[],
+            safe_cards=list(COMPOSITION_RANKS),
+            bust_probability=0.0,
+            note="Soft hand: a single card cannot bust (the ace absorbs it).",
+        )
+
+    counts = shoe_composition.rank_counts
+    total_cards = shoe_composition.total_cards
+    bust_cards: list[str] = []
+    safe_cards: list[str] = []
+    bust_probability = 0.0
+    for rank in COMPOSITION_RANKS:
+        count = counts.get(rank, 0)
+        min_value = 1 if rank == "A" else _CARD_VALUE[rank]
+        if total + min_value > 21:
+            bust_cards.append(rank)
+            if total_cards > 0 and count > 0:
+                bust_probability += count / total_cards
+        else:
+            safe_cards.append(rank)
+
+    return PlayerBustEstimate(
+        player_cards=tuple(player_cards),
+        hand_total=total,
+        is_soft=False,
+        bust_cards=bust_cards,
+        safe_cards=safe_cards,
+        bust_probability=bust_probability,
+        note=(
+            f"Composition-aware: {bust_probability * 100:.1f}% of the "
+            f"{total_cards} remaining cards would bust a hard {total}."
+        ),
+    )
+
+
+def _dealer_distribution_composition(
+    dealer_upcard: RenderedCard | str,
+    hits_soft_17: bool,
+    rank_counts: dict[str, int],
+) -> dict[str, float]:
+    """Exact finite-shoe dealer final-total distribution (with depletion).
+
+    Buckets: ``"17"``..``"21"`` and ``"bust"``. The shoe is depleted as the
+    dealer draws; memoised on the remaining-count vector plus (total, soft).
+    """
+    order = COMPOSITION_RANKS
+    start_counts = tuple(rank_counts.get(r, 0) for r in order)
+    memo: dict[tuple, dict[str, float]] = {}
+
+    def dist(counts: tuple, total: int, is_soft: bool) -> dict[str, float]:
+        if total > 21:
+            return {"bust": 1.0}
+        stands = total >= 17 and not (total == 17 and is_soft and hits_soft_17)
+        if stands:
+            return {str(total): 1.0}
+        key = (counts, total, is_soft)
+        cached = memo.get(key)
+        if cached is not None:
+            return cached
+        remaining = sum(counts)
+        if remaining <= 0:
+            # Degenerate: no cards left to draw; treat the current total as final.
+            return {str(total): 1.0} if total >= 17 else {"bust": 1.0}
+        out: dict[str, float] = {}
+        for i, rank in enumerate(order):
+            count = counts[i]
+            if count <= 0:
+                continue
+            prob = count / remaining
+            new_counts = counts[:i] + (count - 1,) + counts[i + 1:]
+            nt, ns, _ = _add_card(total, is_soft, rank)
+            for bucket, sub_prob in dist(new_counts, nt, ns).items():
+                out[bucket] = out.get(bucket, 0.0) + prob * sub_prob
+        memo[key] = out
+        return out
+
+    key = _aggregated_rank(dealer_upcard)
+    if key == "A":
+        start_total, start_soft = 11, True
+    else:
+        start_total, start_soft = _CARD_VALUE[key], False
+    return dist(start_counts, start_total, start_soft)
+
+
+def estimate_dealer_outcomes_composition(
+    dealer_upcard: RenderedCard | str,
+    profile: RuleProfile = DEFAULT_PROFILE,
+    shoe_composition: ShoeComposition | None = None,
+) -> DealerOutcomeEstimate:
+    """Exact finite-shoe dealer outcome probabilities (17-21 and bust).
+
+    Falls back to a fresh full shoe (``profile.decks``) if no composition is
+    given. Fast enough for 6-8 decks thanks to count-vector memoisation.
+    """
+    if shoe_composition is None:
+        shoe_composition = build_shoe_composition(decks=profile.decks)
+    raw = _dealer_distribution_composition(
+        dealer_upcard, profile.dealer_hits_soft_17, shoe_composition.rank_counts
+    )
+    probabilities = {
+        "dealer_17": raw.get("17", 0.0),
+        "dealer_18": raw.get("18", 0.0),
+        "dealer_19": raw.get("19", 0.0),
+        "dealer_20": raw.get("20", 0.0),
+        "dealer_21": raw.get("21", 0.0),
+        "dealer_bust": raw.get("bust", 0.0),
+    }
+    return DealerOutcomeEstimate(
+        dealer_upcard=str(
+            dealer_upcard.rank if isinstance(dealer_upcard, RenderedCard)
+            else dealer_upcard
+        ),
+        profile_key=profile.key,
+        probabilities=probabilities,
+        note=(
+            "Exact finite-shoe dealer distribution from remaining composition "
+            f"({'H17' if profile.dealer_hits_soft_17 else 'S17'})."
+        ),
+    )
+
+
+def _one_card_then_stand_composition(
+    total: int,
+    is_soft: bool,
+    raw_dist: dict[str, float],
+    rank_counts: dict[str, int],
+    total_cards: int,
+) -> tuple[float, float, float, float, float]:
+    """Composition-weighted (ev, win, loss, push, bust) for hit-then-stand."""
+    ev = win = loss = push = bust = 0.0
+    if total_cards <= 0:
+        return 0.0, 0.0, 0.0, 0.0, 0.0
+    for rank in COMPOSITION_RANKS:
+        count = rank_counts.get(rank, 0)
+        if count <= 0:
+            continue
+        prob = count / total_cards
+        nt, ns, busted = _add_card(total, is_soft, rank)
+        if busted:
+            ev += prob * -1.0
+            loss += prob
+            bust += prob
+        else:
+            e, w, ln, ps = _stand_outcome(nt, raw_dist)
+            ev += prob * e
+            win += prob * w
+            loss += prob * ln
+            push += prob * ps
+    return ev, win, loss, push, bust
+
+
+def estimate_action_ev_composition(
+    player_cards: list[str] | tuple[str, ...],
+    dealer_upcard: RenderedCard | str,
+    action: Action | str,
+    profile: RuleProfile = DEFAULT_PROFILE,
+    shoe_composition: ShoeComposition | None = None,
+) -> ActionEVEstimate:
+    """Composition-aware EV / outcome probabilities for one action."""
+    if shoe_composition is None:
+        shoe_composition = build_shoe_composition(decks=profile.decks)
+    action_value = action.value if isinstance(action, Action) else str(action).upper()
+    ev_hand = evaluate_hand(player_cards)
+    total, is_soft = ev_hand.total, ev_hand.is_soft
+    raw_dist = _dealer_distribution_composition(
+        dealer_upcard, profile.dealer_hits_soft_17, shoe_composition.rank_counts
+    )
+    counts = shoe_composition.rank_counts
+    total_cards = shoe_composition.total_cards
+
+    legal = {a.value for a in legal_actions_for_hand(player_cards, profile)}
+    if action_value not in legal:
+        return ActionEVEstimate(
+            action=action_value, estimated_ev=None, win_probability=0.0,
+            loss_probability=0.0, push_probability=0.0, bust_probability=0.0,
+            note=f"{action_value} is not legal for this hand/profile.",
+        )
+
+    if action_value == Action.STAND.value:
+        e, w, ln, ps = _stand_outcome(total, raw_dist)
+        return ActionEVEstimate(
+            action=action_value, estimated_ev=e, win_probability=w,
+            loss_probability=ln, push_probability=ps, bust_probability=0.0,
+            note="Stand vs the exact finite-shoe dealer distribution.",
+        )
+
+    if action_value == Action.HIT.value:
+        e, w, ln, ps, bust = _one_card_then_stand_composition(
+            total, is_soft, raw_dist, counts, total_cards)
+        return ActionEVEstimate(
+            action=action_value, estimated_ev=e, win_probability=w,
+            loss_probability=ln, push_probability=ps, bust_probability=bust,
+            note="Composition-weighted one-card-then-stand look-ahead.",
+        )
+
+    if action_value == Action.DOUBLE.value:
+        e, w, ln, ps, bust = _one_card_then_stand_composition(
+            total, is_soft, raw_dist, counts, total_cards)
+        return ActionEVEstimate(
+            action=action_value, estimated_ev=2.0 * e, win_probability=w,
+            loss_probability=ln, push_probability=ps, bust_probability=bust,
+            note="Composition-weighted: one card then stand, stakes doubled.",
+        )
+
+    if action_value == Action.SURRENDER.value:
+        return ActionEVEstimate(
+            action=action_value, estimated_ev=-0.5, win_probability=0.0,
+            loss_probability=0.0, push_probability=0.0, bust_probability=0.0,
+            note="Surrender forfeits half the bet (fixed EV -0.5).",
+        )
+
+    if action_value == Action.SPLIT.value:
+        return ActionEVEstimate(
+            action=action_value, estimated_ev=None, win_probability=0.0,
+            loss_probability=0.0, push_probability=0.0, bust_probability=0.0,
+            note=_SPLIT_SIMPLIFIED_WARNING,
+        )
+
+    return ActionEVEstimate(
+        action=action_value, estimated_ev=None, win_probability=0.0,
+        loss_probability=0.0, push_probability=0.0, bust_probability=0.0,
+        note=f"{action_value} EV is not supported by the advisor.",
+    )
+
+
+def build_composition_aware_advice(
+    player_cards: list[str] | tuple[str, ...],
+    dealer_upcard: RenderedCard | str,
+    profile: RuleProfile = DEFAULT_PROFILE,
+    decks: int = 6,
+    seen_cards: list[RenderedCard | str] | None = None,
+    true_count: float | None = None,
+) -> CompositionAwareProbabilityAdvice:
+    """Assemble the composition-aware probability / EV advisory for a hand.
+
+    The recommended action comes from the coach (engine / deviation) exactly as
+    in :func:`build_probability_advice` and is never overridden by EV. When the
+    best-EV action differs, a clear advisory warning is added.
+    """
+    step = explain_next_best_action(player_cards, dealer_upcard, profile,
+                                    true_count=true_count)
+    recommended_action = (
+        step.final_recommended_action or step.recommended_action
+    ).value
+
+    known_cards: list[RenderedCard | str] = list(player_cards) + [dealer_upcard]
+    composition, comp_warnings = _compose(decks, known_cards, seen_cards)
+
+    bust_estimate = estimate_player_bust_probability_composition(
+        player_cards, composition)
+    dealer_estimate = estimate_dealer_outcomes_composition(
+        dealer_upcard, profile, composition)
+
+    action_estimates = [
+        estimate_action_ev_composition(
+            player_cards, dealer_upcard, a, profile, composition)
+        for a in legal_actions_for_hand(player_cards, profile)
+    ]
+
+    scored = [e for e in action_estimates if e.estimated_ev is not None]
+    best_estimated_action = (
+        max(scored, key=lambda e: e.estimated_ev).action if scored else None
+    )
+
+    warnings = [_COMPOSITION_ADVISORY_WARNING, *comp_warnings]
+    if any(e.action == Action.SPLIT.value and e.estimated_ev is None
+           for e in action_estimates):
+        warnings.append(_SPLIT_SIMPLIFIED_WARNING)
+    if best_estimated_action and best_estimated_action != recommended_action:
+        warnings.append(
+            f"Approximate best-EV action ({best_estimated_action}) differs from "
+            f"the strategy recommendation ({recommended_action}); the "
+            "recommendation stands."
+        )
+
+    return CompositionAwareProbabilityAdvice(
+        player_cards=tuple(player_cards),
+        dealer_upcard=str(
+            dealer_upcard.rank if isinstance(dealer_upcard, RenderedCard)
+            else dealer_upcard
+        ),
+        profile_key=profile.key,
+        decks=decks,
+        shoe_composition=composition,
+        recommended_action=recommended_action,
+        player_bust_estimate=bust_estimate,
+        dealer_outcome_estimate=dealer_estimate,
+        action_estimates=action_estimates,
+        best_estimated_action=best_estimated_action,
+        composition_note=composition.note,
+        approximation_note=COMPOSITION_APPROXIMATION_NOTE,
         warnings=warnings,
     )
