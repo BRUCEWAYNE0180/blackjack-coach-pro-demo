@@ -30,6 +30,13 @@ from .rules import (
     RuleProfile,
     get_profile,
 )
+from .quiz import (
+    QuizQuestion,
+    QuizResult,
+    generate_strategy_question,
+    grade_strategy_answer,
+    normalize_user_action,
+)
 from .shoe import (
     build_shoe,
     cards_remaining,
@@ -61,7 +68,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -75,6 +82,8 @@ __all__ = [
     "PROFILES",
     "PlayedHand",
     "PlayedSplitHand",
+    "QuizQuestion",
+    "QuizResult",
     "Recommendation",
     "RuleProfile",
     "SimulatedHand",
@@ -91,10 +100,13 @@ __all__ = [
     "explain_action",
     "explain_insurance_no",
     "explain_state",
+    "generate_strategy_question",
     "get_profile",
+    "grade_strategy_answer",
     "hilo_value",
     "is_counting_allowed_context",
     "normalize_rank",
+    "normalize_user_action",
     "penetration",
     "play_dealer_hand",
     "play_split_subhand",

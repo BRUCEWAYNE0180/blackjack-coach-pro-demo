@@ -170,3 +170,88 @@ class TestCliPlay:
         assert "Split hand 2:" in out
         assert "Final dealer cards:" in out
         assert "True count after:" in out
+
+
+
+class TestCliQuiz:
+    def test_quiz_with_answer_correct(self, capsys):
+        # seed 42 -> Q,3 vs 2 -> correct STAND.
+        exit_code = cli.main(["quiz", "--seed", "42", "--answer", "S"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Player cards:   Q, 3" in out
+        assert "Dealer upcard:  2" in out
+        assert "Your answer:    STAND" in out
+        assert "Correct action: STAND" in out
+        assert "Result:         Correct" in out
+        assert "Why:" in out
+
+    def test_quiz_with_answer_incorrect(self, capsys):
+        exit_code = cli.main(["quiz", "--seed", "42", "--answer", "H"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Your answer:    HIT" in out
+        assert "Result:         Incorrect" in out
+
+    def test_quiz_full_name_answer(self, capsys):
+        exit_code = cli.main(["quiz", "--seed", "42", "--answer", "stand"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Result:         Correct" in out
+
+    def test_quiz_invalid_answer_errors(self, capsys):
+        exit_code = cli.main(["quiz", "--seed", "42", "--answer", "Z"])
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err
+
+    def test_quiz_interactive_prompt(self, capsys, monkeypatch):
+        # Without --answer, the user is prompted; simulate typing "S".
+        monkeypatch.setattr("builtins.input", lambda *_: "S")
+        exit_code = cli.main(["quiz", "--seed", "42"])
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Result:         Correct" in out
+
+
+class TestCliCountQuiz:
+    def test_count_quiz_correct(self, capsys):
+        # 2(+1) 5(+1) K(-1) A(-1) 9(0) -> running count 0.
+        exit_code = cli.main(
+            ["count-quiz", "--cards", "2,5,K,A,9", "--answer", "0"]
+        )
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Cards:                2, 5, K, A, 9" in out
+        assert "Your answer:          +0" in out
+        assert "Correct running count: +0" in out
+        assert "Result:               Correct" in out
+        assert "educational" in out.lower()
+
+    def test_count_quiz_incorrect(self, capsys):
+        exit_code = cli.main(
+            ["count-quiz", "--cards", "2,5,K,A,9", "--answer", "3"]
+        )
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Your answer:          +3" in out
+        assert "Correct running count: +0" in out
+        assert "Result:               Incorrect" in out
+
+    def test_count_quiz_positive(self, capsys):
+        # 2,3,4,6 -> +4.
+        exit_code = cli.main(
+            ["count-quiz", "--cards", "2,3,4,6", "--answer", "4"]
+        )
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Correct running count: +4" in out
+        assert "Result:               Correct" in out
+
+    def test_count_quiz_invalid_card_errors(self, capsys):
+        exit_code = cli.main(
+            ["count-quiz", "--cards", "2,Z", "--answer", "1"]
+        )
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err
