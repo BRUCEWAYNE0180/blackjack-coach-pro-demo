@@ -118,6 +118,12 @@ tool relies on and the project's evolution.
   `build_drill_session_record`, save/load/list, `build_spot_history` (per-spot
   mastery), and `summarize_drill_history`. Saves graded drills locally and
   suggests review; never changes the correct answers or the recommendation.
+- `app/review_scheduler.py` — Local drill review scheduler & streaks:
+  `ReviewScheduleItem`, `ReviewQueue`, `DrillStreakSummary`, plus
+  `parse_date_or_today`, `calculate_due_date`, `build_review_queue`,
+  `build_drill_streak_summary`, the text / Markdown renderers, and
+  `export_review_queue`. Schedules local reviews from the drill history; never
+  changes the correct answers or the recommendation.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -146,8 +152,8 @@ tool relies on and the project's evolution.
   `deviation-quiz`, `diagnose`, `profiles`, `split-rules`, `matrix`,
   `audit`, `outcomes`, `coach`, `coach-play`, `odds`, `learn`, `ev-review`,
   `report`, and `dashboard` subcommands, plus `drill` (with `--save` /
-  `--review`); `odds`/`coach --show-odds` accept `--explain-ev` and `ev-review`
-  accepts `--explain` / `--large-gaps-only`).
+  `--review`) and `review-queue`; `odds`/`coach --show-odds` accept
+  `--explain-ev` and `ev-review` accepts `--explain` / `--large-gaps-only`).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -1243,7 +1249,7 @@ the Strategy-vs-EV engine, the reporting module, or the dashboard. Per
 promising results, and uses no external dependencies, network, cloud, or
 database.
 
-### v1.22.0 — Drill Session History & Spaced Review (current)
+### v1.22.0 — Drill Session History & Spaced Review (done)
 
 Builds on the v1.21.0 drill generator. The generator could create and grade
 drills but did not remember them; v1.22.0 saves graded drill sessions locally
@@ -1279,6 +1285,40 @@ stores no sensitive data, suggests review without promising results, keeps files
 under the git-ignored `.blackjack_coach/drill_sessions` tree (unless a
 `--drill-dir` is given), and uses no external dependencies, network, cloud, or
 database.
+
+### v1.23.0 — Drill Review Queue & Streaks (current)
+
+Builds on the v1.22.0 drill history. The history could summarise mastery but did
+not schedule reviews; v1.23.0 adds a local spaced-repetition queue (due / overdue
+/ upcoming) and a practice-streak summary, so the user knows what to practise
+today and can see local progress. It never re-derives the correct play (that
+comes from the saved drill results / strategy engine) and never changes play.
+
+Delivered:
+
+- **`app/review_scheduler.py`**: `ReviewScheduleItem` (spot, mastery, accuracy,
+  due date, days-until-due, is-due, priority, reason), `ReviewQueue` (due /
+  overdue / upcoming counts, items, notes), and `DrillStreakSummary` (active
+  days, current / longest streak, last practice date). Functions:
+  `parse_date_or_today`, `calculate_due_date` (intervals by mastery),
+  `build_review_queue`, `build_drill_streak_summary`, `render_review_queue`,
+  `render_streak_summary`, `render_review_queue_markdown`, and
+  `export_review_queue`.
+- **CLI**: new `review-queue` command with `--profile`, `--limit`,
+  `--drill-dir`, `--today`, `--due-only`, `--streaks`, `--markdown`, `--export`,
+  and `--output`.
+- **Tests**: new `tests/test_review_scheduler.py` and `TestCliReviewQueue` in
+  `tests/test_cli.py`.
+
+**Limits / honesty:** the scheduler is local practice training. It never
+re-derives or changes the correct answers, and never changes
+`strategy_engine.recommend`, the Hi-Lo math, adaptive learning, guided coaching,
+outcome / session history, the EV-snapshot history, the Strategy-vs-EV engine,
+reporting, the dashboard, the drill generator, or the drill history. Per
+`PROJECT_RULES.md` it stores no sensitive data, suggests review without promising
+results, keeps exported files under the git-ignored `.blackjack_coach/reports`
+tree (unless an `--output` path is given), and uses no external dependencies,
+network, cloud, or database.
 
 ### v2.0 — Possible Web UI (if decided later)
 
