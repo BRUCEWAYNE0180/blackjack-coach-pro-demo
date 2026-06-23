@@ -1510,6 +1510,25 @@ def build_coach_step_output(step, player_display=None, dealer_display=None) -> s
         ("Fallback applied", "yes" if step.fallback_applied else "no"),
         ("Legal actions", format_cards([a.value for a in step.legal_actions])),
     ])
+
+    if step.true_count is not None:
+        final_action = (step.final_recommended_action.value
+                        if step.final_recommended_action else
+                        step.recommended_action.value)
+        count_rows = [
+            ("True count", f"{step.true_count:g}"),
+            ("Basic action", (step.basic_action or step.recommended_action).value),
+        ]
+        if step.count_adjusted_action is not None:
+            count_rows.append(("Count-adjusted action", step.count_adjusted_action.value))
+        count_rows.append(("Deviation applied", "yes" if step.deviation_applied else "no"))
+        if step.deviation_applied and step.deviation_title:
+            count_rows.append(("Deviation rule", step.deviation_title))
+        count_rows.append(("Final recommended action", final_action))
+        lines.append("")
+        lines.append(format_section("Count-aware advisory"))
+        lines += _kv_block(count_rows)
+
     lines.append("")
     lines.append(format_kv("Why", step.explanation))
 
@@ -1540,6 +1559,9 @@ def build_coach_parser() -> argparse.ArgumentParser:
     parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
                         choices=sorted(PROFILES),
                         help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
+    parser.add_argument("--true-count", type=float, default=None, dest="true_count",
+                        help="Optional Hi-Lo true count; folds in the "
+                             "educational deviation study when one applies.")
     return parser
 
 
@@ -1553,7 +1575,8 @@ def _run_coach(argv: Sequence[str]) -> int:
         dealer_card = cards_mod.parse_card(args.dealer)
         profile = get_profile(args.profile)
         step = build_coach_step(cards_mod.cards_to_ranks(cards),
-                                dealer_card.rank, profile)
+                                dealer_card.rank, profile,
+                                true_count=args.true_count)
     except (ValueError, KeyError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
@@ -1569,21 +1592,27 @@ def _run_coach(argv: Sequence[str]) -> int:
 def build_coach_play_output(result) -> str:
     """Render a fully coached, simulated hand for the terminal."""
     lines = [format_header("Guided Coach - Played Hand")]
-    lines += _kv_block([
+    top_rows = [
         ("Profile", result.profile_key),
         ("Starting cards", _render_cards(list(result.initial_player_cards), decorative=True)),
         ("Dealer upcard", _render_cards([result.dealer_upcard], decorative=True)),
-    ])
+    ]
+    if result.true_count is not None:
+        top_rows.append(("True count (advisory)", f"{result.true_count:g}"))
+    lines += _kv_block(top_rows)
 
     for step in result.coach_steps:
         lines.append("")
         lines.append(format_section(f"Step {step.step_id}"))
-        lines += _kv_block([
+        step_rows = [
             ("Player cards", _render_cards(list(step.player_cards), decorative=True)),
             ("Dealer upcard", _render_cards([step.dealer_upcard], decorative=True)),
             ("Coach recommends", step.recommended_action.value),
-            ("Why", step.explanation),
-        ])
+        ]
+        if step.true_count is not None:
+            step_rows.append(("True count", f"{step.true_count:g}"))
+        step_rows.append(("Why", step.explanation))
+        lines += _kv_block(step_rows)
 
     lines.append("")
     lines.append(format_section("Result"))
@@ -1628,6 +1657,10 @@ def build_coach_play_parser() -> argparse.ArgumentParser:
     parser.add_argument("--outcome-dir", default=None, dest="outcome_dir",
                         help="Directory for the saved outcome (default: "
                              "./.blackjack_coach/outcomes).")
+    parser.add_argument("--true-count", type=float, default=None, dest="true_count",
+                        help="Optional Hi-Lo true count, shown as advisory "
+                             "context per step (the hand is played with basic "
+                             "strategy).")
     return parser
 
 
@@ -1640,7 +1673,8 @@ def _run_coach_play(argv: Sequence[str]) -> int:
         profile = get_profile(args.profile)
         # Play once so the same hand backs both the display and any saved outcome.
         hand = play_training_hand(decks=args.decks, seed=args.seed, profile=profile)
-        result = build_guided_result(hand, profile, args.seed)
+        result = build_guided_result(hand, profile, args.seed,
+                                     true_count=args.true_count)
     except (ValueError, KeyError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2

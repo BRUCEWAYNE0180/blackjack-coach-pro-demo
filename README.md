@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.10.0 feature summary
+## v1.11.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -75,6 +75,10 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 - **Professional card display** (v1.10.0): enter and see cards with suits and
   colour (`A♠`, `10♥`, `K♦`, `8♣`) - hearts/diamonds in red - with `--no-color`
   and `--plain-cards` options. Visual only; the engine still uses plain ranks.
+- **Count-aware coach advice** (v1.11.0): pass an optional `--true-count` to
+  `coach` / `coach-play` and the coach compares basic strategy with the
+  educational deviation study, showing the basic action, the count-adjusted
+  action, and the final recommendation.
 
 ## Terminal visual polish (v1.1.0)
 
@@ -691,6 +695,49 @@ existing auto-simulation; `audit` is the **technical** breakdown; and
 `diagnose` is the **expanded** explanation. The coach never modifies the
 strategy engine - it only reads it.
 
+## Count-aware coach advice (v1.11.0)
+
+By default the coach uses basic strategy. If you also know the **true count**,
+pass `--true-count` and the coach folds in the educational deviation study,
+comparing the basic play with the count-adjusted play and choosing a final
+recommendation.
+
+```bash
+blackjack-coach coach --cards 10♠,6♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --true-count 1
+blackjack-coach coach --cards 10♠,5♥ --dealer 10♦ --profile SIX_DECK_H17_DAS_LS --true-count 4
+blackjack-coach coach --cards A♠,7♥ --dealer 9♦ --profile SIX_DECK_H17_DAS_LS
+blackjack-coach coach-play --decks 6 --seed 42 --profile SIX_DECK_H17_DAS_LS --true-count 1
+```
+
+```text
+=== Guided Coach ===
+Cards             : 10♠, 6♥
+Dealer upcard     : 10♦
+Profile           : SIX_DECK_H17_DAS_LS
+Hand              : Hard 16 vs dealer 10
+Recommended action: SURRENDER
+...
+-- Count-aware advisory --
+True count              : 1
+Basic action            : SURRENDER
+Count-adjusted action   : STAND
+Deviation applied       : yes
+Deviation rule          : Hard 16 vs 10: stand at TC >= 0
+Final recommended action: STAND
+```
+
+- **No `--true-count`**: basic strategy / audit only, exactly as before; no
+  deviation is applied.
+- **With `--true-count`**: if a studied deviation applies, the final action
+  becomes the deviation action and the explanation names the rule; otherwise the
+  final action stays the basic play and the coach says no deviation applies.
+- `coach-play --true-count` shows the true count per step as **advisory context
+  only** - the hand is still played with basic strategy.
+
+The deviation set is intentionally small (study only). The insurance deviation
+is never the coach's final action - insurance advice stays NO. The basic engine
+recommendation is always preserved and never modified.
+
 ## Professional card display (v1.10.0)
 
 Enter and see cards with figures, suits, and colour, so the coach feels like a
@@ -746,14 +793,14 @@ Python 3.9-3.12 for every push to `main` and every pull request
 
 ## Scope and roadmap
 
-v1.10.0 adds a professional card renderer (`app/cards.py`): cards can be entered
-and shown with suits and colour (`A♠`, `10♥`, ...), with `--no-color` and
-`--plain-cards` options, across the card-facing commands. It is a display /
-input layer only - the engine always receives plain ranks, so strategy,
-counting, outcomes, and scoring are unchanged. No changes to basic strategy,
-Hi-Lo math, deviations, the simulator, the matrix/audit tooling, outcome
-history, or guided coaching. It is a professional coach for local practice,
-demo money, video games, recreational tournaments, and training.
+v1.11.0 makes the guided coach count-aware: an optional `--true-count` on
+`coach` / `coach-play` folds in the educational deviation study, keeping basic
+action, count-adjusted action, and final recommendation separate (and the
+insurance study rule never becomes a final action). Without a true count the
+coach uses basic strategy as before. No changes to `strategy_engine.recommend`,
+Hi-Lo counting math, the simulator, outcome history, or session history. It is a
+professional coach for local practice, demo money, video games, recreational
+tournaments, and training.
 
 Planned next (educational/local only): a possible v2.0 web UI if decided later.
 See
