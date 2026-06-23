@@ -120,6 +120,15 @@ As of v0.9 the project enforces these gates on every change:
   `max_split_hands` is never exceeded; split aces with `hit_split_aces=false`
   take exactly one card and stop; split aces with `hit_split_aces=true` play
   normally; and double-after-split is honoured per profile.
+- **Any new decision table or matrix change needs a coverage audit and
+  cell tests.** Decision-coverage tooling (v1.7.0: `app/strategy_matrix.py` and
+  `app/decision_audit.py`) must keep proving full coverage. Whenever a strategy
+  table, a representative-hand set, or a matrix generator changes, the suite
+  must re-verify: every hard total (5-21), soft total (13-21), and pair (A,A and
+  2,2..10,10) is covered against dealer 2-10 and A; there are no missing cells;
+  every cell yields a valid `Action`; and fallback cells are detected for
+  profiles that restrict surrender / double / split. Coverage tooling reads
+  `strategy_engine.recommend` and must never change basic strategy.
 
 ## 8. Release Rules
 

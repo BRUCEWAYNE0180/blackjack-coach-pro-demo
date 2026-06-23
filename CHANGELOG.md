@@ -7,6 +7,54 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.7.0] - 2026-06-23
+
+Complete strategy-matrix audit and per-hand decision audit. Makes the coach
+more confident and transparent: it can now print a full basic-strategy decision
+matrix for any profile, audit its coverage, and explain for any single hand how
+the recommendation was reached (direct table play or a legal fallback). Basic
+strategy itself is unchanged: both new layers only read
+`strategy_engine.recommend`.
+
+### Added
+
+- `app/strategy_matrix.py`: `StrategyCell`, `StrategyMatrix`,
+  `MatrixAuditReport`, the generators `generate_hard_total_matrix`,
+  `generate_soft_total_matrix`, `generate_pair_matrix`,
+  `generate_strategy_matrix`, plus `audit_strategy_matrix` and
+  `format_strategy_matrix`. A full matrix covers hard 5-21, soft 13-21, and
+  pairs (A,A and 2,2..10,10) against dealer 2-10 and A: 360 cells per profile.
+- `app/decision_audit.py`: `DecisionAudit`, `audit_decision`,
+  `legal_actions_for_hand`, `detect_strategy_category`, and
+  `detect_table_section`.
+- CLI `matrix` command (`--profile`, `--section hard|soft|pairs|all`,
+  `--audit`): prints the compact matrix with a dealer 2-10,A header and a
+  coverage summary (total / fallback / missing cells, warnings).
+- CLI `audit` command (`--cards`, `--dealer`, `--profile`): reports a hand's
+  category, table section, recommended vs raw table action, fallback applied,
+  legal actions, warnings, and a plain explanation.
+
+### Changed
+
+- `diagnose` now includes a compact audit summary (table section, raw table
+  action, fallback applied, legal actions, profile rules) so it explains both
+  the *why* and the underlying mechanics.
+- Bumped the package and `app.__version__` to **1.7.0**.
+
+### Quality
+
+- New deterministic suites `tests/test_strategy_matrix.py` and
+  `tests/test_decision_audit.py` plus CLI tests for `matrix`, `audit`, and the
+  `diagnose` audit summary. Full suite passing; ruff clean; CI on Python
+  3.9-3.12.
+
+### Safety
+
+- Coverage / explainability only: no change to basic strategy, the engine
+  recommendation, deviations, the simulator, or session history. No casino
+  connectivity, real betting, bankroll, camera/video, scraping, or promise of
+  winnings. Responsible scope is preserved.
+
 ## [1.6.0] - 2026-06-23
 
 Full re-split tree simulator. Completes the split/re-split logic that v1.5.0

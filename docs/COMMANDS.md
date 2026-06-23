@@ -236,5 +236,37 @@ split; 2+ considers a re-split).
 In v1.5.0 the simulator and `diagnose` are profile-aware: split aces get one
 card each when `hit_split_aces` is false, split sub-hands double only when
 `double_after_split` is allowed, and re-split is gated by `resplit_allowed` /
-`max_split_hands` (full multi-round re-split is still simplified, with an honest
-warning).
+`max_split_hands`. As of v1.6.0 the `play` simulator plays the full re-split
+tree (see the `play` section above).
+
+## Complete strategy matrix and decision audit (v1.7.0)
+
+### matrix
+
+```bash
+blackjack-coach matrix --profile SIX_DECK_H17_DAS_LS --section hard
+blackjack-coach matrix --profile SIX_DECK_H17_DAS_LS --section pairs --audit
+blackjack-coach matrix --profile SINGLE_DECK_H17_NDAS_NS --section all
+```
+
+Prints the complete basic-strategy decision matrix for a profile: hard totals
+5-21, soft totals 13-21, and pairs (A,A and 2,2..10,10) against dealer 2-10 and
+A (360 cells). `--section` selects `hard`, `soft`, `pairs`, or `all` (default).
+Action codes are uppercase for a direct chart play and lowercase when a legal
+fallback was applied. A coverage summary reports total / fallback / missing
+cells and warnings; `--audit` adds the detailed list of fallback and missing
+cells plus the fallback notes.
+
+### audit
+
+```bash
+blackjack-coach audit --cards A,7 --dealer 9 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach audit --cards 10,6 --dealer 10 --profile SINGLE_DECK_H17_NDAS_NS
+```
+
+Audits a single hand: its category, the strategy table consulted, the raw chart
+action vs the recommended action, whether a legal fallback was applied (with the
+reason), the legal actions under the profile, any warnings, and a plain-language
+explanation. Reads the stable strategy engine and never modifies it. The
+`diagnose` command also shows a compact version of this audit.
+
