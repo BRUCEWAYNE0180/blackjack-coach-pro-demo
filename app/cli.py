@@ -1,8 +1,12 @@
 """Command-line interface for Blackjack Coach Pro Demo.
 
-A small terminal entry point for practising basic strategy. Example:
+A small terminal entry point. Two forms are supported:
 
     python -m app.cli --cards A,7 --dealer 9 --profile MULTI_DECK_H17_DAS_LS
+    python -m app.cli count --cards 2,5,K,A,9 --decks-remaining 5
+
+The first prints a basic-strategy recommendation; the second runs the Hi-Lo
+counting trainer (educational / simulated practice only).
 
 Educational/practice tool only: it never connects to a casino, places real
 bets, uses any camera/video, or promises winnings. See docs/PROJECT_RULES.md.
@@ -14,6 +18,7 @@ import argparse
 import sys
 from collections.abc import Sequence
 
+from .counting import CountingState
 from .explanations import explain_insurance_no
 from .rules import DEFAULT_PROFILE, PROFILES, get_profile
 from .strategy_engine import Recommendation, recommend
@@ -56,6 +61,42 @@ def build_output(rec: Recommendation, dealer_upcard: str) -> str:
             lines.append(f"  - {w}")
 
     return "\n".join(lines)
+
+
+def build_count_output(state: CountingState) -> str:
+    """Render a Hi-Lo counting state as human-readable terminal output."""
+    lines = [
+        "Hi-Lo counting (educational / simulated practice)",
+        f"Cards seen:       {state.cards_seen}",
+        f"Running count:    {state.running_count:+d}",
+        f"Decks remaining:  {state.decks_remaining}",
+        f"True count:       {state.true_count:+.2f}",
+        f"Note:             {state.note}",
+    ]
+    return "\n".join(lines)
+
+
+def build_count_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'count' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli count",
+        description=(
+            "Hi-Lo counting trainer (educational / simulated only). "
+            "Not for real tables: no betting, no camera/video, no winnings."
+        ),
+    )
+    parser.add_argument(
+        "--cards",
+        required=True,
+        help="Cards observed, comma-separated, e.g. '2,5,K,A,9'.",
+    )
+    parser.add_argument(
+        "--decks-remaining",
+        required=True,
+        type=float,
+        help="Approximate decks remaining in the shoe (must be > 0).",
+    )
+    return parser
 
 
 
@@ -102,8 +143,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """CLI entry point. Returns a process exit code."""
+def _run_strategy(argv: Sequence[str] | None) -> int:
+    """Handle the default basic-strategy recommendation command."""
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -124,6 +165,35 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     print(build_output(rec, args.dealer))
     return 0
+
+
+def _run_count(argv: Sequence[str]) -> int:
+    """Handle the 'count' Hi-Lo trainer subcommand."""
+    parser = build_count_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        cards = _parse_cards(args.cards)
+        state = CountingState.from_cards(cards, args.decks_remaining)
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    print(build_count_output(state))
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """CLI entry point. Returns a process exit code.
+
+    Supports two forms:
+        python -m app.cli --cards A,7 --dealer 9      (basic-strategy advice)
+        python -m app.cli count --cards 2,5,K --decks-remaining 5  (Hi-Lo)
+    """
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args and args[0] == "count":
+        return _run_count(args[1:])
+    return _run_strategy(args)
 
 
 if __name__ == "__main__":  # pragma: no cover

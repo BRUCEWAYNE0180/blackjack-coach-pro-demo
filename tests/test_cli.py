@@ -61,3 +61,43 @@ class TestCliErrors:
         # argparse rejects an unknown choice with SystemExit.
         with pytest.raises(SystemExit):
             cli.main(["--cards", "A,7", "--dealer", "9", "--profile", "BOGUS"])
+
+
+class TestCliCount:
+    def test_count_basic(self, capsys):
+        exit_code = cli.main(
+            ["count", "--cards", "2,5,K,A,9", "--decks-remaining", "5"]
+        )
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Cards seen:       5" in out
+        assert "Running count:    +0" in out
+        assert "Decks remaining:  5.0" in out
+        assert "True count:       +0.00" in out
+        # Educational note present.
+        assert "educational" in out.lower()
+
+    def test_count_positive_true_count(self, capsys):
+        exit_code = cli.main(
+            ["count", "--cards", "2,3,4,6", "--decks-remaining", "2"]
+        )
+        out = capsys.readouterr().out
+        assert exit_code == 0
+        assert "Running count:    +4" in out
+        assert "True count:       +2.00" in out
+
+    def test_count_zero_decks_errors(self, capsys):
+        exit_code = cli.main(
+            ["count", "--cards", "2,5", "--decks-remaining", "0"]
+        )
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "decks_remaining" in err
+
+    def test_count_invalid_card_errors(self, capsys):
+        exit_code = cli.main(
+            ["count", "--cards", "2,Z", "--decks-remaining", "3"]
+        )
+        err = capsys.readouterr().err
+        assert exit_code == 2
+        assert "Error" in err
