@@ -7,6 +7,55 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.6.0] - 2026-06-23
+
+Full re-split tree simulator. Completes the split/re-split logic that v1.5.0
+began: the local play simulator now plays a real re-split tree instead of
+treating re-splits as a simplified warning. No changes to basic strategy,
+Hi-Lo math, deviations, or session history.
+
+### Added
+
+- `app/simulator.py`: `_play_split_tree` and `_play_out_position`, which build
+  and play a full split / re-split tree from an opening pair.
+- `SplitSubHand` now records `hand_id` (1-based play order), `split_depth`
+  (1 = initial split, 2+ = re-split), and `from_resplit`.
+- `PlayedSplitHand.num_split_hands` reports the final number of sub-hands.
+- `RESPLIT_LIMIT_REACHED` marker, recorded when a pair would re-split but the
+  rules forbid it (re-split disallowed or `max_split_hands` reached).
+
+### Changed
+
+- The simulator now plays real re-splits up to `profile.max_split_hands`,
+  honouring `resplit_allowed`, `hit_split_aces`, and `double_after_split`:
+  - A split hand that is again a pair is re-split when basic strategy says so
+    and the rules allow it.
+  - When `resplit_allowed` is false, or `max_split_hands` is reached, the pair
+    is played as a normal total with a clear warning.
+  - Split aces with `hit_split_aces=false` receive exactly one card and stop;
+    with `hit_split_aces=true` they play normally (and may re-split).
+- `play` output shows the number of split hands and, per sub-hand, whether it
+  came from a split or a re-split (with its depth).
+- `diagnose` and rule-profile notes updated: re-split / max-split-hands are now
+  enforced by the simulator, not descriptive metadata.
+- The legacy `RESPLIT_NOT_IMPLEMENTED` marker is no longer produced (kept only
+  so external imports do not break).
+- Bumped the package and `app.__version__` to **1.6.0**.
+
+### Quality
+
+- Added a deterministic `TestFullResplitTree` suite plus a CLI re-split test;
+  updated existing split tests for the real tree. Full suite passing; ruff
+  clean; CI on Python 3.9-3.12.
+
+### Safety
+
+- Behaviour change is local/simulated coaching only; basic strategy, the engine
+  recommendation, deviations, and session history are unchanged. No casino
+  connectivity, real betting, bankroll, camera/video, scraping, or promise of
+  winnings. Responsible scope is preserved in the Safety / Educational Scope
+  section.
+
 ## [1.5.0] - 2026-06-23
 
 Profile-aware split rules. Promotes part of the v1.4.0 profile metadata from

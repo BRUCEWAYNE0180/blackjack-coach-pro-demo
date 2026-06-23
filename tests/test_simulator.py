@@ -8,12 +8,14 @@ from app.counting import hilo_value
 from app.rules import MULTI_DECK_H17_DAS_LS, MULTI_DECK_S17_DAS_LS
 from app.shoe import build_shoe, shuffle_shoe
 from app.simulator import (
+    RESPLIT_LIMIT_REACHED,
     RESPLIT_NOT_IMPLEMENTED,
     HandOutcome,
     PlayedHand,
     PlayedSplitHand,
     SimulatedHand,
     SplitSubHand,
+    _play_split_hands,
     can_split_hand,
     deal_initial_hand,
     play_dealer_hand,
@@ -245,10 +247,16 @@ class TestPlayTrainingHandSplit:
 
     def test_two_split_hands_and_outcomes(self):
         hand = play_training_hand(decks=6, seed=SPLIT_SEED)
-        assert len(hand.split_hands) == 2
-        assert len(hand.outcomes_by_hand) == 2
-        assert len(hand.actions_by_hand) == 2
-        assert len(hand.recommendations_by_hand) == 2
+        # The full re-split tree produces at least the two initial hands; all
+        # per-hand lists stay aligned with the number of sub-hands.
+        n = len(hand.split_hands)
+        assert n >= 2
+        assert hand.num_split_hands == n
+        assert len(hand.outcomes_by_hand) == n
+        assert len(hand.actions_by_hand) == n
+        assert len(hand.recommendations_by_hand) == n
+        # Sub-hands are numbered 1..n in play order.
+        assert [s.hand_id for s in hand.split_hands] == list(range(1, n + 1))
 
     def test_outcomes_are_resolved(self):
         hand = play_training_hand(decks=6, seed=SPLIT_SEED)
@@ -273,22 +281,19 @@ class TestPlayTrainingHandSplit:
         assert a.running_count_after == b.running_count_after
 
     def test_split_aces_warns_but_resolves(self):
-        # Seed 164 deals a pair of Aces; v0.6 warns and plays both hands.
+        # Seed 164 deals a pair of Aces; each hand gets one card and resolves.
         hand = play_training_hand(decks=6, seed=164)
         assert hand.original_player_cards == ("A", "A")
         assert any("Split Aces" in w for w in hand.warnings)
-        assert len(hand.outcomes_by_hand) == 2
+        assert len(hand.outcomes_by_hand) == hand.num_split_hands
 
-    def test_resplit_is_played_as_total_with_warning(self):
-        # Seed 428 produces a sub-hand that would re-split; it is played as a
-        # normal total and a warning is recorded.
-        from app.simulator import RESPLIT_NOT_IMPLEMENTED
-
+    def test_resplit_no_longer_uses_legacy_marker(self):
+        # As of v1.6.0 the simulator plays a real re-split tree, so the legacy
+        # RESPLIT_NOT_IMPLEMENTED marker is never produced during play.
         hand = play_training_hand(decks=6, seed=428)
-        assert any(
+        assert not any(
             RESPLIT_NOT_IMPLEMENTED in actions for actions in hand.actions_by_hand
         )
-        assert any("re-split" in w for w in hand.warnings)
 
 
 
@@ -333,7 +338,130 @@ class TestProfileAwareSplits:
         assert sub.is_complete is True
 
     def test_resplit_blocked_warning(self):
+        # With re-splitting disallowed, a pair sub-hand is played as a normal
+        # total, flagged with the RESPLIT_LIMIT_REACHED marker and a warning.
         no_resplit = _replace(H17, resplit_allowed=False)
-        hand = play_training_hand(decks=6, seed=RESPLIT_SEED, profile=no_resplit)
-        if any(RESPLIT_NOT_IMPLEMENTED in a for a in hand.actions_by_hand):
-            assert any("not allowed" in w.lower() for w in hand.warnings)
+        # 8,8 vs 6 (hole 10). Both initial hands draw another 8 -> would split,
+        # but cannot; played as totals. Tail feeds the dealer.
+        shoe = list(reversed(["8", "8"] + ["10"] * 8))
+        hand = _play_split_hands(shoe, ["8", "8"], "6", "10", 0, 0, no_resplit)
+        assert hand.num_split_hands == 2
+        assert all(
+            RESPLIT_LIMIT_REACHED in actions for actions in hand.actions_by_hand
+        )
+        assert any("not allowed" in w.lower() for w in hand.warnings)
+
+
+class TestFullResplitTree:
+    """Deterministic coverage of the v1.6.0 full split / re-split tree.
+
+    These tests stack the shoe explicitly. ``draw_card`` pops from the end of
+    the list, so the *last* element is drawn first; helpers build the shoe by
+    reversing the intended draw order and padding the dealer's draws.
+    """
+
+    @staticmethod
+    def _shoe(draw_order, dealer_pad=12):
+        # Cards are drawn from the end; reverse the intended draw order so that
+        # draw_order[0] is popped first. The dealer's padding tens must be drawn
+        # *after* the player's cards, so they go at the front of the list.
+        return ["10"] * dealer_pad + list(reversed(list(draw_order)))
+
+    def test_resplit_allowed_up_to_max_split_hands(self):
+        # 8,8 vs 6. First hand draws 8 -> re-split; one child draws 8 -> re-split
+        # again, reaching the 4-hand maximum. Remaining positions draw a 10.
+        draw = ["8", "8", "10", "10", "10", "10"]
+        hand = _play_split_hands(self._shoe(draw), ["8", "8"], "6", "10",
+                                 0, 0, H17)
+        assert hand.num_split_hands == 4
+        assert len(hand.split_hands) == 4
+        # Some hands came from re-splitting (depth >= 2).
+        assert any(s.from_resplit for s in hand.split_hands)
+        assert max(s.split_depth for s in hand.split_hands) >= 3
+
+    def test_max_split_hands_is_respected_with_warning(self):
+        # Force a pair to appear once the 4-hand cap is already reached.
+        draw = ["8", "8", "10", "10", "8", "10"]
+        hand = _play_split_hands(self._shoe(draw), ["8", "8"], "6", "10",
+                                 0, 0, H17)
+        # Never more than the profile maximum.
+        assert hand.num_split_hands <= H17.max_split_hands == 4
+        assert any(
+            RESPLIT_LIMIT_REACHED in actions for actions in hand.actions_by_hand
+        )
+        assert any("maximum" in w.lower() for w in hand.warnings)
+
+    def test_resplit_blocked_when_not_allowed(self):
+        no_resplit = _replace(H17, resplit_allowed=False)
+        draw = ["8", "8"]  # both initial hands become 8,8 pairs
+        hand = _play_split_hands(self._shoe(draw), ["8", "8"], "6", "10",
+                                 0, 0, no_resplit)
+        assert hand.num_split_hands == 2  # no re-split occurred
+        assert all(
+            RESPLIT_LIMIT_REACHED in actions for actions in hand.actions_by_hand
+        )
+        assert any("not allowed" in w.lower() for w in hand.warnings)
+
+    def test_split_aces_no_hit_one_card_and_stop(self):
+        # Default H17 does not allow hitting split aces.
+        draw = ["9", "7"]
+        hand = _play_split_hands(self._shoe(draw), ["A", "A"], "6", "10",
+                                 0, 0, H17)
+        assert hand.num_split_hands == 2
+        for sub in hand.split_hands:
+            assert sub.actions_taken == ["ONE_CARD"]
+            assert len(sub.cards) == 2
+        assert any("one card" in w.lower() for w in hand.warnings)
+
+    def test_split_aces_no_resplit_even_when_paired(self):
+        # Two aces are drawn as partners; without hit-split-aces the hands must
+        # still receive exactly one card and never re-split.
+        draw = ["A", "A"]
+        hand = _play_split_hands(self._shoe(draw), ["A", "A"], "6", "10",
+                                 0, 0, H17)
+        assert hand.num_split_hands == 2
+        for sub in hand.split_hands:
+            assert sub.actions_taken == ["ONE_CARD"]
+
+    def test_split_aces_hit_allowed_plays_normally(self):
+        hit_aces = _replace(H17, hit_split_aces=True)
+        # First ace draws another ace -> re-split allowed; children draw tens.
+        draw = ["A", "10", "10", "10"]
+        hand = _play_split_hands(self._shoe(draw), ["A", "A"], "6", "10",
+                                 0, 0, hit_aces)
+        assert hand.num_split_hands >= 3  # a real re-split of aces happened
+        for sub in hand.split_hands:
+            assert "ONE_CARD" not in sub.actions_taken
+        assert any("allows hitting split aces" in w.lower()
+                   for w in hand.warnings)
+
+    def test_double_after_split_allowed(self):
+        # 5,5 split; a hand of 11 vs 6 doubles when DAS is allowed.
+        draw = ["6", "6"]
+        hand = _play_split_hands(self._shoe(draw), ["5", "5"], "6", "10",
+                                 0, 0, H17)
+        assert any("DOUBLE" in actions for actions in hand.actions_by_hand)
+
+    def test_double_after_split_disallowed(self):
+        ndas = _replace(H17, double_after_split=False)
+        draw = ["6", "6"]
+        hand = _play_split_hands(self._shoe(draw), ["5", "5"], "6", "10",
+                                 0, 0, ndas)
+        assert not any("DOUBLE" in actions for actions in hand.actions_by_hand)
+
+    def test_subhands_are_numbered_in_play_order(self):
+        draw = ["8", "8", "10", "10", "10", "10"]
+        hand = _play_split_hands(self._shoe(draw), ["8", "8"], "6", "10",
+                                 0, 0, H17)
+        ids = [s.hand_id for s in hand.split_hands]
+        assert ids == list(range(1, hand.num_split_hands + 1))
+
+    def test_single_deck_caps_at_two_hands(self):
+        # SINGLE_DECK allows at most two split hands; no re-split is possible.
+        from app.rules import SINGLE_DECK_H17_NDAS_NS as SD
+
+        draw = ["8", "8"]
+        hand = _play_split_hands(self._shoe(draw), ["8", "8"], "6", "10",
+                                 0, 0, SD)
+        assert hand.num_split_hands == 2
+        assert SD.max_split_hands == 2

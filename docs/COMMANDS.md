@@ -84,10 +84,22 @@ plus the running/true count. `--seed` makes the shuffle reproducible.
 
 ```bash
 blackjack-coach play --decks 6 --seed 42
+blackjack-coach play --decks 6 --seed 5 --profile SIX_DECK_H17_DAS_LS
+blackjack-coach play --decks 6 --seed 428 --profile SIX_DECK_H17_DAS_LS
 ```
 
-Plays a full hand against the dealer (H17/S17 dealer logic), including basic
-pair splits, and prints the actions, final hands, and outcome.
+Plays a full hand against the dealer (H17/S17 dealer logic) and prints the
+actions, final hands, and outcome.
+
+When basic strategy says SPLIT, the simulator plays a full **split / re-split
+tree** (v1.6.0): a split hand that is again a pair is re-split up to the
+profile's `max_split_hands`, honouring `resplit_allowed`, `hit_split_aces`, and
+`double_after_split`. The output lists each sub-hand, labelled `split` or
+`re-split` with its depth, plus the number of split hands. The third example
+above (seed 428, six-deck H17) re-splits a pair of 8s into three hands. A pair
+that cannot be re-split (re-split disallowed or the maximum reached) is played
+as a normal total with a clear warning; split aces with `hit_split_aces=false`
+get exactly one card and stop.
 
 ### quiz
 

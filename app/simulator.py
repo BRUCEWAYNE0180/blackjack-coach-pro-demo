@@ -34,9 +34,18 @@ from .strategy_engine import Action, Recommendation, recommend
 # fallback where a split is indicated but cannot be performed.)
 SPLIT_NOT_IMPLEMENTED = "SPLIT_NOT_IMPLEMENTED"
 
-# Marker recorded when a split hand would itself be re-split. Re-splitting is
-# out of scope for v0.6, so the hand is instead played as a normal total.
+# Legacy marker (v0.6) recorded when a split hand would itself be re-split but
+# re-splitting was out of scope. As of v1.6.0 the simulator plays a full
+# re-split tree, so this marker is no longer produced; it is kept only so that
+# external imports do not break. Prefer ``RESPLIT_LIMIT_REACHED`` instead.
 RESPLIT_NOT_IMPLEMENTED = "RESPLIT_NOT_IMPLEMENTED"
+
+# Marker recorded (as of v1.6.0) when a split hand is a pair that basic strategy
+# would re-split, but the table rules prevent it: either re-splitting is not
+# allowed (``resplit_allowed=False``) or the maximum number of split hands
+# (``max_split_hands``) has been reached. The pair is then played as a normal
+# total and a clear warning is attached to the played hand.
+RESPLIT_LIMIT_REACHED = "RESPLIT_LIMIT_REACHED"
 
 
 @dataclass(frozen=True)
@@ -187,7 +196,7 @@ class PlayedHand:
 
 @dataclass(frozen=True)
 class SplitSubHand:
-    """One of the hands produced by splitting a pair.
+    """One of the hands produced by splitting (or re-splitting) a pair.
 
     Attributes:
         cards: The sub-hand's cards (the kept card plus any drawn cards).
@@ -197,6 +206,13 @@ class SplitSubHand:
             after the dealer plays). ``None`` until resolved.
         recommendations: Basic-strategy recommendations consulted, in order.
         is_complete: True once the sub-hand has finished being played.
+        hand_id: 1-based position of this sub-hand among all played sub-hands,
+            in play order (left to right through the re-split tree).
+        split_depth: How deep this sub-hand sits in the split tree. ``1`` means
+            it came from the initial split of the opening pair; ``2`` means it
+            came from one re-split; ``3`` from a second re-split; and so on.
+        from_resplit: Convenience flag, ``True`` when ``split_depth >= 2`` (the
+            sub-hand was produced by re-splitting an already-split hand).
     """
 
     cards: tuple[str, ...]
@@ -204,24 +220,35 @@ class SplitSubHand:
     final_outcome: "HandOutcome | None"
     recommendations: list[Recommendation]
     is_complete: bool = False
+    hand_id: int = 0
+    split_depth: int = 1
+    from_resplit: bool = False
 
 
 @dataclass(frozen=True)
 class PlayedSplitHand:
     """A fully played-out hand that began with a pair split.
 
+    As of v1.6.0 this models a full split / re-split tree: the opening pair may
+    be split, and each resulting hand may itself be re-split (up to the
+    profile's ``max_split_hands``) when basic strategy and the table rules
+    allow it. ``split_hands`` therefore holds between two and
+    ``max_split_hands`` sub-hands.
+
     Attributes:
         original_player_cards: The original pair before splitting.
         dealer_cards: The dealer's final cards (played once for all sub-hands).
-        split_hands: The played :class:`SplitSubHand` objects (two for v0.6).
+        split_hands: The played :class:`SplitSubHand` objects, in play order.
         actions_by_hand: Actions taken per sub-hand, in order.
         outcomes_by_hand: The resolved :class:`HandOutcome` per sub-hand.
         running_count_before: Running count before the hand.
         running_count_after: Running count after all visible cards were counted.
         true_count_after: True count derived from ``running_count_after``.
         recommendations_by_hand: Recommendations consulted per sub-hand.
+        num_split_hands: The final number of sub-hands the split tree produced.
         note: Short educational interpretation of the count / result.
-        warnings: Advisory messages (educational reminder, re-split note, etc.).
+        warnings: Advisory messages (educational reminder, re-split notes, max
+            split-hands notes, split-aces notes, etc.).
     """
 
     original_player_cards: tuple[str, ...]
@@ -233,6 +260,7 @@ class PlayedSplitHand:
     running_count_after: int
     true_count_after: float
     recommendations_by_hand: list[list[Recommendation]]
+    num_split_hands: int = 2
     note: str = ""
     warnings: list[str] = field(default_factory=list)
 
@@ -449,9 +477,11 @@ def play_training_hand(
     draws until strategy says STAND or the hand busts; STAND ends the turn.
 
     If the opening recommendation is SPLIT on a real pair, the hand is split
-    and both sub-hands are played (see :func:`play_split_subhand`); a
-    :class:`PlayedSplitHand` is returned in that case. Re-splitting and special
-    split-Aces handling are out of scope for v0.6.
+    and the full split / re-split tree is played out (see
+    :func:`_play_split_hands`); a :class:`PlayedSplitHand` is returned in that
+    case. As of v1.6.0 the simulator plays a real re-split tree up to the
+    profile's ``max_split_hands`` and honours ``resplit_allowed``,
+    ``hit_split_aces`` and ``double_after_split``.
 
     The dealer then reveals its hole card and plays once, unless the player
     surrendered, busted, or (for splits) every sub-hand busted. The running
@@ -579,6 +609,190 @@ def play_training_hand(
 
 
 
+def _play_out_position(
+    shoe: list[str],
+    cards: list[str] | tuple[str, ...],
+    dealer_upcard: str,
+    profile: RuleProfile,
+    running: list[int],
+    *,
+    depth: int,
+    extra_actions: list[str] | None = None,
+) -> SplitSubHand:
+    """Play a single split position out as a normal total (no split, no surrender).
+
+    DOUBLE is offered only when the profile allows double-after-split and takes
+    exactly one card then stands; HIT draws until strategy says STAND or the
+    hand busts; STAND ends the turn. The running count (carried in the
+    one-element list ``running``) is updated for every newly drawn card.
+
+    ``extra_actions`` lets the caller prepend markers (for example
+    :data:`RESPLIT_LIMIT_REACHED` when a pair could not be re-split). The
+    returned sub-hand's ``hand_id`` is left at ``0`` and assigned later, in play
+    order, by :func:`_play_split_tree`.
+    """
+    cards = list(cards)
+    actions: list[str] = list(extra_actions or [])
+    recommendations: list[Recommendation] = []
+    busted = False
+    can_double = profile.double_after_split
+
+    rec = recommend(
+        cards, dealer_upcard, profile,
+        can_double=can_double, can_surrender=False, can_split=False,
+    )
+    recommendations.append(rec)
+    action = rec.action
+
+    if action == Action.DOUBLE:
+        actions.append(Action.DOUBLE.value)
+        card = draw_card(shoe)
+        cards.append(card)
+        running[0] = update_running_count(running[0], card)
+        busted = evaluate_hand(cards).is_bust
+    elif action == Action.STAND:
+        actions.append(Action.STAND.value)
+    else:  # HIT (SURRENDER and SPLIT are disabled here)
+        while True:
+            actions.append(Action.HIT.value)
+            card = draw_card(shoe)
+            cards.append(card)
+            running[0] = update_running_count(running[0], card)
+            if evaluate_hand(cards).is_bust:
+                busted = True
+                break
+            rec = recommend(
+                cards, dealer_upcard, profile,
+                can_double=False, can_surrender=False, can_split=False,
+            )
+            recommendations.append(rec)
+            if rec.action != Action.HIT:
+                actions.append(Action.STAND.value)
+                break
+
+    return SplitSubHand(
+        cards=tuple(cards),
+        actions_taken=actions,
+        final_outcome=HandOutcome.PLAYER_BUST if busted else None,
+        recommendations=recommendations,
+        is_complete=True,
+        hand_id=0,
+        split_depth=depth,
+        from_resplit=depth >= 2,
+    )
+
+
+def _play_split_tree(
+    shoe: list[str],
+    original_pair: list[str] | tuple[str, ...],
+    dealer_upcard: str,
+    profile: RuleProfile,
+    running: int,
+) -> tuple[list[SplitSubHand], int, list[str]]:
+    """Build and play a full split / re-split tree from an opening pair.
+
+    The opening pair is split into two positions; each position draws one card.
+    A position that is again a pair is re-split when *all* of these hold:
+
+        * basic strategy recommends SPLIT for the new pair,
+        * ``profile.resplit_allowed`` is True,
+        * the running number of hands is still below ``profile.max_split_hands``,
+        * and (for aces) ``profile.hit_split_aces`` is True.
+
+    When a pair would be split but the rules forbid it (re-splitting disallowed
+    or ``max_split_hands`` reached) the pair is instead played as a normal total
+    and a clear warning is recorded, with a :data:`RESPLIT_LIMIT_REACHED` marker
+    on that sub-hand. Split aces with ``hit_split_aces=False`` receive exactly
+    one card and stop (no hitting and no re-splitting).
+
+    The running count is updated for every newly drawn card (the original pair's
+    two cards were already counted by the caller).
+
+    Returns:
+        ``(sub_hands, running_count, warnings)`` where each sub-hand has
+        ``final_outcome`` of ``PLAYER_BUST`` or ``None`` (pending the dealer).
+    """
+    is_aces = evaluate_hand(original_pair).pair_value == 11
+    hit_aces_allowed = profile.hit_split_aces
+    max_hands = profile.max_split_hands
+
+    completed: list[SplitSubHand] = []
+    warnings: list[str] = []
+    rc = [running]
+    # The initial split of the opening pair already produces two hands.
+    state = {"num_hands": 2}
+
+    def add_warning(message: str) -> None:
+        if message not in warnings:
+            warnings.append(message)
+
+    def play_position(kept_card: str, depth: int) -> None:
+        partner = draw_card(shoe)
+        rc[0] = update_running_count(rc[0], partner)
+        cards = [kept_card, partner]
+
+        # Split aces without hit-split-aces: exactly one card, then stop.
+        if is_aces and not hit_aces_allowed:
+            busted = evaluate_hand(cards).is_bust
+            completed.append(SplitSubHand(
+                cards=tuple(cards),
+                actions_taken=["ONE_CARD"],
+                final_outcome=HandOutcome.PLAYER_BUST if busted else None,
+                recommendations=[],
+                is_complete=True,
+                hand_id=0,
+                split_depth=depth,
+                from_resplit=depth >= 2,
+            ))
+            return
+
+        # Re-split decision: only when the new two cards are a pair.
+        if len(cards) == 2 and evaluate_hand(cards).is_pair:
+            rec = recommend(
+                cards, dealer_upcard, profile,
+                can_double=profile.double_after_split,
+                can_surrender=False, can_split=True,
+            )
+            if rec.action == Action.SPLIT:
+                if profile.resplit_allowed and state["num_hands"] < max_hands:
+                    # This position becomes two: net +1 hand in the tree.
+                    state["num_hands"] += 1
+                    play_position(cards[0], depth + 1)
+                    play_position(cards[1], depth + 1)
+                    return
+                # Cannot re-split: warn and play the pair as a normal total.
+                if not profile.resplit_allowed:
+                    add_warning(
+                        "A split hand could be re-split, but re-splitting is "
+                        "not allowed in this rule set, so it was played as a "
+                        "normal total."
+                    )
+                else:
+                    add_warning(
+                        f"The maximum of {max_hands} split hands was reached, "
+                        "so a pair was played as a normal total instead of "
+                        "being re-split."
+                    )
+                completed.append(_play_out_position(
+                    shoe, cards, dealer_upcard, profile, rc,
+                    depth=depth, extra_actions=[RESPLIT_LIMIT_REACHED],
+                ))
+                return
+
+        # Otherwise play the position out normally.
+        completed.append(_play_out_position(
+            shoe, cards, dealer_upcard, profile, rc, depth=depth,
+        ))
+
+    # Initial split into two positions, played left to right.
+    play_position(original_pair[0], 1)
+    play_position(original_pair[1], 1)
+
+    # Assign 1-based ids in play order.
+    resolved = [replace(s, hand_id=i) for i, s in enumerate(completed, start=1)]
+    return resolved, rc[0], warnings
+
+
 def _play_split_hands(
     shoe: list[str],
     player_cards: list[str],
@@ -588,51 +802,37 @@ def _play_split_hands(
     running: int,
     profile: RuleProfile,
 ) -> PlayedSplitHand:
-    """Play out a split into two sub-hands, then the dealer, then resolve."""
+    """Play a full split / re-split tree, then the dealer, then resolve.
+
+    Implements the v1.6.0 full re-split tree: the opening pair is split and each
+    resulting hand may itself be re-split up to ``profile.max_split_hands`` when
+    basic strategy and the rules allow it (see :func:`_play_split_tree`). The
+    dealer then reveals the hole card and plays once for all sub-hands, unless
+    every sub-hand busted.
+    """
     warnings: list[str] = [EDUCATIONAL_NOTE]
 
     is_aces = evaluate_hand(player_cards).pair_value == 11
-    allow_hit = True
     if is_aces:
         if profile.hit_split_aces:
-            allow_hit = True
             warnings.append(
-                "Split Aces: this rule set allows hitting split aces; both "
-                "hands are played normally."
+                "Split Aces: this rule set allows hitting split aces; each "
+                "hand is played normally."
             )
         else:
-            allow_hit = False
             warnings.append(
                 "Split Aces: each hand receives exactly one card and cannot be "
                 "hit again in this rule set."
             )
 
-    hand_one, hand_two = split_initial_hand(shoe, player_cards)
-    # The two newly dealt cards are visible and are counted now.
-    running = update_running_count_many(running, [hand_one[1], hand_two[1]])
-
-    sub1, running = play_split_subhand(
-        shoe, hand_one, dealer_upcard, profile, running, allow_hit=allow_hit
+    subs, running, tree_warnings = _play_split_tree(
+        shoe, player_cards, dealer_upcard, profile, running,
     )
-    sub2, running = play_split_subhand(
-        shoe, hand_two, dealer_upcard, profile, running, allow_hit=allow_hit
-    )
-    subs = [sub1, sub2]
+    for message in tree_warnings:
+        if message not in warnings:
+            warnings.append(message)
 
-    if any(RESPLIT_NOT_IMPLEMENTED in s.actions_taken for s in subs):
-        if profile.resplit_allowed:
-            warnings.append(
-                "A split hand could be re-split; this rule set allows it, but "
-                "full re-split play is out of scope, so it was played as a "
-                "normal total instead."
-            )
-        else:
-            warnings.append(
-                "A split hand could re-split, but re-splitting is not allowed "
-                "in this rule set, so it was played as a normal total."
-            )
-
-    # The dealer plays once for both sub-hands, only if at least one is live.
+    # The dealer plays once for all sub-hands, only if at least one is live.
     dealer_cards: list[str] = [dealer_upcard, dealer_hole]
     all_busted = all(s.final_outcome == HandOutcome.PLAYER_BUST for s in subs)
     if not all_busted:
@@ -664,6 +864,7 @@ def _play_split_hands(
         running_count_after=running,
         true_count_after=tc_after,
         recommendations_by_hand=[s.recommendations for s in resolved_subs],
+        num_split_hands=len(resolved_subs),
         note=note,
         warnings=warnings,
     )

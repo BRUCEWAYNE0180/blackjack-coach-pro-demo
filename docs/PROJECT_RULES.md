@@ -111,6 +111,15 @@ As of v0.9 the project enforces these gates on every change:
   `double_after_split` did for the simulator in v1.5.0), it must have explicit
   tests and updated docs that state the new behaviour, and any part that is
   still simplified (e.g. full re-split) must be called out honestly.
+- **All re-split logic must have tests.** As of v1.6.0 the simulator plays a
+  full split / re-split tree. Any change to the re-split tree, or to how
+  `resplit_allowed`, `max_split_hands`, `hit_split_aces`, or
+  `double_after_split` affect split play, must be covered by deterministic
+  tests. At minimum the suite must keep proving: re-split is allowed up to
+  `max_split_hands`; re-split is blocked when `resplit_allowed` is false;
+  `max_split_hands` is never exceeded; split aces with `hit_split_aces=false`
+  take exactly one card and stop; split aces with `hit_split_aces=true` play
+  normally; and double-after-split is honoured per profile.
 
 ## 8. Release Rules
 
