@@ -86,7 +86,25 @@ As of v0.9 the project enforces these gates on every change:
 - **Changes land via pull request.** No direct commits to `main`; CI must be
   green before merge.
 
-## 8. Responsible-Use Notice
+## 8. Release Rules
+
+For a tagged release (e.g. **v1.0.0**), all of the following must hold before
+the release pull request is merged:
+
+- All automated tests pass (`python -m pytest`) locally and in CI.
+- CI is **green** for the release branch (lint + tests on all supported Python
+  versions).
+- No secrets, credentials, `.env` files, or API tokens are present anywhere in
+  the repository.
+- No sensitive data, private PDFs, or screenshots are committed.
+- No changes outside the educational/simulated scope (see Section 2).
+- **Release notes are mandatory**: a `docs/RELEASE_NOTES_v<version>.md` and a
+  matching `CHANGELOG.md` entry must accompany the release.
+- The version is bumped consistently in `app.__version__` and `pyproject.toml`.
+
+Tags and GitHub releases are created only **after** the release PR is merged.
+
+## 9. Responsible-Use Notice
 
 This tool is for learning and entertainment. Gambling involves financial risk
 and can be addictive. Users are responsible for complying with all applicable
