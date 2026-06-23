@@ -38,6 +38,17 @@ class TestCliInsurance:
         assert exit_code == 0
         assert "Dealer shows an Ace" not in out
 
+    def test_insurance_note_not_duplicated(self, capsys):
+        # The dedicated insurance block is shown, but the same note must not
+        # also appear in the "Notes:" section.
+        cli.main(["--cards", "10,6", "--dealer", "A"])
+        out = capsys.readouterr().out
+        from app.explanations import explain_insurance_no
+
+        assert out.count(explain_insurance_no()) == 1
+        # With only the insurance warning present, no "Notes:" block is shown.
+        assert "Notes:" not in out
+
 
 class TestCliErrors:
     def test_invalid_card_errors(self, capsys):

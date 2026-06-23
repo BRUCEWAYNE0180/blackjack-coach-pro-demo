@@ -37,8 +37,9 @@ ACTION_NOTES: dict[str, str] = {
         "is likely to bust, so drawing would only add risk."
     ),
     DOUBLE: (
-        "Double the bet and take exactly one more card. Basic strategy favours "
-        "you here, so you put more money out while you hold the edge."
+        "Double the bet and take exactly one more card. Basic strategy treats "
+        "adding one extra bet and taking one card as the highest-value legal "
+        "play here."
     ),
     SPLIT: (
         "Split the pair into two separate hands. Each card plays better as the "

@@ -43,10 +43,16 @@ def build_output(rec: Recommendation, dealer_upcard: str) -> str:
         lines.append("Dealer shows an Ace - insurance may be offered.")
         lines.append(f"Insurance advice: NO. {explain_insurance_no()}")
 
-    if rec.warnings:
+    # The engine already includes the insurance note in rec.warnings when the
+    # dealer shows an Ace. Since we print a dedicated insurance block above,
+    # filter that exact text out of "Notes" to avoid showing it twice.
+    insurance_note = explain_insurance_no()
+    extra_warnings = [w for w in rec.warnings if w != insurance_note]
+
+    if extra_warnings:
         lines.append("")
         lines.append("Notes:")
-        for w in rec.warnings:
+        for w in extra_warnings:
             lines.append(f"  - {w}")
 
     return "\n".join(lines)
