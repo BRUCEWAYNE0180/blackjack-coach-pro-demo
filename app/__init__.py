@@ -106,6 +106,17 @@ from .formatting import (
     format_warning,
 )
 from .hand_evaluator import HandEvaluation, card_value, evaluate_hand, normalize_rank
+from .practice_pack import (
+    PracticePack,
+    PracticePackExport,
+    PracticePackItem,
+    build_pack_item_from_drill_spot,
+    build_pack_item_from_review_item,
+    build_practice_pack,
+    export_practice_pack,
+    render_practice_pack,
+    render_practice_pack_markdown,
+)
 from .quiz import (
     CountQuizResult,
     QuizQuestion,
@@ -219,7 +230,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.23.0"
+__version__ = "1.24.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -255,6 +266,9 @@ __all__ = [
     "DrillStreakSummary",
     "ReviewQueue",
     "ReviewScheduleItem",
+    "PracticePack",
+    "PracticePackExport",
+    "PracticePackItem",
     "FOUR_DECK_H17_DAS_LS",
     "HandEvaluation",
     "HandOutcome",
@@ -324,6 +338,12 @@ __all__ = [
     "render_review_queue",
     "render_review_queue_markdown",
     "render_streak_summary",
+    "build_practice_pack",
+    "build_pack_item_from_review_item",
+    "build_pack_item_from_drill_spot",
+    "export_practice_pack",
+    "render_practice_pack",
+    "render_practice_pack_markdown",
     "can_double_after_split",
     "can_hit_split_aces",
     "can_resplit",

@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.23.0 feature summary
+## v1.24.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -132,6 +132,11 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   upcoming) and tracks practice **streaks**. Print it, show it as Markdown, or
   `--export` it. Local and read-only; it never changes the correct answers or
   the recommendation.
+- **Daily practice pack generator** (v1.24.0): `practice-pack` builds one
+  ready-to-practise session for today by combining due reviews, weak spots, EV
+  disagreement spots, and an educational mix (with a starter set when there is
+  no history). Reproducible with `--seed`, exportable to Markdown. Local and
+  read-only; it never changes the correct answers or the recommendation.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -337,6 +342,34 @@ WEAK -> today/soon, LEARNING -> ~2 days, MASTERED -> ~7 days. With no saved
 drill sessions it says so clearly. The scheduler is local practice only - no
 sensitive data - and is never committed.
 
+## Daily Practice Pack Generator (v1.24.0)
+
+`practice-pack` assembles one ready-to-practise session for today by combining
+every local signal: the review-queue's **due** items, **weak** drill-history
+spots, **EV disagreement / high-gap** spots, and a focus-specific or educational
+**mix** (with a starter set when there is no saved history). Due spots come
+first, then weak, then EV, then the mix.
+
+```bash
+blackjack-coach practice-pack
+blackjack-coach practice-pack --focus due --count 10
+blackjack-coach practice-pack --focus ev --profile SIX_DECK_H17_DAS_LS
+blackjack-coach practice-pack --today 2026-06-23 --seed 42
+blackjack-coach practice-pack --markdown
+blackjack-coach practice-pack --export --output practice_pack.md
+```
+
+`--focus` is one of `daily` / `due` / `weak` / `ev` / `pairs` / `hard` / `soft`
+/ `mixed`; `--count` caps the items; `--seed` makes the pack deterministic;
+`--today YYYY-MM-DD` drives the due scheduling; `--markdown` prints a Markdown
+checklist; `--export` (with optional `--output`) saves it under
+`./.blackjack_coach/reports`; and `--profile` / `--drill-dir` / `--session-dir`
+/ `--outcome-dir` / `--ev-dir` scope where the pack draws from. With no saved
+history it prints a starter educational pack and says so. The correct play for
+every item comes from the strategy engine - the pack never changes it. (After
+practising, save progress with `drill --answer ... --save` and re-run
+`review-queue`.)
+
 ## Terminal visual polish (v1.1.0)
 
 v1.1.0 makes the CLI clearer and more pleasant to practise with. Output now has
@@ -435,6 +468,9 @@ blackjack-coach drill --review --due-only
 blackjack-coach review-queue
 blackjack-coach review-queue --due-only
 blackjack-coach review-queue --streaks
+blackjack-coach practice-pack
+blackjack-coach practice-pack --focus due --count 10
+blackjack-coach practice-pack --markdown
 ```
 
 Without installing, run it as a module from the repository root:

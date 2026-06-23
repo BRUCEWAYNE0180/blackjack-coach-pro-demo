@@ -7,6 +7,60 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.24.0] - 2026-06-23
+
+Local daily practice-pack generator. A new `practice-pack` command assembles one
+ready-to-practise session for "today" by combining the review-queue's due items
+(v1.23.0), weak / EV-disagreement / educational spots from the drill generator
+(v1.21.0), and the saved drill history (v1.22.0). It never re-derives the
+correct play (that always comes from the strategy engine via the drill
+generator) and never changes the recommendation or the Hi-Lo math.
+
+### Added
+
+- `app/practice_pack.py`: dataclasses `PracticePackItem`, `PracticePack`, and
+  `PracticePackExport`, plus `build_practice_pack` (due review items -> weak ->
+  EV / high-gap -> focus-specific -> educational fallback, with `profile_key` /
+  `focus` / `count` / `today` / `seed` and spot-id de-duplication),
+  `build_pack_item_from_review_item`, `build_pack_item_from_drill_spot`,
+  `render_practice_pack`, `render_practice_pack_markdown` (a checklist), and
+  `export_practice_pack`.
+- CLI `practice-pack` command with `--profile`, `--focus`
+  (daily/due/weak/ev/pairs/hard/soft/mixed), `--count`, `--seed`, `--today`,
+  `--drill-dir`, `--session-dir`, `--outcome-dir`, `--ev-dir`, `--markdown`,
+  `--export`, and `--output`. With no saved history it prints a starter
+  educational pack.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.24.0**.
+
+### Quality
+
+- New suite `tests/test_practice_pack.py` (starter pack with no history; `count`
+  respected; `seed` determinism; no duplicate spot ids; `focus due` prioritises
+  due items; `focus pairs` yields pairs; review-item and drill-spot converters;
+  text + Markdown renderers; export saves a file; no sensitive field names; and
+  that building a pack never changes `recommend()`) plus `TestCliPracticePack`
+  in `tests/test_cli.py` for the `practice-pack` command (starter pack,
+  `--focus due --count`, `--focus ev --profile`, `--today`/`--seed`,
+  `--markdown`, `--export --output`, and `--version` = 1.24.0). Full suite
+  passing; ruff clean.
+
+### Safety
+
+- The practice pack is **local practice training** only. The correct play for
+  every item comes from the existing strategy engine (via the drill generator);
+  no strategy logic is duplicated. It never changes `strategy_engine.recommend`,
+  the Hi-Lo math, adaptive learning, guided coaching, outcome / session history,
+  the EV-snapshot history, the Strategy-vs-EV engine, reporting, the dashboard,
+  the drill generator, the drill history, or the review scheduler. It stores /
+  exports no money, bankroll, real bets, accounts, tokens, screenshots, or any
+  sensitive/personal data, suggests practice without promising results, and uses
+  no external dependencies, network, cloud, or database. Exported packs live
+  under the git-ignored `.blackjack_coach/reports` tree (unless an explicit
+  `--output` path is given) and are never committed.
+
 ## [1.23.0] - 2026-06-23
 
 Local drill review scheduler & streaks. The v1.22.0 drill history is now turned

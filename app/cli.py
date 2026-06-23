@@ -93,6 +93,12 @@ from .outcome_history import (
     save_outcome_record,
     summarize_outcomes,
 )
+from .practice_pack import (
+    build_practice_pack,
+    export_practice_pack,
+    render_practice_pack,
+    render_practice_pack_markdown,
+)
 from .probability_advisor import (
     COMPOSITION_RANKS,
     build_composition_aware_advice,
@@ -2862,6 +2868,89 @@ def _run_review_queue(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_practice_pack_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'practice-pack' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli practice-pack",
+        description=(
+            "Generate a local daily practice pack from your due reviews, weak "
+            "spots, EV disagreements, and history (or a starter educational "
+            "set). Never changes the recommendation or the correct answers "
+            "(educational / local only)."
+        ),
+    )
+    parser.add_argument("--profile", default=None, choices=sorted(PROFILES),
+                        help="Rule profile for the pack.")
+    parser.add_argument("--focus", default="daily",
+                        help="Focus: daily|due|weak|ev|pairs|hard|soft|mixed "
+                             "(default: daily).")
+    parser.add_argument("--count", type=int, default=20,
+                        help="Maximum number of items (default: 20).")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Seed for a deterministic pack order.")
+    parser.add_argument("--today", default=None,
+                        help="Treat this YYYY-MM-DD date as today (for due "
+                             "scheduling).")
+    parser.add_argument("--drill-dir", default=None, dest="drill_dir",
+                        help="Drill session directory.")
+    parser.add_argument("--session-dir", default=None, dest="session_dir",
+                        help="Session history directory.")
+    parser.add_argument("--outcome-dir", default=None, dest="outcome_dir",
+                        help="Outcome history directory.")
+    parser.add_argument("--ev-dir", default=None, dest="ev_dir",
+                        help="EV snapshot directory.")
+    parser.add_argument("--markdown", action="store_true",
+                        help="Print the pack as Markdown instead of text.")
+    parser.add_argument("--export", action="store_true",
+                        help="Save the pack as a local Markdown file and print "
+                             "the path.")
+    parser.add_argument("--output", default=None,
+                        help="Exact output file path for --export (default: a "
+                             "timestamped file under ./.blackjack_coach/reports).")
+    return parser
+
+
+def _run_practice_pack(argv: Sequence[str]) -> int:
+    """Handle the 'practice-pack' daily-pack subcommand."""
+    parser = build_practice_pack_parser()
+    args = parser.parse_args(argv)
+
+    if args.count <= 0:
+        print("Error: --count must be >= 1.", file=sys.stderr)
+        return 2
+
+    try:
+        pack = build_practice_pack(
+            profile_key=args.profile,
+            focus=args.focus,
+            count=args.count,
+            drill_dir=args.drill_dir,
+            session_dir=args.session_dir,
+            outcome_dir=args.outcome_dir,
+            ev_dir=args.ev_dir,
+            today=args.today,
+            seed=args.seed,
+        )
+    except (ValueError, KeyError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    if args.markdown:
+        print(render_practice_pack_markdown(pack))
+    else:
+        print(render_practice_pack(pack))
+
+    if args.export or args.output:
+        try:
+            export = export_practice_pack(pack, output_path=args.output)
+        except OSError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print("")
+        print(format_kv("Saved practice pack", export.output_path))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -2890,6 +2979,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli dashboard --profile SIX_DECK_H17_DAS_LS (profile dashboard)
         python -m app.cli drill --focus weak --count 5         (practice drills)
         python -m app.cli review-queue --due-only             (scheduled reviews)
+        python -m app.cli practice-pack --focus daily         (daily practice pack)
         python -m app.cli coach --cards A,7 --dealer 9       (direct advice)
         python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
         python -m app.cli odds --cards 10,6 --dealer 10      (probability advisor)
@@ -2958,6 +3048,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_drill(args[1:])
     if args and args[0] == "review-queue":
         return _run_review_queue(args[1:])
+    if args and args[0] == "practice-pack":
+        return _run_practice_pack(args[1:])
     if args and args[0] == "coach":
         return _run_coach(args[1:])
     if args and args[0] == "coach-play":
