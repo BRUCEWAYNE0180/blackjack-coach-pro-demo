@@ -51,6 +51,12 @@ from .quiz import (
     run_strategy_session,
 )
 from .rules import DEFAULT_PROFILE, PROFILES, get_profile
+from .session_history import (
+    build_session_record,
+    list_session_records,
+    save_session_record,
+    summarize_history,
+)
 from .simulator import (
     PlayedHand,
     PlayedSplitHand,
@@ -561,7 +567,22 @@ def build_quiz_session_parser() -> argparse.ArgumentParser:
     parser.add_argument("--profile", default=DEFAULT_PROFILE.key,
                         choices=sorted(PROFILES),
                         help=f"Rule profile (default: {DEFAULT_PROFILE.key}).")
+    parser.add_argument("--save", action="store_true",
+                        help="Save a local summary of this session.")
+    parser.add_argument("--history-dir", default=None,
+                        help="Directory for saved history (default: "
+                             "./.blackjack_coach/history).")
     return parser
+
+
+def _maybe_save_session(result: QuizSessionResult, save: bool, history_dir) -> None:
+    """Save a session summary locally and print its path when requested."""
+    if not save:
+        return
+    record = build_session_record(result)
+    path = save_session_record(record, history_dir=history_dir)
+    print("")
+    print(format_kv("Saved", path))
 
 
 def _run_quiz_session(argv: Sequence[str]) -> int:
@@ -584,6 +605,7 @@ def _run_quiz_session(argv: Sequence[str]) -> int:
         return 2
 
     print(build_session_output(result))
+    _maybe_save_session(result, args.save, args.history_dir)
     return 0
 
 
@@ -622,6 +644,11 @@ def build_count_session_parser() -> argparse.ArgumentParser:
     parser.add_argument("--answers", default=None,
                         help="Comma-separated running counts (e.g. '1,-1,1'). "
                              "If omitted, you are prompted per batch.")
+    parser.add_argument("--save", action="store_true",
+                        help="Save a local summary of this session.")
+    parser.add_argument("--history-dir", default=None,
+                        help="Directory for saved history (default: "
+                             "./.blackjack_coach/history).")
     return parser
 
 
@@ -646,6 +673,7 @@ def _run_count_session(argv: Sequence[str]) -> int:
         return 2
 
     print(build_session_output(result))
+    _maybe_save_session(result, args.save, args.history_dir)
     return 0
 
 
@@ -656,6 +684,69 @@ def _prompt_count_answers(batches: list[list[str]]) -> list[str]:
         print(f"Q{i}: {', '.join(batch)}")
         answers.append(input(f"Q{i} Running count?: "))
     return answers
+
+
+def build_history_output(records: list) -> str:
+    """Render a summary of saved session history as terminal output."""
+    summary = summarize_history(records)
+    lines = [format_header("Practice History")]
+    if summary.total_sessions == 0:
+        lines.append("No saved sessions yet. Run a session with --save first.")
+        lines.append("")
+        lines.append(format_kv("Note", summary.note))
+        return "\n".join(lines)
+
+    lines += _kv_block([
+        ("Total sessions", summary.total_sessions),
+        ("Average accuracy", format_percentage(summary.average_accuracy)),
+        ("Best accuracy", format_percentage(summary.best_accuracy)),
+        ("Worst accuracy", format_percentage(summary.worst_accuracy)),
+    ])
+    lines.append("")
+    lines.append(format_section("Most common weak spots"))
+    weak_labels = [f"{label} (x{count})" for label, count in summary.common_weak_spots]
+    lines.append(format_list(weak_labels))
+    lines.append("")
+    lines.append(format_kv("Note", summary.note))
+    return "\n".join(lines)
+
+
+def build_history_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'history' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli history",
+        description=(
+            "Show a summary of locally saved practice sessions (educational "
+            "only). Stores no money, accounts, or personal data."
+        ),
+    )
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Only summarise the most recent N sessions.")
+    parser.add_argument("--dir", default=None, dest="history_dir",
+                        help="Directory to read history from (default: "
+                             "./.blackjack_coach/history).")
+    return parser
+
+
+def _run_history(argv: Sequence[str]) -> int:
+    """Handle the 'history' subcommand."""
+    parser = build_history_parser()
+    args = parser.parse_args(argv)
+
+    try:
+        records = list_session_records(args.history_dir)
+    except (ValueError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    if args.limit is not None:
+        if args.limit < 0:
+            print("Error: --limit must be >= 0.", file=sys.stderr)
+            return 2
+        records = records[-args.limit:] if args.limit else []
+
+    print(build_history_output(records))
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -671,6 +762,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli count-quiz --cards 2,5,K --answer 0  (count quiz)
         python -m app.cli quiz-session --questions 10 --seed 42 --answers ...
         python -m app.cli count-session --batches "2,5,K|A,9" --answers "1,0"
+        python -m app.cli history                            (saved sessions)
     """
     args = list(sys.argv[1:] if argv is None else argv)
     if args and args[0] in ("--version", "-V"):
@@ -682,6 +774,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_simulate(args[1:])
     if args and args[0] == "play":
         return _run_play(args[1:])
+    if args and args[0] == "history":
+        return _run_history(args[1:])
     if args and args[0] == "quiz":
         return _run_quiz(args[1:])
     if args and args[0] == "count-quiz":

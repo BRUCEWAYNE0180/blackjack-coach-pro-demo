@@ -7,6 +7,39 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.2.0] - 2026-06-23
+
+Local session history. Adds opt-in, local-only progress tracking. No changes
+to strategy, counting, simulation, split, or scoring logic.
+
+### Added
+
+- `app/session_history.py` with `SessionRecord`, `HistorySummary`,
+  `default_history_dir`, `ensure_history_dir`, `build_session_record`,
+  `save_session_record`, `load_session_record`, `list_session_records`, and
+  `summarize_history`.
+- `--save` and `--history-dir` flags on `quiz-session` and `count-session` to
+  store a JSON summary locally and print the saved path.
+- A new `history` command (with `--limit` and `--dir`) that summarises saved
+  sessions: total, average/best/worst accuracy, and most common weak spots.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.2.0**.
+- Added `.blackjack_coach/` to `.gitignore` so local history is never
+  committed.
+
+### Quality
+
+- Added `tests/test_session_history.py` and CLI history tests. Full suite
+  passing; ruff clean; CI on Python 3.9-3.12.
+
+### Safety
+
+- History stores a **summary only** (mode, totals, accuracy, weak spots,
+  timestamp, id). It never stores money, bankroll, bets, accounts, personal
+  data, secrets, screenshots, or casino data. No database, network, or cloud.
+
 ## [1.1.0] - 2026-06-23
 
 Terminal visual polish. This release improves how the CLI looks and reads; it

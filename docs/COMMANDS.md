@@ -122,3 +122,29 @@ blackjack-coach count-session --batches "2,5,K|A,9,3|10,6,2" --answers "1,-1,1"
 
 Runs a scored running-count session over several batches (separated by `|`).
 Omit `--answers` to be prompted per batch.
+
+## Session history (v1.2.0)
+
+### Save a session
+
+Add `--save` to a session command to store a local JSON summary (and print its
+path). Use `--history-dir <path>` to choose where it is written (default:
+`./.blackjack_coach/history`).
+
+```bash
+blackjack-coach quiz-session --questions 10 --seed 42 --answers H,S,D,H,R,S,H,D,P,S --save
+blackjack-coach count-session --batches "2,5,K|A,9,3" --answers "1,0" --save --history-dir ./my-history
+```
+
+### history
+
+```bash
+blackjack-coach history
+blackjack-coach history --limit 5
+blackjack-coach history --dir ./my-history
+```
+
+Summarises saved sessions: total sessions, average/best/worst accuracy, and the
+most common weak spots. `--limit N` summarises only the most recent N sessions;
+`--dir` reads from a specific folder. The history is a **summary only** — no
+money, accounts, or personal data — and is never committed to git.

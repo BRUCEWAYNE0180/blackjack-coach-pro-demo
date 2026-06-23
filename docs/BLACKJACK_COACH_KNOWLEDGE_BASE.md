@@ -37,6 +37,8 @@ through v0.6.
   insurance-NO).
 - `app/formatting.py` — Dependency-free terminal formatting helpers (headers,
   aligned key/value rows, result badges, percentages); presentation only.
+- `app/session_history.py` — Local JSON session history (summary only):
+  `SessionRecord`, `HistorySummary`, save/load/list, and `summarize_history`.
 - `app/counting.py` — Hi-Lo counting trainer: tag values, running count, true
   count, and `CountingState` (educational / simulated practice only).
 - `app/shoe.py` — Virtual multi-deck shoe: build, shuffle (seedable), draw,
@@ -56,7 +58,7 @@ through v0.6.
   `run_count_session`).
 - `app/cli.py` — Terminal trainer (`python -m app.cli` or the installed
   `blackjack-coach` command, plus `count`, `simulate`, `play`, `quiz`,
-  `count-quiz`, `quiz-session`, and `count-session` subcommands).
+  `count-quiz`, `quiz-session`, `count-session`, and `history` subcommands).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -452,7 +454,7 @@ no web app, and no promise of winnings.
 All future work stays educational and local unless explicitly decided
 otherwise.
 
-### v1.1.0 — Terminal Visual Polish (current)
+### v1.1.0 — Terminal Visual Polish (done)
 
 Presentation-only release: the CLI looks clearer and more professional, with
 **no changes** to strategy, counting, simulation, split, or scoring logic.
@@ -474,10 +476,30 @@ Out of scope (unchanged): no logic changes, no casino connectivity, no real
 betting/bankroll, no camera/video, no scraping, no betting spread, no Kelly, no
 Illustrious 18, no insurance index, no web app, and no promise of winnings.
 
-### v1.2 — Saved Local Session History
+### v1.2.0 — Local Session History (current)
 
-- Optionally persist practice-session results **locally** (opt-in), for
-  progress tracking. No accounts, no cloud, no sensitive data.
+Adds opt-in, local-only progress tracking. No changes to strategy, counting,
+simulation, split, or scoring logic.
+
+Delivered:
+
+- **`app/session_history.py`** with a `SessionRecord` summary dataclass and a
+  `HistorySummary` aggregate, plus `default_history_dir`, `ensure_history_dir`,
+  `build_session_record`, `save_session_record`, `load_session_record`,
+  `list_session_records`, and `summarize_history`.
+- **`--save` / `--history-dir`** on `quiz-session` and `count-session`: write a
+  JSON summary to `./.blackjack_coach/history` (or a chosen folder) and print
+  the path.
+- **`history` command** (`--limit`, `--dir`): summarises saved sessions with
+  total, average/best/worst accuracy, and the most common weak spots.
+- Version bumped to **1.2.0**; `.blackjack_coach/` added to `.gitignore`.
+- Tests: `tests/test_session_history.py` and CLI history tests; all earlier
+  tests still pass; ruff clean.
+
+Privacy / safety: the history stores a **summary only** (mode, totals,
+accuracy, weak spots, timestamp, id). It never stores money, bankroll, bets,
+accounts, personal data, secrets, screenshots, or casino data; there is no
+database, network, or cloud, and history files are never committed.
 
 ### v1.3 — Advanced Deviations (educational only)
 
