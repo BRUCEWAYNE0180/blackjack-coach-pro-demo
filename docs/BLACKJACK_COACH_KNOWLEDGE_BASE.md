@@ -1615,7 +1615,7 @@ math, never overrides the recommendation with EV, never runs external commands
 no FastAPI / Telegram / database / cloud. The CLI keeps working exactly as
 before.
 
-### v2.1.0 — Web card buttons & UI polish (current)
+### v2.1.0 — Web card buttons & UI polish
 
 A usability pass over the v2.0.0 web page. Instead of typing cards, the user
 taps **card buttons** to build the hand and pick the dealer upcard, loads sample
@@ -1648,6 +1648,47 @@ testable, Streamlit-free boundary and the new helpers are display/input only;
 `web/streamlit_app.py` is the UI and imports the adapter, never the reverse;
 `strategy_engine`, `guided_coach`, and `probability_advisor` are untouched. Per
 `PROJECT_RULES.md` the UI remains a local presentation layer only.
+
+### v2.2.0 — Web round-result tracker (current)
+
+Closes the loop on a played hand. The initial recommendation uses only the
+player cards and the dealer *upcard* (the hole card must not change it), but
+after the round the user often wants to record what happened. v2.2.0 adds a
+**Round result** section after the recommendation and, crucially, keeps
+**decision quality** (did the play follow the coach?) **separate from the round
+outcome** (win/loss/push) - a correct play can still lose, so a LOSS is never
+treated as a bad decision.
+
+Delivered:
+
+- **`app/round_result.py`** (Streamlit-free, standard library only):
+  `build_round_review` (decision review separated from outcome),
+  `suggest_outcome` (WIN/LOSS/PUSH hint from the final hands; surrender =
+  half-loss), `normalize_action` / `normalize_outcome`, `RoundResultReview` /
+  `RoundResultRecord` / `RoundResultSummary`, and local JSON persistence
+  (`build_round_result_record`, `save`/`load`/`list_round_result_records`,
+  `summarize_round_results`) under the git-ignored `.blackjack_coach/web_rounds`
+  tree, following the existing local-history pattern.
+- **`app/web_adapter.py`** round wrappers: `WebRoundInput`,
+  `build_web_round_review`, `suggest_web_round_outcome`, `WEB_ACTIONS`,
+  `WEB_OUTCOMES` (parse the web card strings, delegate to `round_result`).
+- **`web/streamlit_app.py`**: a Round result section with final-card buttons
+  (player + dealer, undo / clear, copy-initial shortcut), action-taken control
+  (defaulting to the coach action), WIN/LOSS/PUSH outcome (with a suggestion),
+  a Save button, a colour-coded Decision review (coach action / action taken /
+  final hand result / correct-or-different / outcome + the separation note), and
+  a session-visible Round history with a summary (including correct decisions
+  that still lost). Reset all clears the round inputs; history has its own clear.
+- **Tests**: `tests/test_round_result.py`, extended `tests/test_web_adapter.py`,
+  `tests/test_streamlit_app_interactions.py`, and `tests/test_streamlit_app_static.py`;
+  `--version` assertions updated to 2.2.0.
+
+**Architecture:** `app/round_result.py` is the testable, Streamlit-free logic /
+persistence boundary; `app/web_adapter.py` wraps it for the UI;
+`web/streamlit_app.py` only renders. `strategy_engine`, `guided_coach`, and
+`probability_advisor` are untouched, and the recommendation is never recomputed
+from the final cards. Per `PROJECT_RULES.md` it stays local, educational, and
+outcome-separated, with no money or sensitive data.
 
 ### v2.x — Possible further web modes (if decided later)
 

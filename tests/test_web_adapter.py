@@ -1,17 +1,22 @@
-"""Tests for the web adapter (v2.1.0)."""
+"""Tests for the web adapter (v2.2.0)."""
 
 import sys
 
 from app.rules import get_profile
 from app.strategy_engine import recommend
 from app.web_adapter import (
+    WEB_ACTIONS,
     WEB_CARD_RANKS,
+    WEB_OUTCOMES,
     WEB_QUICK_EXAMPLES,
     WebCoachInput,
     WebCoachOutput,
+    WebRoundInput,
     action_visual,
     build_web_coach_output,
+    build_web_round_review,
     format_web_action,
+    suggest_web_round_outcome,
     validate_web_cards,
 )
 
@@ -250,3 +255,58 @@ class TestRecommendedAvailability:
             hand_summary="", legal_actions=["HIT", "STAND"])
         assert out.recommended_available is True
         assert out.disabled_actions == []
+
+
+
+class TestWebRoundResult:
+    """v2.2.0 round-result wrappers over app.round_result."""
+
+    def test_actions_and_outcomes_exposed(self):
+        assert WEB_ACTIONS == ("HIT", "STAND", "DOUBLE", "SPLIT", "SURRENDER")
+        assert WEB_OUTCOMES == ("WIN", "LOSS", "PUSH")
+
+    def test_build_review_from_strings(self):
+        review = build_web_round_review(WebRoundInput(
+            coach_recommended_action="HIT",
+            action_taken="HIT",
+            player_final_cards="A,7,K",
+            dealer_final_cards="10,Q",
+            outcome="LOSS",
+        ))
+        assert review.followed_coach is True
+        assert review.outcome == "LOSS"
+        assert review.player_total == 18
+        assert review.dealer_total == 20
+
+    def test_build_review_requires_two_player_cards(self):
+        try:
+            build_web_round_review(WebRoundInput("HIT", "HIT", "A", "10", "WIN"))
+        except ValueError as exc:
+            assert "player" in str(exc).lower()
+        else:
+            raise AssertionError("expected ValueError for one player card")
+
+    def test_build_review_requires_dealer_card(self):
+        try:
+            build_web_round_review(WebRoundInput("HIT", "HIT", "A,7", "", "WIN"))
+        except ValueError as exc:
+            assert "dealer" in str(exc).lower()
+        else:
+            raise AssertionError("expected ValueError for missing dealer card")
+
+    def test_suggest_outcome_helper(self):
+        assert suggest_web_round_outcome("A,7,K", "10,Q", "HIT") == "LOSS"
+        assert suggest_web_round_outcome("10,9", "10,7", "STAND") == "WIN"
+
+    def test_suggest_outcome_tolerates_bad_input(self):
+        assert suggest_web_round_outcome("", "", None) is None
+        assert suggest_web_round_outcome("Z,Z", "10", None) is None
+        assert suggest_web_round_outcome("A", "10", None) is None
+
+    def test_round_review_does_not_change_recommendation(self):
+        profile = get_profile(PROFILE)
+        before = recommend(["A", "7"], "10", profile).action
+        build_web_round_review(WebRoundInput(
+            "HIT", "STAND", "A,7,K", "10,Q", "LOSS"))
+        after = recommend(["A", "7"], "10", profile).action
+        assert before == after

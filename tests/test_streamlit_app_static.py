@@ -1,4 +1,4 @@
-"""Static checks for the local Streamlit Web Coach UI (v2.1.0).
+"""Static checks for the local Streamlit Web Coach UI (v2.2.0).
 
 These read the source as text and never import Streamlit, so they run without
 the optional web extra installed.
@@ -77,6 +77,33 @@ class TestStreamlitAppV21Features:
         for key in ("manual_player", "manual_dealer", "seen_cards",
                     "true_count_value"):
             assert key in source
+
+
+class TestStreamlitAppV22RoundResult:
+    """v2.2.0 round-result tracker section."""
+
+    def test_has_round_result_section(self):
+        source = _source()
+        assert "Round result" in source
+        assert "Decision review" in source
+
+    def test_uses_round_adapter(self):
+        source = _source()
+        assert "build_web_round_review" in source
+        assert "WebRoundInput" in source
+
+    def test_has_save_and_history_controls(self):
+        source = _source()
+        assert "round_save" in source
+        assert "round_history" in source
+        assert "Save round result" in source
+
+    def test_records_outcome_and_action(self):
+        source = _source()
+        assert "WEB_OUTCOMES" in source
+        assert "WEB_ACTIONS" in source
+        assert "Action taken" in source
+        assert "Round outcome" in source
 
     def test_player_and_dealer_pickers(self):
         source = _source()

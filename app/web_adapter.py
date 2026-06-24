@@ -14,6 +14,14 @@ v2.1.0 adds **display-only** helpers used by the web UI's card buttons and
 polished recommendation output: :data:`WEB_CARD_RANKS`, :data:`WEB_QUICK_EXAMPLES`,
 and :func:`action_visual`. These are presentation/input helpers only - they do
 not touch strategy, counting, or EV.
+
+v2.2.0 adds **round-result** wrappers (:class:`WebRoundInput`,
+:func:`build_web_round_review`, :func:`suggest_web_round_outcome`,
+:data:`WEB_ACTIONS`, :data:`WEB_OUTCOMES`) over the Streamlit-free
+:mod:`app.round_result` module, so the UI can record how a round finished
+*after* the recommendation. The dealer's final cards are used only here and
+never change the recommendation, and decision quality is kept separate from the
+round outcome.
 """
 
 from __future__ import annotations
@@ -21,6 +29,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from . import cards as cards_mod
+from . import round_result as round_result_mod
 from .guided_coach import build_coach_step
 from .probability_advisor import (
     build_composition_aware_advice,
@@ -282,3 +291,91 @@ def build_web_coach_output(web_input: WebCoachInput) -> WebCoachOutput:
         disabled_actions=disabled,
         raw_debug=raw_debug,
     )
+
+
+
+# --- Round-result tracking (v2.2.0) ---------------------------------------
+#
+# After the coach gives its initial recommendation (which uses only the player
+# cards and the dealer *upcard*), the web UI can record how the round actually
+# finished. These wrappers parse the web's card strings and delegate to the
+# Streamlit-free :mod:`app.round_result` module. The dealer's final cards are
+# used here only - never to change the recommendation - and decision quality is
+# kept separate from the round outcome.
+
+# Re-exported so the UI can build its action / outcome controls from one place.
+WEB_ACTIONS: tuple[str, ...] = round_result_mod.ACTIONS
+WEB_OUTCOMES: tuple[str, ...] = round_result_mod.OUTCOMES
+
+
+@dataclass(frozen=True)
+class WebRoundInput:
+    """Final round result collected by the local web UI (display strings)."""
+
+    coach_recommended_action: str
+    action_taken: str
+    player_final_cards: str
+    dealer_final_cards: str
+    outcome: str | None = None
+
+
+def _parse_round_cards(text: str, min_cards: int, who: str) -> list[str]:
+    """Parse a comma-separated final-cards string into engine ranks."""
+    if not text or not str(text).strip():
+        raise ValueError(f"Enter the {who} final cards.")
+    try:
+        ranks = cards_mod.cards_to_ranks(cards_mod.parse_cards(text))
+    except (ValueError, KeyError) as exc:
+        raise ValueError(f"Could not read the {who} final cards: {exc}") from exc
+    if len(ranks) < min_cards:
+        noun = "card" if min_cards == 1 else "cards"
+        raise ValueError(f"Enter at least {min_cards} {who} final {noun}.")
+    return ranks
+
+
+def build_web_round_review(
+    web_round: WebRoundInput,
+) -> round_result_mod.RoundResultReview:
+    """Build a :class:`app.round_result.RoundResultReview` from web input.
+
+    Reuses :func:`app.round_result.build_round_review`; the player needs at
+    least two final cards and the dealer at least one. The strategy engine and
+    the original recommendation are never touched here.
+    """
+    player_ranks = _parse_round_cards(
+        web_round.player_final_cards, min_cards=2, who="player")
+    dealer_ranks = _parse_round_cards(
+        web_round.dealer_final_cards, min_cards=1, who="dealer")
+    return round_result_mod.build_round_review(
+        coach_recommended_action=web_round.coach_recommended_action,
+        action_taken=web_round.action_taken,
+        player_final_cards=player_ranks,
+        dealer_final_cards=dealer_ranks,
+        outcome=web_round.outcome,
+    )
+
+
+def suggest_web_round_outcome(
+    player_final_cards: str,
+    dealer_final_cards: str,
+    action_taken: str | None = None,
+) -> str | None:
+    """Best-effort WIN/LOSS/PUSH suggestion for the UI (never raises).
+
+    Returns ``None`` when the cards are missing or unreadable; this is only a
+    convenience default for the outcome control, not a recorded value.
+    """
+    try:
+        player_ranks = cards_mod.cards_to_ranks(
+            cards_mod.parse_cards(player_final_cards)) if player_final_cards else []
+        dealer_ranks = cards_mod.cards_to_ranks(
+            cards_mod.parse_cards(dealer_final_cards)) if dealer_final_cards else []
+    except (ValueError, KeyError):
+        return None
+    if len(player_ranks) < 2:
+        return None
+    try:
+        return round_result_mod.suggest_outcome(
+            player_ranks, dealer_ranks, action_taken)
+    except ValueError:
+        return None

@@ -16,6 +16,14 @@ dealer-upcard entry, one-click quick examples, clear / reset controls, a
 polished colour-coded recommendation, clearer warnings, and a mobile-friendly
 layout. A manual text-entry mode is kept for power users. All of this is
 presentation only; the engine and CLI are unchanged.
+
+v2.2.0 adds a **Round result** section after the recommendation: record the
+player's and dealer's final cards, the action actually taken, and the WIN /
+LOSS / PUSH outcome, then see a decision review that keeps **decision quality**
+(did it follow the coach?) separate from the **round outcome** - a correct play
+can still lose. The dealer's final cards are used only here and never change the
+recommendation, which still depends solely on the player cards and dealer
+upcard.
 """
 
 from __future__ import annotations
@@ -26,12 +34,17 @@ from app import __version__
 from app.rules import DEFAULT_PROFILE, PROFILES
 from app.web_adapter import (
     EDUCATIONAL_NOTE,
+    WEB_ACTIONS,
     WEB_CARD_RANKS,
+    WEB_OUTCOMES,
     WEB_QUICK_EXAMPLES,
     WebCoachInput,
+    WebRoundInput,
     action_visual,
     build_web_coach_output,
+    build_web_round_review,
     format_web_action,
+    suggest_web_round_outcome,
 )
 
 # Commands the user can run themselves in a terminal (shown as text only - the
@@ -64,6 +77,10 @@ def _init_state() -> None:
     st.session_state.setdefault("seen_cards", "")
     st.session_state.setdefault("use_true_count", False)
     st.session_state.setdefault("true_count_value", 0.0)
+    # v2.2.0 round-result tracker state.
+    st.session_state.setdefault("round_player_cards", [])
+    st.session_state.setdefault("round_dealer_cards", [])
+    st.session_state.setdefault("round_history", [])
 
 
 def _add_player_card(rank: str) -> None:
@@ -102,11 +119,55 @@ def _reset_all() -> None:
     st.session_state.seen_cards = ""
     st.session_state.use_true_count = False
     st.session_state.true_count_value = 0.0
+    # Clear the round-result *inputs* too (the saved history is kept; it has a
+    # dedicated "Clear round history" control).
+    st.session_state.round_player_cards = []
+    st.session_state.round_dealer_cards = []
 
 
 def _load_example(player: tuple[str, ...], dealer: str) -> None:
     st.session_state.player_cards = list(player)
     st.session_state.dealer_upcard = dealer
+
+
+# --- Round-result callbacks (v2.2.0) --------------------------------------
+
+def _add_round_player_card(rank: str) -> None:
+    st.session_state.round_player_cards.append(rank)
+
+
+def _undo_round_player_card() -> None:
+    if st.session_state.round_player_cards:
+        st.session_state.round_player_cards.pop()
+
+
+def _clear_round_player_cards() -> None:
+    st.session_state.round_player_cards = []
+
+
+def _add_round_dealer_card(rank: str) -> None:
+    st.session_state.round_dealer_cards.append(rank)
+
+
+def _undo_round_dealer_card() -> None:
+    if st.session_state.round_dealer_cards:
+        st.session_state.round_dealer_cards.pop()
+
+
+def _clear_round_dealer_cards() -> None:
+    st.session_state.round_dealer_cards = []
+
+
+def _copy_initial_into_round(player_str: str, dealer_str: str) -> None:
+    """Pre-fill the round final-card pickers from the initial hand / upcard."""
+    st.session_state.round_player_cards = [
+        c.strip() for c in player_str.split(",") if c.strip()]
+    st.session_state.round_dealer_cards = (
+        [dealer_str.strip()] if dealer_str.strip() else [])
+
+
+def _clear_round_history() -> None:
+    st.session_state.round_history = []
 
 
 # --- Rendering helpers -----------------------------------------------------
@@ -269,6 +330,181 @@ def _render_output(output) -> None:
             st.warning(warning)
 
 
+# --- Round-result rendering (v2.2.0) --------------------------------------
+
+# Native colours for the round outcome badge (display only).
+_OUTCOME_COLOR = {"WIN": "green", "LOSS": "red", "PUSH": "blue"}
+
+
+def _render_decision_review(review) -> None:
+    """Render the decision review, keeping decision quality vs outcome apart."""
+    with st.container(border=True):
+        st.markdown("#### Decision review")
+        st.markdown(
+            f"- **Coach recommended action:** {review.coach_recommended_action}")
+        st.markdown(f"- **Player action taken:** {review.action_taken}")
+        player_line = f"player {review.player_total}"
+        if review.player_busted:
+            player_line += " (bust)"
+        dealer_line = f"dealer {review.dealer_total}"
+        if review.dealer_busted:
+            dealer_line += " (bust)"
+        st.markdown(f"- **Final hand result:** {player_line} vs {dealer_line}")
+        decision_color = "green" if review.followed_coach else "orange"
+        review_word = "correct" if review.followed_coach else "different from coach"
+        st.markdown(
+            f"- **Decision review:** :{decision_color}[{review.decision_label}] "
+            f"({review_word})")
+        outcome_color = _OUTCOME_COLOR.get(review.outcome, "gray")
+        st.markdown(
+            f"- **Outcome:** :{outcome_color}[{review.outcome_label}]")
+        st.caption(review.note)
+
+
+def _round_history_row(review) -> dict:
+    """Build a compact, display-only history row from a review."""
+    return {
+        "Outcome": review.outcome,
+        "Action taken": review.action_taken,
+        "Coach": review.coach_recommended_action,
+        "Followed coach": "yes" if review.followed_coach else "no",
+        "Player": " ".join(review.player_final_cards),
+        "Dealer": " ".join(review.dealer_final_cards),
+    }
+
+
+def _render_round_history() -> None:
+    """Render this session's saved round history and a small summary."""
+    history = st.session_state.round_history
+    if not history:
+        return
+    st.markdown("#### Round history (this session)")
+    wins = sum(1 for r in history if r["Outcome"] == "WIN")
+    losses = sum(1 for r in history if r["Outcome"] == "LOSS")
+    pushes = sum(1 for r in history if r["Outcome"] == "PUSH")
+    followed = sum(1 for r in history if r["Followed coach"] == "yes")
+    followed_but_lost = sum(
+        1 for r in history
+        if r["Followed coach"] == "yes" and r["Outcome"] == "LOSS")
+    st.caption(
+        f"{len(history)} round(s) - {wins}W / {losses}L / {pushes}P - "
+        f"followed coach {followed}/{len(history)} "
+        f"(incl. {followed_but_lost} correct decision(s) that still lost)")
+    # Show most recent first; st.table is static so it reconciles cleanly.
+    st.table(list(reversed(history)))
+    st.button(
+        "Clear round history", key="round_clear_history",
+        on_click=_clear_round_history, use_container_width=True)
+
+
+def _render_round_result(output, profile_key: str,
+                         initial_player: str, initial_dealer: str) -> None:
+    """Render the 'Round result' section shown after the recommendation.
+
+    The dealer's final cards and the player's final cards are recorded here only
+    - the recommendation above used only the player cards and the dealer upcard
+    and is never recomputed from this section.
+    """
+    st.markdown("---")
+    st.markdown("### Round result")
+    st.caption(
+        "Record how this round finished. The dealer's other cards and the "
+        "final hands are used only here - they never change the recommendation "
+        "above. A correct decision can still lose, so the decision review is "
+        "kept separate from the outcome.")
+
+    coach_action = output.final_action
+
+    st.button(
+        "Copy initial hand into final cards", key="round_copy_initial",
+        on_click=_copy_initial_into_round, args=(initial_player, initial_dealer),
+        use_container_width=True)
+
+    st.markdown("**Player final cards**")
+    _render_rank_buttons("round_player", _add_round_player_card)
+    round_player = st.session_state.round_player_cards
+    if round_player:
+        st.markdown(f"Selected: {_card_badges(round_player)}")
+    else:
+        st.markdown("Selected: _no cards yet_")
+    p_undo, p_clear = st.columns(2)
+    p_undo.button("Undo player card", key="round_player_undo",
+                  on_click=_undo_round_player_card,
+                  use_container_width=True, disabled=not round_player)
+    p_clear.button("Clear player final", key="round_player_clear",
+                   on_click=_clear_round_player_cards,
+                   use_container_width=True, disabled=not round_player)
+
+    st.markdown("**Dealer final cards**")
+    _render_rank_buttons("round_dealer", _add_round_dealer_card)
+    round_dealer = st.session_state.round_dealer_cards
+    if round_dealer:
+        st.markdown(f"Selected: {_card_badges(round_dealer)}")
+    else:
+        st.markdown("Selected: _no cards yet_")
+    d_undo, d_clear = st.columns(2)
+    d_undo.button("Undo dealer card", key="round_dealer_undo",
+                  on_click=_undo_round_dealer_card,
+                  use_container_width=True, disabled=not round_dealer)
+    d_clear.button("Clear dealer final", key="round_dealer_clear",
+                   on_click=_clear_round_dealer_cards,
+                   use_container_width=True, disabled=not round_dealer)
+
+    player_final_str = ",".join(round_player)
+    dealer_final_str = ",".join(round_dealer)
+
+    # Action taken defaults to the coach's recommended action.
+    action_index = (
+        list(WEB_ACTIONS).index(coach_action)
+        if coach_action in WEB_ACTIONS else 0
+    )
+    action_taken = st.radio(
+        "Action taken", WEB_ACTIONS, index=action_index,
+        key="round_action_taken", horizontal=True)
+
+    suggested = suggest_web_round_outcome(
+        player_final_str, dealer_final_str, action_taken)
+    if suggested is not None:
+        st.caption(f"Suggested from the final cards: {suggested}")
+    outcome_index = (
+        list(WEB_OUTCOMES).index(suggested)
+        if suggested in WEB_OUTCOMES else 0
+    )
+    outcome = st.radio(
+        "Round outcome", WEB_OUTCOMES, index=outcome_index,
+        key="round_outcome", horizontal=True)
+
+    save_clicked = st.button(
+        "Save round result", key="round_save", type="primary",
+        use_container_width=True)
+
+    review = None
+    try:
+        review = build_web_round_review(WebRoundInput(
+            coach_recommended_action=coach_action,
+            action_taken=action_taken,
+            player_final_cards=player_final_str,
+            dealer_final_cards=dealer_final_str,
+            outcome=outcome,
+        ))
+    except (ValueError, KeyError) as exc:
+        st.info(f"Add the final cards to record this round: {exc}")
+
+    if save_clicked:
+        if review is None:
+            st.warning(
+                "Add at least two player final cards and one dealer final "
+                "card before saving.")
+        else:
+            st.session_state.round_history.append(_round_history_row(review))
+            st.success("Round result saved to this session's history.")
+
+    if review is not None:
+        _render_decision_review(review)
+
+    _render_round_history()
+
+
 def _render_sidebar() -> dict:
     """Render the sidebar controls and return the collected options."""
     st.sidebar.header("Settings")
@@ -393,6 +629,8 @@ def main() -> None:
                 st.warning(f"Cannot give a decision yet: {exc}")
             else:
                 _render_output(output)
+                _render_round_result(
+                    output, options["profile_key"], player_cards, dealer_upcard)
         else:
             st.info(
                 "Add at least two player cards and the dealer's upcard, then "

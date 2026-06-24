@@ -1146,6 +1146,43 @@ handles no money or sensitive data. The display-only helpers live in
 `app/web_adapter.py` (`WEB_CARD_RANKS`, `WEB_QUICK_EXAMPLES`, `action_visual`),
 which stays Streamlit-free.
 
+## Web Round Result Tracker (v2.2.0)
+
+v2.2.0 adds a **Round result** section to the local web page, shown *after* the
+recommendation. Start the web UI the same way:
+
+```bash
+python -m pip install -e ".[web]"
+python -m streamlit run web/streamlit_app.py
+```
+
+In blackjack the initial recommendation depends only on the player cards and the
+dealer *upcard*; the dealer's hole card must not change it. The Round result
+section lets you record what actually happened once the round is over:
+
+- **Player final cards** and **Dealer final cards** via card buttons (with undo
+  / clear, and a "Copy initial hand into final cards" shortcut).
+- **Action taken** (HIT / STAND / DOUBLE / SPLIT / SURRENDER), defaulting to the
+  coach's recommendation.
+- **Round outcome** WIN / LOSS / PUSH (a suggestion is computed from the final
+  cards; you can override it).
+- **Save round result** into a session-visible **Round history** with a small
+  summary (including how many correct decisions still lost).
+
+The **Decision review** shows the coach recommended action, the player action
+taken, the final hand result, whether the decision was *correct / different from
+coach*, and the *outcome (win / loss / push)*. Decision quality is kept separate
+from the outcome - a correct play can still lose, so a LOSS is never marked a bad
+decision.
+
+The logic lives in the Streamlit-free `app/round_result.py` (outcome suggestion,
+decision review, and optional JSON persistence under the git-ignored
+`.blackjack_coach/web_rounds` tree) and is reached through `app/web_adapter.py`
+(`WebRoundInput`, `build_web_round_review`, `suggest_web_round_outcome`,
+`WEB_ACTIONS`, `WEB_OUTCOMES`). It never changes the recommendation, the correct
+answers, the Hi-Lo math, or the CLI, uses no EV as the main decision, runs no
+external commands, and stores no money, bankroll, bets, or sensitive data.
+
 
 
 

@@ -1,4 +1,4 @@
-"""Interaction tests for the local Streamlit Web Coach UI (v2.1.0).
+"""Interaction tests for the local Streamlit Web Coach UI (v2.2.0).
 
 These exercise the app the way a user would (clicking card buttons, quick
 examples, clear / reset / undo, and the manual text mode) using Streamlit's
@@ -309,3 +309,87 @@ class TestManualWarningNotStale:
         # No decision-button click needed: a complete manual hand evaluates.
         _assert_clean(at)
         assert "SPLIT" in (_action_heading(at) or "")
+
+
+
+def _ready_hand(player=("A", "7"), dealer="9"):
+    """Return an AppTest with a recommendation already shown (round section up)."""
+    return _build_hand(_fresh(), list(player), dealer)
+
+
+class TestRoundResultSection:
+    """v2.2.0: record a round result after the recommendation."""
+
+    def test_section_appears_after_recommendation(self):
+        at = _ready_hand()
+        _assert_clean(at)
+        assert any(m.value == "### Round result" for m in at.markdown)
+
+    def test_copy_initial_prefills_final_cards(self):
+        at = _ready_hand(("A", "7"), "9")
+        at.button(key="round_copy_initial").click().run()
+        _assert_clean(at)
+        assert at.session_state["round_player_cards"] == ["A", "7"]
+        assert at.session_state["round_dealer_cards"] == ["9"]
+
+    def test_save_round_records_history(self):
+        at = _ready_hand(("A", "7"), "10")
+        at.button(key="round_copy_initial").click().run()
+        at.button(key="round_player_K").click().run()   # A,7,K
+        at.button(key="round_dealer_Q").click().run()    # dealer 10,Q
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        at.button(key="round_save").click().run()
+        _assert_clean(at)
+        history = at.session_state["round_history"]
+        assert len(history) == 1
+        assert history[0]["Outcome"] == "LOSS"
+        assert history[0]["Followed coach"] == "yes"
+
+    def test_correct_decision_that_loses_is_not_marked_bad(self):
+        at = _ready_hand(("A", "7"), "10")
+        at.button(key="round_copy_initial").click().run()
+        at.button(key="round_player_K").click().run()
+        at.button(key="round_dealer_Q").click().run()
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        _assert_clean(at)
+        markdowns = [m.value for m in at.markdown]
+        # Decision review says it followed the coach (correct) even though LOSS.
+        assert any(
+            "Followed coach recommendation" in m and "correct" in m
+            for m in markdowns)
+        assert any("Loss" in m and "Outcome" in m for m in markdowns)
+
+    def test_different_action_is_flagged_different(self):
+        at = _ready_hand(("A", "7"), "10")  # coach recommends HIT
+        at.button(key="round_copy_initial").click().run()
+        at.button(key="round_dealer_Q").click().run()
+        at.radio(key="round_action_taken").set_value("STAND").run()
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        _assert_clean(at)
+        markdowns = [m.value for m in at.markdown]
+        assert any("Different from coach recommendation" in m for m in markdowns)
+
+    def test_reset_all_clears_round_inputs_keeps_history(self):
+        at = _ready_hand(("A", "7"), "10")
+        at.button(key="round_copy_initial").click().run()
+        at.button(key="round_dealer_Q").click().run()
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        at.button(key="round_save").click().run()
+        assert len(at.session_state["round_history"]) == 1
+        at.button(key="reset_all").click().run()
+        _assert_clean(at)
+        assert at.session_state["round_player_cards"] == []
+        assert at.session_state["round_dealer_cards"] == []
+        # History is intentionally preserved across Reset all.
+        assert len(at.session_state["round_history"]) == 1
+
+    def test_clear_round_history(self):
+        at = _ready_hand(("A", "7"), "10")
+        at.button(key="round_copy_initial").click().run()
+        at.button(key="round_dealer_Q").click().run()
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        at.button(key="round_save").click().run()
+        assert len(at.session_state["round_history"]) == 1
+        at.button(key="round_clear_history").click().run()
+        _assert_clean(at)
+        assert at.session_state["round_history"] == []
