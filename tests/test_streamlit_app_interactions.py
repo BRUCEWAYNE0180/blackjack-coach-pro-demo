@@ -571,3 +571,55 @@ class TestPracticeTable:
         assert any(b.key.startswith("table_act_") for b in at.button)
         assert any(
             "Current coach recommendation" in m.value for m in at.markdown)
+
+
+
+class TestPracticeTableLearningReview:
+    """v2.4.0: learning review over the practice table."""
+
+    def _finish_different_win(self, at):
+        # 10,7 (hard 17) vs 6 -> coach STAND; HIT (->21) then STAND; dealer busts.
+        from app import practice_table as pt
+        at.session_state["table_state"] = pt.build_table_state(
+            "MULTI_DECK_H17_DAS_LS", ["10", "7"], ["6", "10"], ["8", "4"])
+        at.run()
+        at.button(key="table_act_HIT").click().run()
+        at.button(key="table_act_STAND").click().run()
+
+    def test_round_shows_explanation_and_next_time_advice(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        self._finish_different_win(at)
+        _assert_clean(at)
+        infos = [i.value for i in at.info]
+        warns = [w.value for w in at.warning]
+        assert any("different from the coach" in i for i in infos)
+        assert any("Next time" in w for w in warns)
+
+    def test_learning_dashboard_rendered(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        self._finish_different_win(at)
+        _assert_clean(at)
+        markdowns = [m.value for m in at.markdown]
+        assert any("Learning dashboard" in m for m in markdowns)
+        assert any("Conclusion:" in m for m in markdowns)
+        assert len(at.session_state["table_history"]) == 1
+
+    def test_correct_loss_is_not_flagged_as_mistake(self):
+        # Inject a followed-coach losing round; the dashboard mistake count is 0.
+        from app import practice_review as pr
+        from app import practice_table as pt
+        at = _fresh()
+        _enter_practice_table(at)
+        state = pt.build_table_state(
+            "MULTI_DECK_H17_DAS_LS", ["10", "7"], ["10", "9"], [])
+        pt.apply_action(state, "STAND")  # follows coach STAND, loses to 19
+        record = pt.build_round_record(state)
+        learning = pr.build_round_learning(record)
+        at.session_state["table_history"] = [learning]
+        at.run()
+        _assert_clean(at)
+        dash = pr.build_learning_dashboard(at.session_state["table_history"])
+        assert dash.mistakes == 0
+        assert dash.correct_but_lost == 1

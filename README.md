@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v2.3.0 feature summary
+## v2.4.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -188,6 +188,13 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   WIN / LOSS / PUSH outcome, decision review, and a session history are recorded
   for you. Local / simulated / educational only: no camera, no screen reading,
   no scraping, no real casino, no real money or bankroll.
+- **Practice table learning review** (v2.4.0): the practice table now explains
+  *why* each round ended, categorises the conclusion, tracks **weak spots**,
+  gives **"next time" advice** for mistakes, suggests **drills** for repeated
+  errors, and shows a **learning dashboard** (follow-coach %, mistakes,
+  correct-but-lost spots, most repeated situations). Decision quality is always
+  kept separate from the round outcome - a correct decision that loses is never
+  counted as a mistake.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -674,6 +681,35 @@ lives in the Streamlit-free `app/practice_table.py`, which reuses the existing
 shoe, dealer-play and outcome code and **never changes `strategy_engine.recommend`,
 the Hi-Lo math, or the coach's decisions**. As always, decision quality is kept
 separate from the round outcome - a correct play can still lose.
+
+## Practice Table Learning Review (v2.4.0)
+
+v2.4.0 turns the practice table's history into a **learning review**. Every
+finished round now shows:
+
+- a **conclusion category** (correct win / correct loss / different win /
+  different loss / push / surrender);
+- an **outcome-aware explanation** - e.g. *"You followed the coach. This was a
+  correct decision, but the dealer made 20. This does not mean the coach
+  recommendation was wrong - repeat the same decision next time."* or *"You won,
+  but your action was different from the coach. Do not treat this as a good
+  habit automatically."*;
+- for **mistakes** (action different from the coach), concrete **next-time
+  advice** - e.g. *"Next time: stand on hard 17 vs 6."* or *"Next time: split 8s
+  vs 10 if split is allowed."*
+
+A **learning dashboard** summarises the session: total rounds, **followed-coach
+%**, **mistakes**, **correct decisions that still lost** (tracked as variance,
+not errors), **most common missed spots**, most common losing-but-correct spots,
+and the most repeated situations. Repeated mistakes produce **drill suggestions**
+(e.g. *"Practice hard 16 vs 10"*, *"Practice double spots"*).
+
+The single most important rule: **decision quality is separate from the round
+outcome.** A correct decision that loses is never counted as a mistake, and a
+win after a non-recommended play is never automatically a good habit. The logic
+lives in the Streamlit-free `app/practice_review.py` and **never changes
+`strategy_engine.recommend`, the Hi-Lo math, or the coach's decisions**. It is
+local / educational only and stores no money, bankroll, or sensitive data.
 
 ## Terminal visual polish (v1.1.0)
 

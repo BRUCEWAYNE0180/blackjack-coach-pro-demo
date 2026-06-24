@@ -151,6 +151,25 @@ class TestStreamlitAppV23PracticeTable:
         assert "Current coach recommendation" in source
         assert "current_coach_action" in source
 
+
+class TestStreamlitAppV24LearningReview:
+    """v2.4.0 practice-table learning review."""
+
+    def test_uses_practice_review(self):
+        source = _source()
+        assert "practice_review" in source
+        assert "build_round_learning" in source
+
+    def test_has_learning_dashboard(self):
+        source = _source()
+        assert "Learning dashboard" in source
+        assert "build_learning_dashboard" in source
+
+    def test_shows_explanation_and_advice(self):
+        source = _source()
+        assert "learning.explanation" in source
+        assert "next_time_advice" in source
+
     def test_player_and_dealer_pickers(self):
         source = _source()
         assert "Your hand" in source

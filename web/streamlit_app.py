@@ -32,13 +32,20 @@ SURRENDER; SPLIT is auto-played), plays the dealer out automatically per the
 profile, computes WIN / LOSS / PUSH, and auto-saves a decision review to a
 session history. Local / simulated / educational only - no real money, no
 bankroll.
+
+v2.4.0 adds a **learning review** to the practice table: every round gets an
+outcome-aware explanation and a conclusion category, weak spots are tracked, a
+learning dashboard summarises follow-rate / mistakes / correct-but-lost spots /
+repeated situations, mistakes get "next time" advice, and repeated mistakes
+suggest drills. Decision quality is always kept separate from the round outcome
+- a correct decision that loses is never counted as a mistake.
 """
 
 from __future__ import annotations
 
 import streamlit as st
 
-from app import __version__, practice_table
+from app import __version__, practice_review, practice_table
 from app.rules import DEFAULT_PROFILE, PROFILES
 from app.web_adapter import (
     DOUBLE_PLAY_NOTE,
@@ -215,7 +222,7 @@ def _table_action(action: str) -> None:
     if state.is_round_over and not state.recorded:
         record = practice_table.build_round_record(state)
         st.session_state.table_history.append(
-            practice_table.round_history_row(record))
+            practice_review.build_round_learning(record))
         state.recorded = True
 
 
@@ -643,23 +650,44 @@ def _render_round_result(profile_key: str) -> None:
 # --- Practice-table rendering (v2.3.0) ------------------------------------
 
 def _render_table_history() -> None:
-    """Render this session's demo-round history with a small summary."""
-    history = st.session_state.table_history
-    if not history:
+    """Render this session's learning review: dashboard, drills, and history."""
+    learnings = st.session_state.table_history
+    if not learnings:
         return
-    st.markdown("#### Session history")
-    wins = sum(1 for r in history if r["Outcome"] == "WIN")
-    losses = sum(1 for r in history if r["Outcome"] == "LOSS")
-    pushes = sum(1 for r in history if r["Outcome"] == "PUSH")
-    followed = sum(1 for r in history if r["Followed coach"] == "yes")
-    followed_but_lost = sum(
-        1 for r in history
-        if r["Followed coach"] == "yes" and r["Outcome"] == "LOSS")
+    dashboard = practice_review.build_learning_dashboard(learnings)
+
+    st.markdown("#### Learning dashboard")
     st.caption(
-        f"{len(history)} round(s) - {wins}W / {losses}L / {pushes}P - "
-        f"followed coach {followed}/{len(history)} "
-        f"(incl. {followed_but_lost} correct decision(s) that still lost)")
-    st.table(list(reversed(history)))
+        "Decision quality is tracked separately from the round outcome - a "
+        "correct decision that loses is never counted as a mistake.")
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("Rounds", dashboard.total_rounds)
+    col_b.metric("Followed coach", f"{dashboard.followed_coach_pct:.0f}%")
+    col_c.metric("Mistakes", dashboard.mistakes)
+    col_d, col_e = st.columns(2)
+    col_d.metric("Correct but lost", dashboard.correct_but_lost)
+    col_e.metric("Different but won", dashboard.different_but_won)
+
+    if dashboard.most_common_missed_spots:
+        st.markdown("**Most common missed spots (mistakes):**")
+        for spot, count in dashboard.most_common_missed_spots:
+            st.markdown(f"- {spot} - {count}x")
+    if dashboard.most_common_losing_correct_spots:
+        st.markdown("**Correct decisions that still lost (variance, not errors):**")
+        for spot, count in dashboard.most_common_losing_correct_spots:
+            st.markdown(f"- {spot} - {count}x")
+    if dashboard.most_repeated_situations:
+        st.markdown("**Most repeated situations:**")
+        for spot, count in dashboard.most_repeated_situations:
+            st.markdown(f"- {spot} - {count}x")
+    if dashboard.drill_suggestions:
+        st.markdown("**Suggested drills (repeated mistakes):**")
+        for drill in dashboard.drill_suggestions:
+            st.markdown(f"- {drill}")
+
+    st.markdown("#### Session history")
+    rows = [practice_review.learning_row(entry) for entry in reversed(learnings)]
+    st.table(rows)
     st.button(
         "Clear session history", key="table_clear_history",
         on_click=_clear_table_history, use_container_width=True)
@@ -668,6 +696,7 @@ def _render_table_history() -> None:
 def _render_table_round_result(state) -> None:
     """Render a finished demo round: outcome, decision review, conclusion."""
     record = practice_table.build_round_record(state)
+    learning = practice_review.build_round_learning(record)
     outcome_color = _OUTCOME_COLOR.get(record.outcome, "gray")
     with st.container(border=True):
         st.caption("ROUND RESULT")
@@ -677,7 +706,7 @@ def _render_table_round_result(state) -> None:
     st.markdown("#### Decision review")
     st.markdown(
         f"- **Initial hand:** {record.initial_hand} vs dealer "
-        f"{record.dealer_upcard}")
+        f"{record.dealer_upcard} ({learning.hand_type})")
     st.markdown(f"- **Coach recommended action:** {record.coach_action}")
     st.markdown(f"- **Player action taken:** {record.action_taken}")
     st.markdown(f"- **Player final cards:** {record.player_final}")
@@ -687,6 +716,11 @@ def _render_table_round_result(state) -> None:
     st.markdown(
         f"- **Decision review:** :{decision_color}[{record.decision_label}] "
         f"({review_word})")
+    st.markdown(
+        f"- **Conclusion:** {learning.conclusion_category.replace('_', ' ')}")
+    st.info(learning.explanation)
+    if learning.next_time_advice:
+        st.warning(learning.next_time_advice)
     if record.decision_steps:
         st.markdown("**Action sequence:**")
         for index, step in enumerate(record.decision_steps, start=1):

@@ -328,6 +328,10 @@ class TableRoundRecord:
     outcome: str
     was_split: bool
     conclusion: str
+    player_busted: bool = False
+    dealer_busted: bool = False
+    doubled: bool = False
+    surrendered: bool = False
     decision_steps: tuple[dict, ...] = ()
     note: str = DECISION_VS_OUTCOME_NOTE
 
@@ -371,6 +375,7 @@ def build_round_record(state: TableState) -> TableRoundRecord:
     action_taken = state.first_action or state.coach_action
     followed = action_taken == state.coach_action
     dealer = evaluate_hand(state.dealer_cards)
+    dealer_busted = state.dealer_revealed and dealer.is_bust
 
     if state.was_split:
         player_final = " / ".join(" ".join(h) for h in state.split_hands)
@@ -405,6 +410,11 @@ def build_round_record(state: TableState) -> TableRoundRecord:
         outcome=state.outcome,
         was_split=state.was_split,
         conclusion=conclusion,
+        player_busted=(not state.was_split
+                       and evaluate_hand(state.player_cards).is_bust),
+        dealer_busted=dealer_busted,
+        doubled=state.doubled,
+        surrendered=state.surrendered,
         decision_steps=tuple(state.steps),
     )
 

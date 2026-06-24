@@ -7,6 +7,73 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [2.4.0] - 2026-06-24
+
+Practice Table Learning Review. v2.4.0 makes the practice table's history
+smarter: instead of just WIN / LOSS / PUSH, every round now gets an
+outcome-aware **explanation**, a **conclusion category**, **weak-spot tracking**,
+**"next time" advice** for mistakes, **drill suggestions** for repeated errors,
+and a **learning dashboard**.
+
+The golden rule is enforced throughout: **decision quality is kept separate from
+the round outcome.** A correct decision that loses is never counted as a mistake
+(only that the round lost), and a win after a non-recommended action is never
+automatically a good habit. "Mistake" means only that the action differed from
+the coach. Local / simulated / educational only; the engine and CLI are
+unchanged.
+
+### Added
+
+- New `app/practice_review.py` (Streamlit-free, unit-testable): `RoundLearning`
+  and `LearningDashboard`, plus `classify_conclusion` (correct/different x
+  win/loss, push, surrender), `hand_type_of` (hard / soft / pair), `spot_label`,
+  `build_explanation` (outcome-aware, never blames a correct decision for a
+  loss), `next_time_advice` (for mistakes only), `build_round_learning`,
+  `learning_row`, `build_drill_suggestions` (for repeated mistakes), and
+  `build_learning_dashboard` (total rounds, followed-coach %, mistakes,
+  correct-but-lost, different-but-won, most common missed spots, most common
+  losing-but-correct spots, most repeated situations, drill suggestions).
+- `app/practice_table.py`: `TableRoundRecord` now also exposes
+  `player_busted` / `dealer_busted` / `doubled` / `surrendered` so the review
+  can explain *how* the round ended.
+- `web/streamlit_app.py` learning review in the Practice table mode: each
+  finished round shows its conclusion category, an outcome-aware explanation,
+  and (for mistakes) next-time advice and the action sequence; a **Learning
+  dashboard** summarises follow-rate, mistakes, correct-but-lost and
+  different-but-won counts, the most common missed / losing-correct / repeated
+  spots, and drill suggestions; the session history table shows per-round spot /
+  coach / action / followed / outcome / conclusion.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **2.4.0** (practice-table learning
+  review only; the engine, the recommendations, the Hi-Lo math, EV (advisory),
+  and the CLI are unchanged and fully backward compatible).
+
+### Quality
+
+- New `tests/test_practice_review.py` (conclusion categories; hand type / spot
+  label; **correct-loss is not a mistake** and is explained as variance;
+  **incorrect-win is flagged, not endorsed**; next-time advice for HIT / SPLIT /
+  DOUBLE; drill suggestions for repeated mistakes; the dashboard summary counts,
+  weak spots and drills; empty dashboard; `recommend()` unchanged). Extended
+  `tests/test_streamlit_app_interactions.py` (the round shows an explanation and
+  next-time advice; the learning dashboard renders; a correct loss is not a
+  mistake) and `tests/test_streamlit_app_static.py`. Updated the `--version`
+  assertions to 2.4.0. Full suite passing (with and without Streamlit
+  installed); ruff clean across `app tests web`.
+
+### Safety
+
+- The learning review is **local, educational, and outcome-separated**. It never
+  uses the round outcome to call a correct decision a mistake, never changes
+  `strategy_engine.recommend`, the Hi-Lo math, the coach decisions, or the
+  correct answers, and never uses EV as the main decision. `app/practice_review.py`
+  stays Streamlit-free and stores no money, bankroll, bets, accounts, tokens,
+  screenshots, or personal data; the session history is in-memory only. No
+  camera, no screen reading, no scraping, no real casino, no external API, no
+  database, no login/auth. The CLI continues to work exactly as before.
+
 ## [2.3.0] - 2026-06-24
 
 Local Blackjack Practice Table. v2.3.0 adds a **Practice table (demo)** mode to
