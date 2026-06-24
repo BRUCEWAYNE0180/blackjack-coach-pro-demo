@@ -1,4 +1,4 @@
-"""Interaction tests for the local Streamlit Web Coach UI (v2.1.0).
+"""Interaction tests for the local Streamlit Web Coach UI (v2.2.0).
 
 These exercise the app the way a user would (clicking card buttons, quick
 examples, clear / reset / undo, and the manual text mode) using Streamlit's
@@ -309,3 +309,176 @@ class TestManualWarningNotStale:
         # No decision-button click needed: a complete manual hand evaluates.
         _assert_clean(at)
         assert "SPLIT" in (_action_heading(at) or "")
+
+
+
+def _ready_hand(player=("A", "7"), dealer="9"):
+    """Return an AppTest with a recommendation already shown (round section up)."""
+    return _build_hand(_fresh(), list(player), dealer)
+
+
+class TestRoundResultSection:
+    """v2.2.0: record a round result after the recommendation."""
+
+    def test_section_appears_after_recommendation(self):
+        at = _ready_hand()
+        _assert_clean(at)
+        assert any(m.value == "### Round result" for m in at.markdown)
+
+    def test_copy_initial_prefills_final_cards(self):
+        at = _ready_hand(("A", "7"), "9")
+        at.button(key="round_copy_initial").click().run()
+        _assert_clean(at)
+        assert at.session_state["round_player_cards"] == ["A", "7"]
+        assert at.session_state["round_dealer_cards"] == ["9"]
+
+    def test_save_round_records_history(self):
+        at = _ready_hand(("A", "7"), "10")
+        at.button(key="round_copy_initial").click().run()
+        at.button(key="round_player_K").click().run()   # A,7,K
+        at.button(key="round_dealer_Q").click().run()    # dealer 10,Q
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        at.button(key="round_save").click().run()
+        _assert_clean(at)
+        history = at.session_state["round_history"]
+        assert len(history) == 1
+        assert history[0]["Outcome"] == "LOSS"
+        assert history[0]["Followed coach"] == "yes"
+
+    def test_correct_decision_that_loses_is_not_marked_bad(self):
+        at = _ready_hand(("A", "7"), "10")
+        at.button(key="round_copy_initial").click().run()
+        at.button(key="round_player_K").click().run()
+        at.button(key="round_dealer_Q").click().run()
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        _assert_clean(at)
+        markdowns = [m.value for m in at.markdown]
+        # Decision review says it followed the coach (correct) even though LOSS.
+        assert any(
+            "Followed coach recommendation" in m and "correct" in m
+            for m in markdowns)
+        assert any("Loss" in m and "Outcome" in m for m in markdowns)
+
+    def test_different_action_is_flagged_different(self):
+        at = _ready_hand(("A", "7"), "10")  # coach recommends HIT
+        at.button(key="round_copy_initial").click().run()
+        at.button(key="round_dealer_Q").click().run()
+        at.radio(key="round_action_taken").set_value("STAND").run()
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        _assert_clean(at)
+        markdowns = [m.value for m in at.markdown]
+        assert any("Different from coach recommendation" in m for m in markdowns)
+
+    def test_reset_all_clears_round_inputs_keeps_history(self):
+        at = _ready_hand(("A", "7"), "10")
+        at.button(key="round_copy_initial").click().run()
+        at.button(key="round_dealer_Q").click().run()
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        at.button(key="round_save").click().run()
+        assert len(at.session_state["round_history"]) == 1
+        at.button(key="reset_all").click().run()
+        _assert_clean(at)
+        assert at.session_state["round_player_cards"] == []
+        assert at.session_state["round_dealer_cards"] == []
+        # History is intentionally preserved across Reset all.
+        assert len(at.session_state["round_history"]) == 1
+
+    def test_clear_round_history(self):
+        at = _ready_hand(("A", "7"), "10")
+        at.button(key="round_copy_initial").click().run()
+        at.button(key="round_dealer_Q").click().run()
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        at.button(key="round_save").click().run()
+        assert len(at.session_state["round_history"]) == 1
+        at.button(key="round_clear_history").click().run()
+        _assert_clean(at)
+        assert at.session_state["round_history"] == []
+
+
+
+class TestFrozenInitialDecision:
+    """Regression: the round review must use the frozen initial coach decision,
+    never a recommendation recomputed from the final / grown cards."""
+
+    def _coach_line(self, at):
+        return next(
+            (m.value for m in at.markdown
+             if "Coach recommended action" in m.value), None)
+
+    def test_decision_frozen_when_main_hand_grows(self):
+        # A,7 vs 10 -> coach HIT. Growing the MAIN hand to A,7,K would make the
+        # live recommendation STAND, but the round review must stay HIT.
+        at = _build_hand(_fresh(), ["A", "7"], "10")
+        assert at.session_state["coach_decision"]["coach_action"] == "HIT"
+        at.button(key="player_K").click().run()  # grow main hand to A,7,K
+        # Frozen decision is unchanged even though the live banner now differs.
+        assert at.session_state["coach_decision"]["coach_action"] == "HIT"
+
+    def test_review_says_followed_coach_even_after_growing_hand(self):
+        at = _build_hand(_fresh(), ["A", "7"], "10")
+        at.button(key="player_K").click().run()  # main hand A,7,K (live STAND)
+        # Record final cards A,7,K vs 10,Q, action HIT, outcome LOSS.
+        at.button(key="round_player_A").click().run()
+        at.button(key="round_player_7").click().run()
+        at.button(key="round_player_K").click().run()
+        at.button(key="round_dealer_10").click().run()
+        at.button(key="round_dealer_Q").click().run()
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        _assert_clean(at)
+        markdowns = [m.value for m in at.markdown]
+        assert self._coach_line(at) == "- **Coach recommended action:** HIT"
+        assert any(
+            "Followed coach recommendation" in m and "correct" in m
+            for m in markdowns)
+        assert not any(
+            "Different from coach recommendation" in m for m in markdowns)
+        assert any("Outcome" in m and "Loss" in m for m in markdowns)
+
+    def test_history_separates_initial_and_final_hands(self):
+        at = _build_hand(_fresh(), ["A", "7"], "10")
+        at.button(key="round_copy_initial").click().run()
+        at.button(key="round_player_K").click().run()
+        at.button(key="round_dealer_Q").click().run()
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        at.button(key="round_save").click().run()
+        _assert_clean(at)
+        row = at.session_state["round_history"][-1]
+        assert row["Initial"] == "A,7 vs 10"
+        assert row["Coach"] == "HIT"
+        assert row["Followed coach"] == "yes"
+        assert row["Outcome"] == "LOSS"
+        # The final hand is recorded separately, not used to infer the coach pick.
+        assert row["Player final"] == "A 7 K"
+        assert row["Dealer final"] == "10 Q"
+
+
+
+class TestDoublePlayHelp:
+    """v2.2.0 UX: clarify how DOUBLE resolves and flag bad final hands."""
+
+    def _infos(self, at):
+        return [i.value for i in at.info]
+
+    def _warnings(self, at):
+        return [w.value for w in at.warning]
+
+    def test_banner_shows_double_note(self):
+        # 6,5 vs 5 -> coach DOUBLE: the banner explains the one-card rule.
+        at = _build_hand(_fresh(), ["6", "5"], "5")
+        _assert_clean(at)
+        assert at.session_state["coach_decision"]["coach_action"] == "DOUBLE"
+        assert any("take exactly one additional card" in i for i in self._infos(at))
+
+    def test_round_warns_on_too_many_cards_after_double(self):
+        at = _build_hand(_fresh(), ["6", "5"], "5")
+        at.button(key="round_copy_initial").click().run()   # 6,5
+        at.button(key="round_player_K").click().run()        # 6,5,K (correct)
+        at.button(key="round_dealer_10").click().run()
+        at.button(key="round_dealer_7").click().run()
+        # Action defaults to the coach action (DOUBLE); 3 cards => no warning.
+        assert not any(
+            "one additional card" in w.lower() for w in self._warnings(at))
+        at.button(key="round_player_3").click().run()        # 6,5,K,3 (too many)
+        _assert_clean(at)
+        assert any(
+            "one additional card" in w.lower() for w in self._warnings(at))

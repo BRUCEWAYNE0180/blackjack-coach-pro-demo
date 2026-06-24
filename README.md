@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v2.1.0 feature summary
+## v2.2.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -174,6 +174,13 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   missing-card warnings, and a mobile-friendly layout - with the manual
   text-entry mode kept. Presentation only; the engine, recommendations, Hi-Lo
   math, and CLI are unchanged.
+- **Web round-result tracker** (v2.2.0): after the recommendation, the local web
+  page can record how the round finished - the player's and dealer's **final
+  cards**, the **action taken**, and the **WIN / LOSS / PUSH** outcome - and show
+  a **decision review** that keeps decision quality (did it follow the coach?)
+  separate from the round outcome. A correct play can still lose, so a LOSS is
+  never marked a bad decision. The initial recommendation still uses only the
+  player cards and dealer upcard.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -585,6 +592,47 @@ power users. All of this is **presentation only**: the engine, the
 recommendation, the correct answers, the Hi-Lo math, and the CLI are unchanged,
 and the UI still runs no external commands and handles no money or sensitive
 data.
+
+## Web Round Result Tracker (v2.2.0)
+
+v2.2.0 lets you close the loop on a hand. In blackjack the initial decision uses
+only the player cards and the dealer's *upcard* - the dealer's hole card must
+**not** change that recommendation. But after the round you often want to record
+what actually happened. v2.2.0 adds a **Round result** section below the
+recommendation for exactly that:
+
+- **Player final cards** and **Dealer final cards** via the same tappable card
+  buttons (with undo / clear, and a *Copy initial hand into final cards*
+  shortcut).
+- **Action taken** (HIT / STAND / DOUBLE / SPLIT / SURRENDER), defaulting to the
+  coach's recommendation.
+- **Outcome** WIN / LOSS / PUSH, with a suggestion computed from the final cards
+  (you can always override it).
+- **Save round result** into a session-visible **Round history** (with a small
+  summary, including how many correct decisions still lost).
+
+The **Decision review** clearly shows the *coach recommended action*, the
+*player action taken*, the *final hand result*, whether the decision was
+**correct / different from coach**, and the **outcome (win / loss / push)**.
+
+When the coach recommends **DOUBLE**, the banner clarifies the rule - *take
+exactly one additional card, then your turn ends* - and the Round result section
+warns if a recorded double's final hand has more than one extra card (e.g.
+initial `6,5` but final `6,5,K,3`).
+
+The most important rule: **decision quality and round outcome are separate**. A
+correct play can lose and a mistake can win, so a LOSS is never automatically a
+bad decision. For example:
+
+> Initial hand `A,7` vs dealer `10` -> coach says **HIT**. Player final cards
+> `A,7,K` (18), dealer final cards `10,Q` (20) -> **Outcome: LOSS**, but the
+> decision review reads *Followed coach recommendation (correct)*.
+
+This is local and educational only: the dealer's final cards are used here
+solely to log the round (never to change the recommendation), and it stores no
+money, bankroll, bets, accounts, or personal data. The in-web history is
+session-only; optional local persistence (the `app.round_result` module) follows
+the project's existing pattern under the git-ignored `.blackjack_coach/` tree.
 
 ## Terminal visual polish (v1.1.0)
 

@@ -405,6 +405,23 @@ As of v0.9 the project enforces these gates on every change:
   Streamlit UI imports the adapter, never the reverse. Streamlit is an optional
   `web` dependency and must not be required by the engine, the CLI, or the test
   suite, and the CLI must keep working unchanged.
+- **The round-result tracker is local, educational, and outcome-separated.**
+  The v2.2.0 round-result tracker (`app/round_result.py` and the web-adapter
+  wrappers `WebRoundInput` / `build_web_round_review` / `suggest_web_round_outcome`,
+  surfaced in the web "Round result" section) records only what happened in a
+  played round - the final cards, the action taken, and the WIN/LOSS/PUSH
+  outcome. It must keep **decision quality separate from round outcome**: a
+  correct play that loses must never be marked a bad decision, and the outcome
+  must never be used to re-grade the decision. The dealer's final cards may be
+  recorded but must **never** change the recommendation, which depends only on
+  the player cards and the dealer upcard. It must not change
+  `strategy_engine.recommend`, the Hi-Lo math, the correct answers, or use EV as
+  the main decision. `app/round_result.py` must stay Streamlit-free and
+  standard-library only (no network, no external API, no database, no
+  login/auth). It must store no money, bankroll, bets, wagers, balances,
+  accounts, tokens, screenshots, or personal data. The in-web history is
+  session-only; optional JSON persistence must live under the git-ignored
+  `.blackjack_coach/` tree and must never be committed.
 
 ## 8. Release Rules
 

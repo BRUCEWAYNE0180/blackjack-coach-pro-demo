@@ -7,6 +7,105 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [2.2.0] - 2026-06-24
+
+Web round-result tracker. v2.2.0 adds a **Round result** section to the local
+Streamlit Web Coach UI so you can record how a round actually finished *after*
+getting the coach's recommendation, and review the play. Crucially, it keeps
+**decision quality** (did the play follow the coach?) separate from the **round
+outcome** (win / loss / push) - a correct play can still lose, so a LOSS is
+never treated as a bad decision.
+
+The initial recommendation is unchanged: it still depends only on the player
+cards and the dealer *upcard*. The dealer's second card and the final hands are
+used only in the new section and never change the recommendation.
+
+### Added
+
+- New `app/round_result.py` (Streamlit-free, unit-testable; standard library
+  only): `RoundResultReview`, `RoundResultRecord`, `RoundResultSummary`, plus
+  `build_round_review` (decision review separated from outcome),
+  `suggest_outcome` (WIN/LOSS/PUSH hint from the final hands; surrender =
+  half-loss), `normalize_action` / `normalize_outcome`, and local JSON
+  persistence (`build_round_result_record`, `save`/`load`/`list_round_result_records`,
+  `summarize_round_results`) under the git-ignored `.blackjack_coach/web_rounds`
+  tree, following the project's existing local-history pattern.
+- New `app/web_adapter.py` round-result wrappers: `WebRoundInput`,
+  `build_web_round_review`, `suggest_web_round_outcome`, and the `WEB_ACTIONS` /
+  `WEB_OUTCOMES` constants. They parse the web's card strings and delegate to
+  `app.round_result`; the adapter stays Streamlit-free.
+- `web/streamlit_app.py` **Round result** section after the recommendation:
+  card-button pickers for the player's and dealer's final cards (with undo /
+  clear and a "Copy initial hand into final cards" convenience), an action-taken
+  control (defaulting to the coach's recommendation), a WIN / LOSS / PUSH
+  outcome control (with a suggestion computed from the final cards), a **Save
+  round result** button, a colour-coded **Decision review** (coach recommended
+  action, player action taken, final hand result, decision correct / different
+  from coach, and the outcome - with a note that decision quality is independent
+  of the outcome), and a session-visible **Round history** with a small summary
+  (including how many correct decisions still lost). `Reset all` clears the
+  round inputs too; the history has its own "Clear round history" control.
+- **Double play clarification**: when the coach recommends `DOUBLE`, the
+  recommendation banner shows a clear note - *"Double: take exactly one
+  additional card, then your turn ends. Do not hit again after doubling."* In
+  the Round result section, if the action taken is `DOUBLE` and the player's
+  final hand does not have exactly one more card than the initial hand (e.g.
+  initial `6,5` -> final `6,5,K,3`), a warning is shown: *"DOUBLE normally
+  receives exactly one additional card. Check the final player cards."*
+  (`app.round_result.double_card_count_warning` /
+  `app.web_adapter.double_round_card_warning` / `DOUBLE_PLAY_NOTE`).
+
+### Changed
+
+- Bumped the package and `app.__version__` to **2.2.0** (web round-result
+  tracking only; the engine, the recommendations, the Hi-Lo math, EV (advisory),
+  and the CLI are unchanged and fully backward compatible).
+
+### Fixed
+
+- The round review now **freezes the coach's recommendation at the initial
+  (two-card) decision point** and uses that frozen action, instead of reading
+  the live recommendation. Previously, if the player's main hand grew (e.g.
+  `A,7` -> `A,7,K`) the live recommendation changed (HIT -> STAND) and the
+  review wrongly showed `Coach recommended action: STAND` / "Different from coach
+  recommendation". The frozen decision is computed from the first two player
+  cards vs the dealer upcard and never recomputed from the final / grown cards
+  (`_capture_coach_decision` + the `coach_decision` session state). The decision
+  review and the round history now also show the **initial hand and the final
+  hand as separate fields**, so the final cards are never used to infer the
+  initial recommendation.
+
+### Quality
+
+- New `tests/test_round_result.py` (outcome suggestion incl. busts / surrender /
+  push; the decision review separating quality from outcome - a correct play
+  that loses is not marked bad; explicit outcome vs suggestion; save/load/list
+  roundtrip and profile filter via `tmp_path`; summary crosses
+  `followed_but_lost` / `differed_but_won`; no sensitive field names;
+  `recommend()` unchanged). Extended `tests/test_web_adapter.py` (round wrappers,
+  validation, suggestion tolerance, recommendation unchanged),
+  `tests/test_streamlit_app_interactions.py` (record a round, copy initial hand,
+  a correct decision that loses stays "Followed coach", a different action is
+  flagged, Reset all keeps history, clear history), and
+  `tests/test_streamlit_app_static.py`. Updated the `--version` assertions to
+  2.2.0. Full suite passing (with and without Streamlit installed); ruff clean
+  across `app tests web`.
+
+### Safety
+
+- The round-result tracker is **local and educational only**. It records
+  win/loss/push to review decisions; it stores no money, bankroll, bets,
+  accounts, tokens, screenshots, or personal data, and never guarantees
+  winnings. It never changes `strategy_engine.recommend`, the Hi-Lo math, the
+  recommendation, or the correct answers, never uses EV as the main decision,
+  and never runs external commands (no shell, no subprocess, no network). The
+  dealer's final cards are used only to log the round, never to change the
+  recommendation. No FastAPI, no Telegram, no database, no login/auth, no
+  cloud. `app/round_result.py` stays Streamlit-free; the in-web history is
+  session-only and the optional JSON persistence lives under the git-ignored
+  `.blackjack_coach/` tree (never committed). The CLI continues to work exactly
+  as before.
+
 ## [2.1.0] - 2026-06-24
 
 Web card buttons & UI polish. v2.1.0 makes the local **Streamlit Web Coach UI**

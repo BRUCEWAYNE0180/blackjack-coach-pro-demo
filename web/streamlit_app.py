@@ -16,6 +16,14 @@ dealer-upcard entry, one-click quick examples, clear / reset controls, a
 polished colour-coded recommendation, clearer warnings, and a mobile-friendly
 layout. A manual text-entry mode is kept for power users. All of this is
 presentation only; the engine and CLI are unchanged.
+
+v2.2.0 adds a **Round result** section after the recommendation: record the
+player's and dealer's final cards, the action actually taken, and the WIN /
+LOSS / PUSH outcome, then see a decision review that keeps **decision quality**
+(did it follow the coach?) separate from the **round outcome** - a correct play
+can still lose. The dealer's final cards are used only here and never change the
+recommendation, which still depends solely on the player cards and dealer
+upcard.
 """
 
 from __future__ import annotations
@@ -25,13 +33,20 @@ import streamlit as st
 from app import __version__
 from app.rules import DEFAULT_PROFILE, PROFILES
 from app.web_adapter import (
+    DOUBLE_PLAY_NOTE,
     EDUCATIONAL_NOTE,
+    WEB_ACTIONS,
     WEB_CARD_RANKS,
+    WEB_OUTCOMES,
     WEB_QUICK_EXAMPLES,
     WebCoachInput,
+    WebRoundInput,
     action_visual,
     build_web_coach_output,
+    build_web_round_review,
+    double_round_card_warning,
     format_web_action,
+    suggest_web_round_outcome,
 )
 
 # Commands the user can run themselves in a terminal (shown as text only - the
@@ -64,6 +79,13 @@ def _init_state() -> None:
     st.session_state.setdefault("seen_cards", "")
     st.session_state.setdefault("use_true_count", False)
     st.session_state.setdefault("true_count_value", 0.0)
+    # v2.2.0 round-result tracker state.
+    st.session_state.setdefault("round_player_cards", [])
+    st.session_state.setdefault("round_dealer_cards", [])
+    st.session_state.setdefault("round_history", [])
+    # The coach decision frozen at the initial (two-card) decision point, used
+    # by the round review so it never drifts with the final/grown cards.
+    st.session_state.setdefault("coach_decision", None)
 
 
 def _add_player_card(rank: str) -> None:
@@ -102,11 +124,56 @@ def _reset_all() -> None:
     st.session_state.seen_cards = ""
     st.session_state.use_true_count = False
     st.session_state.true_count_value = 0.0
+    # Clear the round-result *inputs* too (the saved history is kept; it has a
+    # dedicated "Clear round history" control).
+    st.session_state.round_player_cards = []
+    st.session_state.round_dealer_cards = []
+    st.session_state.coach_decision = None
 
 
 def _load_example(player: tuple[str, ...], dealer: str) -> None:
     st.session_state.player_cards = list(player)
     st.session_state.dealer_upcard = dealer
+
+
+# --- Round-result callbacks (v2.2.0) --------------------------------------
+
+def _add_round_player_card(rank: str) -> None:
+    st.session_state.round_player_cards.append(rank)
+
+
+def _undo_round_player_card() -> None:
+    if st.session_state.round_player_cards:
+        st.session_state.round_player_cards.pop()
+
+
+def _clear_round_player_cards() -> None:
+    st.session_state.round_player_cards = []
+
+
+def _add_round_dealer_card(rank: str) -> None:
+    st.session_state.round_dealer_cards.append(rank)
+
+
+def _undo_round_dealer_card() -> None:
+    if st.session_state.round_dealer_cards:
+        st.session_state.round_dealer_cards.pop()
+
+
+def _clear_round_dealer_cards() -> None:
+    st.session_state.round_dealer_cards = []
+
+
+def _copy_initial_into_round(player_str: str, dealer_str: str) -> None:
+    """Pre-fill the round final-card pickers from the initial hand / upcard."""
+    st.session_state.round_player_cards = [
+        c.strip() for c in player_str.split(",") if c.strip()]
+    st.session_state.round_dealer_cards = (
+        [dealer_str.strip()] if dealer_str.strip() else [])
+
+
+def _clear_round_history() -> None:
+    st.session_state.round_history = []
 
 
 # --- Rendering helpers -----------------------------------------------------
@@ -225,6 +292,8 @@ def _render_recommendation_banner(output) -> None:
             st.write(
                 f"Base strategy recommends {action}, but {action.lower()} is "
                 f"disabled. Legal actions are {legal}.")
+        if action == "DOUBLE":
+            st.info(DOUBLE_PLAY_NOTE)
         st.caption(format_web_action(output.final_action))
         return
 
@@ -233,6 +302,9 @@ def _render_recommendation_banner(output) -> None:
         st.caption("RECOMMENDED ACTION")
         st.markdown(f"## :{color}[{action}]")
         st.write(visual["description"])
+    if action == "DOUBLE":
+        # Clarify how a double resolves (a common point of confusion).
+        st.info(DOUBLE_PLAY_NOTE)
     st.caption(format_web_action(output.final_action))
 
 
@@ -267,6 +339,258 @@ def _render_output(output) -> None:
         st.markdown("### Warnings")
         for warning in output.warnings:
             st.warning(warning)
+
+
+# --- Round-result rendering (v2.2.0) --------------------------------------
+
+# Native colours for the round outcome badge (display only).
+_OUTCOME_COLOR = {"WIN": "green", "LOSS": "red", "PUSH": "blue"}
+
+
+def _render_decision_review(review, initial_player: str, initial_dealer: str) -> None:
+    """Render the decision review, keeping decision quality vs outcome apart.
+
+    The ``coach_recommended_action`` comes from the **frozen initial decision**
+    (computed on the initial two-card hand vs the dealer upcard) and is never
+    recomputed from the final / grown cards.
+    """
+    with st.container(border=True):
+        st.markdown("#### Decision review")
+        st.markdown(f"- **Initial player cards:** {initial_player or '(n/a)'}")
+        st.markdown(f"- **Dealer upcard:** {initial_dealer or '(n/a)'}")
+        st.markdown(
+            f"- **Coach recommended action:** {review.coach_recommended_action}")
+        st.markdown(f"- **Player action taken:** {review.action_taken}")
+        player_final = " ".join(review.player_final_cards) or "(n/a)"
+        if review.player_busted:
+            player_final += f" (total {review.player_total}, bust)"
+        else:
+            player_final += f" (total {review.player_total})"
+        st.markdown(f"- **Player final cards:** {player_final}")
+        dealer_final = " ".join(review.dealer_final_cards) or "(n/a)"
+        if review.dealer_busted:
+            dealer_final += f" (total {review.dealer_total}, bust)"
+        else:
+            dealer_final += f" (total {review.dealer_total})"
+        st.markdown(f"- **Dealer final cards:** {dealer_final}")
+        decision_color = "green" if review.followed_coach else "orange"
+        review_word = "correct" if review.followed_coach else "different from coach"
+        st.markdown(
+            f"- **Decision review:** :{decision_color}[{review.decision_label}] "
+            f"({review_word})")
+        outcome_color = _OUTCOME_COLOR.get(review.outcome, "gray")
+        st.markdown(
+            f"- **Outcome:** :{outcome_color}[{review.outcome_label}]")
+        st.caption(review.note)
+
+
+def _round_history_row(review, initial_player: str, initial_dealer: str) -> dict:
+    """Build a compact, display-only history row from a review.
+
+    Keeps the initial decision hand and the final hand as separate columns so
+    the table never implies the recommendation was derived from the final cards.
+    """
+    return {
+        "Initial": f"{initial_player or '?'} vs {initial_dealer or '?'}",
+        "Coach": review.coach_recommended_action,
+        "Action taken": review.action_taken,
+        "Followed coach": "yes" if review.followed_coach else "no",
+        "Player final": " ".join(review.player_final_cards),
+        "Dealer final": " ".join(review.dealer_final_cards),
+        "Outcome": review.outcome,
+    }
+
+
+def _render_round_history() -> None:
+    """Render this session's saved round history and a small summary."""
+    history = st.session_state.round_history
+    if not history:
+        return
+    st.markdown("#### Round history (this session)")
+    wins = sum(1 for r in history if r["Outcome"] == "WIN")
+    losses = sum(1 for r in history if r["Outcome"] == "LOSS")
+    pushes = sum(1 for r in history if r["Outcome"] == "PUSH")
+    followed = sum(1 for r in history if r["Followed coach"] == "yes")
+    followed_but_lost = sum(
+        1 for r in history
+        if r["Followed coach"] == "yes" and r["Outcome"] == "LOSS")
+    st.caption(
+        f"{len(history)} round(s) - {wins}W / {losses}L / {pushes}P - "
+        f"followed coach {followed}/{len(history)} "
+        f"(incl. {followed_but_lost} correct decision(s) that still lost)")
+    # Show most recent first; st.table is static so it reconciles cleanly.
+    st.table(list(reversed(history)))
+    st.button(
+        "Clear round history", key="round_clear_history",
+        on_click=_clear_round_history, use_container_width=True)
+
+
+def _capture_coach_decision(player_str: str, dealer_str: str, options: dict) -> None:
+    """Freeze the coach decision at the initial (two-card) decision point.
+
+    The round review must use the recommendation the coach gave for the
+    *initial* hand vs the dealer *upcard* - not whatever the main hand becomes
+    if the player keeps hitting (e.g. A,7 -> A,7,K), and never anything derived
+    from the final cards. We therefore compute the recommendation on the first
+    two player cards and cache it, re-computing only when that initial decision
+    (first two cards, upcard, profile, true count) actually changes.
+    """
+    cards = [c.strip() for c in player_str.split(",") if c.strip()]
+    dealer = dealer_str.strip()
+    if len(cards) < 2 or not dealer:
+        return
+    initial_two = cards[:2]
+    signature = (
+        tuple(initial_two), dealer, options["profile_key"], options["true_count"])
+    previous = st.session_state.get("coach_decision")
+    if previous and previous.get("signature") == signature:
+        return
+    try:
+        decision_output = build_web_coach_output(WebCoachInput(
+            player_cards=",".join(initial_two),
+            dealer_upcard=dealer,
+            profile_key=options["profile_key"],
+            true_count=options["true_count"],
+        ))
+    except (ValueError, KeyError):
+        return
+    st.session_state.coach_decision = {
+        "signature": signature,
+        "initial_player": ",".join(initial_two),
+        "dealer_upcard": dealer,
+        "coach_action": decision_output.final_action,
+    }
+
+
+def _render_round_result(profile_key: str) -> None:
+    """Render the 'Round result' section shown after the recommendation.
+
+    Uses the **frozen** initial coach decision (see :func:`_capture_coach_decision`)
+    so the review reflects the recommendation given for the initial hand vs the
+    dealer upcard. The dealer's final cards and the player's final cards are
+    recorded here only and never change that recommendation.
+    """
+    decision = st.session_state.get("coach_decision")
+    if not decision:
+        return
+    coach_action = decision["coach_action"]
+    initial_player = decision["initial_player"]
+    initial_dealer = decision["dealer_upcard"]
+
+    st.markdown("---")
+    st.markdown("### Round result")
+    st.caption(
+        "Record how this round finished. The dealer's other cards and the "
+        "final hands are used only here - they never change the recommendation "
+        "above. A correct decision can still lose, so the decision review is "
+        "kept separate from the outcome.")
+
+    st.markdown(
+        f"**Frozen initial decision:** {initial_player or '?'} vs dealer "
+        f"{initial_dealer or '?'} - coach recommended **{coach_action}**")
+    st.caption(
+        "This is the coach's recommendation for the initial two-card hand; it "
+        "does not change when you enter the final cards below.")
+
+    st.button(
+        "Copy initial hand into final cards", key="round_copy_initial",
+        on_click=_copy_initial_into_round, args=(initial_player, initial_dealer),
+        use_container_width=True)
+
+    st.markdown("**Player final cards**")
+    _render_rank_buttons("round_player", _add_round_player_card)
+    round_player = st.session_state.round_player_cards
+    if round_player:
+        st.markdown(f"Selected: {_card_badges(round_player)}")
+    else:
+        st.markdown("Selected: _no cards yet_")
+    p_undo, p_clear = st.columns(2)
+    p_undo.button("Undo player card", key="round_player_undo",
+                  on_click=_undo_round_player_card,
+                  use_container_width=True, disabled=not round_player)
+    p_clear.button("Clear player final", key="round_player_clear",
+                   on_click=_clear_round_player_cards,
+                   use_container_width=True, disabled=not round_player)
+
+    st.markdown("**Dealer final cards**")
+    _render_rank_buttons("round_dealer", _add_round_dealer_card)
+    round_dealer = st.session_state.round_dealer_cards
+    if round_dealer:
+        st.markdown(f"Selected: {_card_badges(round_dealer)}")
+    else:
+        st.markdown("Selected: _no cards yet_")
+    d_undo, d_clear = st.columns(2)
+    d_undo.button("Undo dealer card", key="round_dealer_undo",
+                  on_click=_undo_round_dealer_card,
+                  use_container_width=True, disabled=not round_dealer)
+    d_clear.button("Clear dealer final", key="round_dealer_clear",
+                   on_click=_clear_round_dealer_cards,
+                   use_container_width=True, disabled=not round_dealer)
+
+    player_final_str = ",".join(round_player)
+    dealer_final_str = ",".join(round_dealer)
+
+    # Action taken defaults to the (frozen) coach's recommended action.
+    action_index = (
+        list(WEB_ACTIONS).index(coach_action)
+        if coach_action in WEB_ACTIONS else 0
+    )
+    action_taken = st.radio(
+        "Action taken", WEB_ACTIONS, index=action_index,
+        key="round_action_taken", horizontal=True)
+
+    # Clarify the one-card double rule and flag final hands that don't match it.
+    if action_taken == "DOUBLE":
+        st.caption(DOUBLE_PLAY_NOTE)
+    double_warning = double_round_card_warning(
+        action_taken, initial_player, player_final_str)
+    if double_warning:
+        st.warning(double_warning)
+
+    suggested = suggest_web_round_outcome(
+        player_final_str, dealer_final_str, action_taken)
+    if suggested is not None:
+        st.caption(f"Suggested from the final cards: {suggested}")
+    outcome_index = (
+        list(WEB_OUTCOMES).index(suggested)
+        if suggested in WEB_OUTCOMES else 0
+    )
+    outcome = st.radio(
+        "Round outcome", WEB_OUTCOMES, index=outcome_index,
+        key="round_outcome", horizontal=True)
+
+    save_clicked = st.button(
+        "Save round result", key="round_save", type="primary",
+        use_container_width=True)
+
+    # The review uses the FROZEN coach action - it never recomputes the
+    # recommendation from the final / grown cards.
+    review = None
+    try:
+        review = build_web_round_review(WebRoundInput(
+            coach_recommended_action=coach_action,
+            action_taken=action_taken,
+            player_final_cards=player_final_str,
+            dealer_final_cards=dealer_final_str,
+            outcome=outcome,
+        ))
+    except (ValueError, KeyError) as exc:
+        st.info(f"Add the final cards to record this round: {exc}")
+
+    if save_clicked:
+        if review is None:
+            st.warning(
+                "Add at least two player final cards and one dealer final "
+                "card before saving.")
+        else:
+            st.session_state.round_history.append(
+                _round_history_row(review, initial_player, initial_dealer))
+            st.success("Round result saved to this session's history.")
+
+    if review is not None:
+        _render_decision_review(review, initial_player, initial_dealer)
+
+    _render_round_history()
 
 
 def _render_sidebar() -> dict:
@@ -393,6 +717,8 @@ def main() -> None:
                 st.warning(f"Cannot give a decision yet: {exc}")
             else:
                 _render_output(output)
+                _capture_coach_decision(player_cards, dealer_upcard, options)
+                _render_round_result(options["profile_key"])
         else:
             st.info(
                 "Add at least two player cards and the dealer's upcard, then "
