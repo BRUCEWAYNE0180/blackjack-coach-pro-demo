@@ -3283,6 +3283,48 @@ def _run_correction_plan(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_web_output() -> str:
+    """Render the instructions for launching the local Web Coach UI."""
+    lines = [format_header("Local Web Coach UI")]
+    lines += [
+        "Blackjack Coach Pro Demo includes an optional local web UI (Streamlit).",
+        "It wraps the existing engine; the CLI and recommendations are unchanged.",
+        "",
+        format_section("Start it locally"),
+        "  python -m pip install -e \".[web]\"",
+        "  python -m streamlit run web/streamlit_app.py",
+        "",
+        "Streamlit opens a local page in your browser (default "
+        "http://localhost:8501).",
+        "",
+        format_kv("Note", "Local practice / training only - no real bets, no "
+                          "casino connectivity, no money handling. The CLI "
+                          "keeps working exactly as before."),
+        "",
+        SCOPE_FOOTER,
+    ]
+    return "\n".join(lines)
+
+
+def build_web_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'web' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli web",
+        description=(
+            "Show how to start the optional local Streamlit Web Coach UI "
+            "(educational / local only). Does not launch any process."
+        ),
+    )
+    return parser
+
+
+def _run_web(argv: Sequence[str]) -> int:
+    """Handle the 'web' launch-instructions subcommand."""
+    build_web_parser().parse_args(argv)
+    print(build_web_output())
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -3315,6 +3357,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli repeat-pack --count 10              (repeat missed spots)
         python -m app.cli correction-dashboard               (missed-spot correction)
         python -m app.cli correction-plan --focus urgent     (correction action plan)
+        python -m app.cli web                                (local web UI instructions)
         python -m app.cli coach --cards A,7 --dealer 9       (direct advice)
         python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
         python -m app.cli odds --cards 10,6 --dealer 10      (probability advisor)
@@ -3391,6 +3434,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_correction_dashboard(args[1:])
     if args and args[0] == "correction-plan":
         return _run_correction_plan(args[1:])
+    if args and args[0] == "web":
+        return _run_web(args[1:])
     if args and args[0] == "coach":
         return _run_coach(args[1:])
     if args and args[0] == "coach-play":

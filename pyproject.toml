@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "blackjack-coach-pro-demo"
-version = "1.29.0"
+version = "2.0.0"
 description = "Educational/practice blackjack basic-strategy, Hi-Lo counting, and simulator trainer (no real betting, no casinos, no winnings promised)."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -29,12 +29,17 @@ dev = [
     "pytest>=7.0",
     "ruff>=0.4",
 ]
+# Optional local web UI (Streamlit). Install with: pip install -e ".[web]".
+# The runtime engine and CLI never require this; only web/streamlit_app.py does.
+web = [
+    "streamlit>=1.0",
+]
 
 [project.scripts]
 blackjack-coach = "app.cli:main"
 
 [tool.setuptools]
-packages = ["app"]
+packages = ["app", "web"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
