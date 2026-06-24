@@ -7,6 +7,59 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.28.0] - 2026-06-23
+
+Local missed-spot correction dashboard. Reading the repeat-pack completion
+history (v1.27.0), the new `correction-dashboard` command shows which
+previously-missed spots are corrected, improving, persistent misses, or new -
+with per-spot accuracy and concrete next-practice priorities. It is a read-only
+summary and never changes the recommendation, the correct answers, or the Hi-Lo
+math.
+
+### Added
+
+- `app/correction_dashboard.py`: dataclasses `CorrectionSpotSummary`,
+  `CorrectionDashboardSummary`, and `CorrectionDashboardExport`, plus
+  `build_correction_dashboard` (groups repeat-spot progress by status and builds
+  next-practice priorities), `classify_correction_trend`,
+  `recommend_correction_next_actions`, `render_correction_dashboard`,
+  `render_correction_dashboard_markdown` (a status table + checklist), and
+  `export_correction_dashboard`.
+- CLI `correction-dashboard` command with `--profile`, `--limit`,
+  `--repeat-dir`, `--markdown`, `--export`, and `--output`. With no saved
+  repeat completions it prints a clear message, and it is useful even with a
+  single record.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.28.0**.
+
+### Quality
+
+- New suite `tests/test_correction_dashboard.py` (empty dashboard + clear note;
+  status counts from repeat records; profile filter; trend classification
+  CORRECTED / IMPROVING / PERSISTENT_MISS / NEW; recommendations include
+  persistent misses; text + Markdown renderers with a status table; export saves
+  a file; no sensitive field names; and that building it never changes
+  `recommend()`) plus `TestCliCorrectionDashboard` in `tests/test_cli.py`
+  (no-data message, with data, `--profile`, `--markdown`, `--export --output`,
+  and `--version` = 1.28.0). Full suite passing; ruff clean.
+
+### Safety
+
+- The correction dashboard is a **local, read-only practice summary** only. It
+  never changes `strategy_engine.recommend`, the Hi-Lo math, adaptive learning,
+  guided coaching, outcome / session history, the EV-snapshot history, the
+  Strategy-vs-EV engine, reporting, the dashboard, the drill generator, the
+  drill history, the review scheduler, the practice-pack generator, the
+  practice-pack completion history, the repeat-pack generator, or the
+  repeat-pack completion history. It stores / exports no money, bankroll, real
+  bets, accounts, tokens, screenshots, or any sensitive/personal data, summarises
+  practice without promising results, and uses no external dependencies,
+  network, cloud, or database. Exported dashboards live under the git-ignored
+  `.blackjack_coach/reports` tree (unless an explicit `--output` path is given)
+  and are never committed.
+
 ## [1.27.0] - 2026-06-23
 
 Local repeat-pack completion history. The v1.26.0 repeat pack can now be marked

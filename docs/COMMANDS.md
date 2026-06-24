@@ -1015,6 +1015,39 @@ corrected and >= 80%), PERSISTENT_MISS (< 50%). The completion history is local
 practice training only - it stores no sensitive data, never changes the correct
 answers or the strategy recommendation, and is never committed.
 
+## Missed-spot correction dashboard (v1.28.0)
+
+### correction-dashboard
+
+```bash
+blackjack-coach correction-dashboard
+blackjack-coach correction-dashboard --profile SIX_DECK_H17_DAS_LS
+blackjack-coach correction-dashboard --markdown
+blackjack-coach correction-dashboard --export --output correction_dashboard.md
+```
+
+Reads your repeat-pack completion history and shows which previously-missed
+spots are corrected, improving, persistent misses, or new - with per-spot repeat
+accuracy and a concrete next-practice priority list. The text view has an
+Overview plus Corrected / Improving / Persistent misses / New / Next practice
+priorities sections.
+
+Flags:
+
+- `--profile <KEY>` - scope the dashboard to one rule profile.
+- `--limit N` - use only the most recent N repeat-pack completions.
+- `--repeat-dir <path>` - repeat-pack completion directory (default
+  `./.blackjack_coach/repeat_packs`).
+- `--markdown` - print a Markdown status table instead of text.
+- `--export` / `--output <path>` - save a Markdown file (default under
+  `./.blackjack_coach/reports`) and print the path.
+
+With no saved repeat completions it prints "No saved repeat pack completions
+yet. Use repeat-pack --complete first."; it is useful even with a single record.
+The dashboard is local practice only - it stores no sensitive data, never
+changes the correct answers or the strategy recommendation, and is never
+committed.
+
 
 
 

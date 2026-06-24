@@ -37,6 +37,12 @@ from .adaptive_learning import (
     build_learning_summary,
     classify_hand_spot,
 )
+from .correction_dashboard import (
+    build_correction_dashboard,
+    export_correction_dashboard,
+    render_correction_dashboard,
+    render_correction_dashboard_markdown,
+)
 from .counting import EDUCATIONAL_NOTE, CountingState, update_running_count_many
 from .dashboard import (
     build_profile_dashboard,
@@ -3138,6 +3144,70 @@ def _run_repeat_pack(argv: Sequence[str]) -> int:
     return 0
 
 
+def build_correction_dashboard_parser() -> argparse.ArgumentParser:
+    """Construct the argument parser for the 'correction-dashboard' subcommand."""
+    parser = argparse.ArgumentParser(
+        prog="python -m app.cli correction-dashboard",
+        description=(
+            "Show a local missed-spot correction dashboard from your repeat-pack "
+            "completions: corrected, improving, persistent-miss, and new spots, "
+            "plus next-practice priorities (educational / local only). Never "
+            "changes the recommendation or the correct answers."
+        ),
+    )
+    parser.add_argument("--profile", default=None, choices=sorted(PROFILES),
+                        help="Scope the dashboard to one rule profile.")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Only use the most recent N repeat-pack completions.")
+    parser.add_argument("--repeat-dir", default=None, dest="repeat_dir",
+                        help="Repeat-pack completion directory (default: "
+                             "./.blackjack_coach/repeat_packs).")
+    parser.add_argument("--markdown", action="store_true",
+                        help="Print the dashboard as Markdown instead of text.")
+    parser.add_argument("--export", action="store_true",
+                        help="Save the dashboard as a local Markdown file and "
+                             "print the path.")
+    parser.add_argument("--output", default=None,
+                        help="Exact output file path for --export (default: a "
+                             "timestamped file under ./.blackjack_coach/reports).")
+    return parser
+
+
+def _run_correction_dashboard(argv: Sequence[str]) -> int:
+    """Handle the 'correction-dashboard' missed-spot correction subcommand."""
+    parser = build_correction_dashboard_parser()
+    args = parser.parse_args(argv)
+
+    if args.limit is not None and args.limit < 0:
+        print("Error: --limit must be >= 0.", file=sys.stderr)
+        return 2
+
+    try:
+        summary = build_correction_dashboard(
+            profile_key=args.profile,
+            repeat_dir=args.repeat_dir,
+            limit=args.limit,
+        )
+    except (ValueError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
+
+    if args.markdown:
+        print(render_correction_dashboard_markdown(summary))
+    else:
+        print(render_correction_dashboard(summary))
+
+    if args.export or args.output:
+        try:
+            export = export_correction_dashboard(summary, output_path=args.output)
+        except OSError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 2
+        print("")
+        print(format_kv("Saved correction dashboard", export.output_path))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point. Returns a process exit code.
 
@@ -3168,6 +3238,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         python -m app.cli review-queue --due-only             (scheduled reviews)
         python -m app.cli practice-pack --focus daily         (daily practice pack)
         python -m app.cli repeat-pack --count 10              (repeat missed spots)
+        python -m app.cli correction-dashboard               (missed-spot correction)
         python -m app.cli coach --cards A,7 --dealer 9       (direct advice)
         python -m app.cli coach-play --decks 6 --seed 42     (coach plays a hand)
         python -m app.cli odds --cards 10,6 --dealer 10      (probability advisor)
@@ -3240,6 +3311,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _run_practice_pack(args[1:])
     if args and args[0] == "repeat-pack":
         return _run_repeat_pack(args[1:])
+    if args and args[0] == "correction-dashboard":
+        return _run_correction_dashboard(args[1:])
     if args and args[0] == "coach":
         return _run_coach(args[1:])
     if args and args[0] == "coach-play":
