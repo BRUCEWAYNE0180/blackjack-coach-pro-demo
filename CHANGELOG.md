@@ -7,6 +7,66 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [2.1.0] - 2026-06-24
+
+Web card buttons & UI polish. v2.1.0 makes the local **Streamlit Web Coach UI**
+much friendlier: instead of typing `A,7` by hand you can tap **card buttons**
+(A, 2-10, J, Q, K) to build the player hand and pick the dealer upcard, load a
+hand with one tap from **quick examples**, and **clear / reset** with dedicated
+buttons. The recommendation is shown as a **polished, colour-coded banner**
+(HIT / STAND / DOUBLE / SPLIT / SURRENDER), warnings are clearer when cards are
+missing or invalid, and the layout is mobile-friendly. A **manual text-entry
+mode** is kept for power users. This is presentation only - the engine, the
+recommendations, the Hi-Lo math, and the CLI are unchanged.
+
+### Added
+
+- `app/web_adapter.py` **display-only** helpers (no strategy logic):
+  `WEB_CARD_RANKS` (the A, 2-10, J, Q, K button ranks), `WEB_QUICK_EXAMPLES`
+  (one-click sample hands), and `action_visual` (a CSS colour + short
+  description per action for the colour-coded recommendation banner). These
+  never change the recommendation, counting, or EV.
+- `web/streamlit_app.py` card-button UI: tappable player-hand buttons
+  (with undo / clear-hand), tappable dealer-upcard buttons (with clear), a live
+  selected-cards display, one-click quick examples, a Reset-all control, a
+  polished colour-coded recommended-action banner, clearer "what's missing"
+  warnings, and a mobile-friendly centred layout. The card-button mode evaluates
+  live once a hand is complete; the **manual text-entry mode** is retained.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **2.1.0** (web UI polish only; the
+  engine, the recommendations, the Hi-Lo math, and the CLI are unchanged and
+  fully backward compatible).
+- CLI `web` command output now mentions the v2.1.0 card buttons / quick examples
+  / clear-reset / colour-coded result (it still only prints instructions and
+  launches no process).
+
+### Quality
+
+- Extended `tests/test_web_adapter.py` (the button ranks are exactly
+  A/2-10/J/Q/K and each one validates as a real engine card; the quick examples
+  are well-formed and produce a recommendation; `action_visual` gives distinct
+  colours per action, is case-insensitive, has a neutral fallback for unknown /
+  `None`, and never changes `recommend()`) and `tests/test_streamlit_app_static.py`
+  (the app uses the card-rank buttons and quick examples, has clear / reset
+  controls, keeps the manual text mode, and uses `action_visual` for the
+  polished output). Updated the `--version` assertions to `2.1.0`. Full suite
+  passing (with and without Streamlit installed); ruff clean across
+  `app tests web`.
+
+### Safety
+
+- The Web Coach UI stays a **local presentation layer only**. The new card
+  buttons, quick examples, clear / reset, colour-coded output, and mobile layout
+  never change the main strategy recommendation, the correct answers, or the
+  engine math, never override the recommendation with EV, and never run external
+  commands (no shell, no subprocess, no network). `app/web_adapter.py` remains
+  Streamlit-free and testable. It uses no FastAPI, no Telegram, no database, and
+  no cloud, and handles no money, bankroll, accounts, tokens, or sensitive data.
+  The `.blackjack_coach/` tree stays git-ignored, and the CLI continues to work
+  exactly as before.
+
 ## [2.0.0] - 2026-06-23
 
 First local web mode. v2.0.0 adds an optional **Streamlit Web Coach UI** so the

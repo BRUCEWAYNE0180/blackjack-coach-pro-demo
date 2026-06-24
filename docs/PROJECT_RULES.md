@@ -391,16 +391,20 @@ As of v0.9 the project enforces these gates on every change:
   explicit `--output` path) and are never committed.
 - **The Web Coach UI is a local presentation layer only.** The Streamlit Web
   Coach UI (v2.0.0: `app/web_adapter.py` and `web/streamlit_app.py`, the `web`
-  command) is local-only and must never change the main strategy recommendation,
-  the correct answers, or the engine math, never override the recommendation
-  with EV, and never change `strategy_engine.recommend`, the Hi-Lo counting
-  math, or any engine module. It must never run external commands automatically
-  (no shell, no subprocess, no network), must add no FastAPI / Telegram /
-  database / cloud, and must handle no money, bankroll, accounts, tokens, or
-  sensitive/personal data. `app/web_adapter.py` must stay Streamlit-free and
-  testable; the Streamlit UI imports the adapter, never the reverse. Streamlit
-  is an optional `web` dependency and must not be required by the engine, the
-  CLI, or the test suite, and the CLI must keep working unchanged.
+  command; extended in v2.1.0 with card buttons, quick examples, clear / reset,
+  a colour-coded recommendation, and a mobile-friendly layout) is local-only and
+  must never change the main strategy recommendation, the correct answers, or
+  the engine math, never override the recommendation with EV, and never change
+  `strategy_engine.recommend`, the Hi-Lo counting math, or any engine module.
+  The v2.1.0 display-only helpers (`WEB_CARD_RANKS`, `WEB_QUICK_EXAMPLES`,
+  `action_visual`) are presentation / input only and must not touch strategy,
+  counting, or EV. It must never run external commands automatically (no shell,
+  no subprocess, no network), must add no FastAPI / Telegram / database / cloud,
+  and must handle no money, bankroll, accounts, tokens, or sensitive/personal
+  data. `app/web_adapter.py` must stay Streamlit-free and testable; the
+  Streamlit UI imports the adapter, never the reverse. Streamlit is an optional
+  `web` dependency and must not be required by the engine, the CLI, or the test
+  suite, and the CLI must keep working unchanged.
 
 ## 8. Release Rules
 

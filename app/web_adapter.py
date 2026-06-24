@@ -1,4 +1,4 @@
-"""Web adapter for Blackjack Coach Pro Demo (v2.0.0).
+"""Web adapter for Blackjack Coach Pro Demo (v2.1.0).
 
 A thin, testable layer between a local UI (the Streamlit app in ``web/``) and the
 existing engine. It reuses the guided coach, probability/EV advisor, and card
@@ -9,6 +9,11 @@ This module deliberately does **not** import Streamlit, so it can be unit-tested
 without a browser. The Streamlit UI imports this module, not the other way
 around. Everything is local; it stores no money, accounts, or sensitive data.
 See docs/PROJECT_RULES.md.
+
+v2.1.0 adds **display-only** helpers used by the web UI's card buttons and
+polished recommendation output: :data:`WEB_CARD_RANKS`, :data:`WEB_QUICK_EXAMPLES`,
+and :func:`action_visual`. These are presentation/input helpers only - they do
+not touch strategy, counting, or EV.
 """
 
 from __future__ import annotations
@@ -36,6 +41,49 @@ EDUCATIONAL_NOTE = (
     "Educational / local practice only - no real bets, no casino connectivity, "
     "and no winnings promised. The web UI only wraps the existing engine."
 )
+
+# Card ranks offered as quick-entry buttons in the local web UI. These are the
+# engine's canonical ranks (J/Q/K are ten-valued); this is input/display order
+# only and never changes strategy, counting, or EV.
+WEB_CARD_RANKS: tuple[str, ...] = (
+    "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K",
+)
+
+# Quick-example hands for one-click loading in the web UI (display/input only).
+WEB_QUICK_EXAMPLES: tuple[dict, ...] = (
+    {"label": "Soft 18 vs 9", "player": ("A", "7"), "dealer": "9"},
+    {"label": "Hard 16 vs 10", "player": ("10", "6"), "dealer": "10"},
+    {"label": "Pair of 8s vs 10", "player": ("8", "8"), "dealer": "10"},
+    {"label": "Pair of Aces vs 6", "player": ("A", "A"), "dealer": "6"},
+    {"label": "11 vs 5", "player": ("6", "5"), "dealer": "5"},
+)
+
+# Display-only colour + description per action for the polished web output. The
+# colours are CSS hex strings; nothing here affects the recommendation.
+_ACTION_VISUALS: dict[str, tuple[str, str]] = {
+    "HIT": ("#1565c0", "Take another card."),
+    "STAND": ("#2e7d32", "Take no more cards."),
+    "DOUBLE": ("#ef6c00", "Double the bet, take exactly one card."),
+    "SPLIT": ("#6a1b9a", "Split the pair into two hands."),
+    "SURRENDER": ("#c62828", "Forfeit half the bet and end the hand."),
+}
+_ACTION_VISUAL_FALLBACK: tuple[str, str] = ("#455a64", "See the explanation below.")
+
+
+def action_visual(action: str | None) -> dict:
+    """Return display-only styling for an action (no strategy logic).
+
+    Provides a CSS ``color`` and a short ``description`` for rendering the
+    recommended action as a coloured badge in the web UI. Unknown / empty
+    actions get a neutral fallback. This never changes the recommendation.
+    """
+    key = str(action or "").upper()
+    color, description = _ACTION_VISUALS.get(key, _ACTION_VISUAL_FALLBACK)
+    return {
+        "action": key or "(none)",
+        "color": color,
+        "description": description,
+    }
 
 
 @dataclass(frozen=True)
@@ -68,6 +116,8 @@ class WebCoachOutput:
     legal_actions: list[str]
     odds_summary: dict | None = None
     ev_summary: dict | None = None
+    recommended_available: bool = True
+    disabled_actions: list[str] = field(default_factory=list)
     raw_debug: dict = field(default_factory=dict)
 
 
@@ -185,6 +235,11 @@ def build_web_coach_output(web_input: WebCoachInput) -> WebCoachOutput:
                 f"You disabled {final_action}, but it is the recommended play; "
                 "re-enable it or pick the next best legal action.")
 
+    # Display-only flag: is the recommended action actually available to the
+    # player given their toggles? (The engine recommendation is unchanged; the
+    # UI uses this to avoid presenting a disabled action as the main play.)
+    recommended_available = final_action in legal_actions
+
     odds_summary = None
     ev_summary = None
     if web_input.show_odds:
@@ -223,5 +278,7 @@ def build_web_coach_output(web_input: WebCoachInput) -> WebCoachOutput:
         legal_actions=legal_actions,
         odds_summary=odds_summary,
         ev_summary=ev_summary,
+        recommended_available=recommended_available,
+        disabled_actions=disabled,
         raw_debug=raw_debug,
     )
