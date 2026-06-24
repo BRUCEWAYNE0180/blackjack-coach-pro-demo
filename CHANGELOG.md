@@ -45,6 +45,15 @@ used only in the new section and never change the recommendation.
   of the outcome), and a session-visible **Round history** with a small summary
   (including how many correct decisions still lost). `Reset all` clears the
   round inputs too; the history has its own "Clear round history" control.
+- **Double play clarification**: when the coach recommends `DOUBLE`, the
+  recommendation banner shows a clear note - *"Double: take exactly one
+  additional card, then your turn ends. Do not hit again after doubling."* In
+  the Round result section, if the action taken is `DOUBLE` and the player's
+  final hand does not have exactly one more card than the initial hand (e.g.
+  initial `6,5` -> final `6,5,K,3`), a warning is shown: *"DOUBLE normally
+  receives exactly one additional card. Check the final player cards."*
+  (`app.round_result.double_card_count_warning` /
+  `app.web_adapter.double_round_card_warning` / `DOUBLE_PLAY_NOTE`).
 
 ### Changed
 

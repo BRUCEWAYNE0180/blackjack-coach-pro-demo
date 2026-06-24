@@ -11,10 +11,12 @@ import pytest
 
 from app.round_result import (
     ACTIONS,
+    DOUBLE_CARD_COUNT_WARNING,
     OUTCOMES,
     RoundResultRecord,
     build_round_result_record,
     build_round_review,
+    double_card_count_warning,
     list_round_result_records,
     load_round_result_record,
     normalize_action,
@@ -219,3 +221,29 @@ class TestEngineUntouched:
         build_round_review("HIT", "HIT", ["A", "7", "K"], ["10", "Q"], "LOSS")
         after = recommend(["A", "7"], "10", profile).action
         assert before == after
+
+
+
+class TestDoubleCardCountWarning:
+    """A double should take exactly one extra card; flag final hands that don't."""
+
+    def test_correct_double_no_warning(self):
+        # Initial 6,5 -> final 6,5,K (one extra card) is fine.
+        assert double_card_count_warning("DOUBLE", ["6", "5"], ["6", "5", "K"]) is None
+
+    def test_too_many_cards_warns(self):
+        # Initial 6,5 -> final 6,5,K,3 (two extra cards) is flagged.
+        warning = double_card_count_warning("DOUBLE", ["6", "5"], ["6", "5", "K", "3"])
+        assert warning == DOUBLE_CARD_COUNT_WARNING
+
+    def test_non_double_action_never_warns(self):
+        # Hitting can legitimately add several cards - no warning for non-double.
+        assert double_card_count_warning("HIT", ["6", "5"], ["6", "5", "K", "3"]) is None
+
+    def test_no_warning_without_enough_final_cards(self):
+        assert double_card_count_warning("DOUBLE", ["6", "5"], []) is None
+        assert double_card_count_warning("DOUBLE", ["6", "5"], ["6"]) is None
+
+    def test_case_insensitive_action(self):
+        assert double_card_count_warning("double", ["6", "5"], ["6", "5", "K", "3"]) == (
+            DOUBLE_CARD_COUNT_WARNING)

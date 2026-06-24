@@ -450,3 +450,35 @@ class TestFrozenInitialDecision:
         # The final hand is recorded separately, not used to infer the coach pick.
         assert row["Player final"] == "A 7 K"
         assert row["Dealer final"] == "10 Q"
+
+
+
+class TestDoublePlayHelp:
+    """v2.2.0 UX: clarify how DOUBLE resolves and flag bad final hands."""
+
+    def _infos(self, at):
+        return [i.value for i in at.info]
+
+    def _warnings(self, at):
+        return [w.value for w in at.warning]
+
+    def test_banner_shows_double_note(self):
+        # 6,5 vs 5 -> coach DOUBLE: the banner explains the one-card rule.
+        at = _build_hand(_fresh(), ["6", "5"], "5")
+        _assert_clean(at)
+        assert at.session_state["coach_decision"]["coach_action"] == "DOUBLE"
+        assert any("take exactly one additional card" in i for i in self._infos(at))
+
+    def test_round_warns_on_too_many_cards_after_double(self):
+        at = _build_hand(_fresh(), ["6", "5"], "5")
+        at.button(key="round_copy_initial").click().run()   # 6,5
+        at.button(key="round_player_K").click().run()        # 6,5,K (correct)
+        at.button(key="round_dealer_10").click().run()
+        at.button(key="round_dealer_7").click().run()
+        # Action defaults to the coach action (DOUBLE); 3 cards => no warning.
+        assert not any(
+            "one additional card" in w.lower() for w in self._warnings(at))
+        at.button(key="round_player_3").click().run()        # 6,5,K,3 (too many)
+        _assert_clean(at)
+        assert any(
+            "one additional card" in w.lower() for w in self._warnings(at))

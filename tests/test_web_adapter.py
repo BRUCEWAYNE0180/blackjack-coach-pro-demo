@@ -5,6 +5,7 @@ import sys
 from app.rules import get_profile
 from app.strategy_engine import recommend
 from app.web_adapter import (
+    DOUBLE_PLAY_NOTE,
     WEB_ACTIONS,
     WEB_CARD_RANKS,
     WEB_OUTCOMES,
@@ -15,6 +16,7 @@ from app.web_adapter import (
     action_visual,
     build_web_coach_output,
     build_web_round_review,
+    double_round_card_warning,
     format_web_action,
     suggest_web_round_outcome,
     validate_web_cards,
@@ -310,3 +312,28 @@ class TestWebRoundResult:
             "HIT", "STAND", "A,7,K", "10,Q", "LOSS"))
         after = recommend(["A", "7"], "10", profile).action
         assert before == after
+
+
+
+class TestDoublePlayHelp:
+    """v2.2.0 UX: clarify the one-card double rule."""
+
+    def test_double_play_note_mentions_one_card_then_stand(self):
+        note = DOUBLE_PLAY_NOTE.lower()
+        assert "exactly one" in note
+        assert "turn ends" in note or "stand" in note
+
+    def test_warning_for_too_many_cards_after_double(self):
+        warning = double_round_card_warning("DOUBLE", "6,5", "6,5,K,3")
+        assert warning is not None
+        assert "one additional card" in warning.lower()
+
+    def test_no_warning_for_correct_double(self):
+        assert double_round_card_warning("DOUBLE", "6,5", "6,5,K") is None
+
+    def test_no_warning_for_non_double(self):
+        assert double_round_card_warning("HIT", "6,5", "6,5,K,3") is None
+
+    def test_tolerates_bad_input(self):
+        assert double_round_card_warning("DOUBLE", "6,5", "") is None
+        assert double_round_card_warning("DOUBLE", "Z,Z", "Z,Z,Z,Z") is None

@@ -33,6 +33,7 @@ import streamlit as st
 from app import __version__
 from app.rules import DEFAULT_PROFILE, PROFILES
 from app.web_adapter import (
+    DOUBLE_PLAY_NOTE,
     EDUCATIONAL_NOTE,
     WEB_ACTIONS,
     WEB_CARD_RANKS,
@@ -43,6 +44,7 @@ from app.web_adapter import (
     action_visual,
     build_web_coach_output,
     build_web_round_review,
+    double_round_card_warning,
     format_web_action,
     suggest_web_round_outcome,
 )
@@ -290,6 +292,8 @@ def _render_recommendation_banner(output) -> None:
             st.write(
                 f"Base strategy recommends {action}, but {action.lower()} is "
                 f"disabled. Legal actions are {legal}.")
+        if action == "DOUBLE":
+            st.info(DOUBLE_PLAY_NOTE)
         st.caption(format_web_action(output.final_action))
         return
 
@@ -298,6 +302,9 @@ def _render_recommendation_banner(output) -> None:
         st.caption("RECOMMENDED ACTION")
         st.markdown(f"## :{color}[{action}]")
         st.write(visual["description"])
+    if action == "DOUBLE":
+        # Clarify how a double resolves (a common point of confusion).
+        st.info(DOUBLE_PLAY_NOTE)
     st.caption(format_web_action(output.final_action))
 
 
@@ -531,6 +538,14 @@ def _render_round_result(profile_key: str) -> None:
     action_taken = st.radio(
         "Action taken", WEB_ACTIONS, index=action_index,
         key="round_action_taken", horizontal=True)
+
+    # Clarify the one-card double rule and flag final hands that don't match it.
+    if action_taken == "DOUBLE":
+        st.caption(DOUBLE_PLAY_NOTE)
+    double_warning = double_round_card_warning(
+        action_taken, initial_player, player_final_str)
+    if double_warning:
+        st.warning(double_warning)
 
     suggested = suggest_web_round_outcome(
         player_final_str, dealer_final_str, action_taken)

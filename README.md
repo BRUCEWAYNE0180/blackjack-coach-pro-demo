@@ -615,6 +615,11 @@ The **Decision review** clearly shows the *coach recommended action*, the
 *player action taken*, the *final hand result*, whether the decision was
 **correct / different from coach**, and the **outcome (win / loss / push)**.
 
+When the coach recommends **DOUBLE**, the banner clarifies the rule - *take
+exactly one additional card, then your turn ends* - and the Round result section
+warns if a recorded double's final hand has more than one extra card (e.g.
+initial `6,5` but final `6,5,K,3`).
+
 The most important rule: **decision quality and round outcome are separate**. A
 correct play can lose and a mistake can win, so a LOSS is never automatically a
 bad decision. For example:

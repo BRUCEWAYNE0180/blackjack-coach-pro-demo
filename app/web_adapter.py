@@ -307,6 +307,9 @@ def build_web_coach_output(web_input: WebCoachInput) -> WebCoachOutput:
 WEB_ACTIONS: tuple[str, ...] = round_result_mod.ACTIONS
 WEB_OUTCOMES: tuple[str, ...] = round_result_mod.OUTCOMES
 
+# Display-only help text: clarifies that a double takes exactly one more card.
+DOUBLE_PLAY_NOTE: str = round_result_mod.DOUBLE_ONE_CARD_NOTE
+
 
 @dataclass(frozen=True)
 class WebRoundInput:
@@ -379,3 +382,32 @@ def suggest_web_round_outcome(
             player_ranks, dealer_ranks, action_taken)
     except ValueError:
         return None
+
+
+
+def double_round_card_warning(
+    action_taken: str | None,
+    initial_player_cards: str,
+    final_player_cards: str,
+) -> str | None:
+    """UI helper: warn if a recorded double didn't take exactly one extra card.
+
+    Parses the web's card strings and delegates to
+    :func:`app.round_result.double_card_count_warning`. Returns ``None`` (never
+    raises) when the cards are missing or unreadable; this is a display-only
+    check and never changes the recommendation.
+    """
+    if str(action_taken or "").strip().upper() != "DOUBLE":
+        return None
+    try:
+        initial = (
+            cards_mod.cards_to_ranks(cards_mod.parse_cards(initial_player_cards))
+            if initial_player_cards else []
+        )
+        final = (
+            cards_mod.cards_to_ranks(cards_mod.parse_cards(final_player_cards))
+            if final_player_cards else []
+        )
+    except (ValueError, KeyError):
+        return None
+    return round_result_mod.double_card_count_warning(action_taken, initial, final)

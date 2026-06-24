@@ -113,6 +113,12 @@ class TestStreamlitAppV22RoundResult:
         assert "_capture_coach_decision" in source
         assert "Frozen initial decision" in source
 
+    def test_explains_double_one_card_rule(self):
+        # UX: DOUBLE shows the one-card note and the round flags extra cards.
+        source = _source()
+        assert "DOUBLE_PLAY_NOTE" in source
+        assert "double_round_card_warning" in source
+
     def test_player_and_dealer_pickers(self):
         source = _source()
         assert "Your hand" in source

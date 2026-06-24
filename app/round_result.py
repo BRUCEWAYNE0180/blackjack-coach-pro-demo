@@ -50,7 +50,40 @@ DECISION_VS_OUTCOME_NOTE = (
     "can still lose, and a mistake can still win."
 )
 
+# How a double plays out, to clear up a common point of confusion in the UI.
+DOUBLE_ONE_CARD_NOTE = (
+    "Double: take exactly one additional card, then your turn ends. Do not hit "
+    "again after doubling."
+)
+# Shown when a recorded double's final hand has more than one extra card.
+DOUBLE_CARD_COUNT_WARNING = (
+    "DOUBLE normally receives exactly one additional card. Check the final "
+    "player cards."
+)
+
 _OUTCOME_LABELS = {"WIN": "Win", "LOSS": "Loss", "PUSH": "Push"}
+
+
+def double_card_count_warning(
+    action_taken: str | None,
+    initial_player_cards: list[str] | tuple[str, ...],
+    final_player_cards: list[str] | tuple[str, ...],
+) -> str | None:
+    """Warn if a recorded double did not take exactly one extra card.
+
+    Returns :data:`DOUBLE_CARD_COUNT_WARNING` when the action taken is DOUBLE and
+    the final player hand does not have exactly one more card than the initial
+    hand (e.g. initial ``6,5`` -> final ``6,5,K,3``). Returns ``None`` otherwise,
+    including for non-double actions or when there are not enough final cards yet
+    to judge. This is a display-only check; it never changes the recommendation.
+    """
+    if str(action_taken or "").strip().upper() != "DOUBLE":
+        return None
+    if not final_player_cards or len(final_player_cards) < 2:
+        return None
+    if len(final_player_cards) != len(initial_player_cards) + 1:
+        return DOUBLE_CARD_COUNT_WARNING
+    return None
 
 
 def normalize_action(action: str | None) -> str:

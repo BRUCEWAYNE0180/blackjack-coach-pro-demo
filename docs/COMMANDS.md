@@ -1175,6 +1175,11 @@ coach*, and the *outcome (win / loss / push)*. Decision quality is kept separate
 from the outcome - a correct play can still lose, so a LOSS is never marked a bad
 decision.
 
+When the coach recommends **DOUBLE**, the banner explains the one-card rule
+("take exactly one additional card, then your turn ends; do not hit again after
+doubling"), and the Round result section warns if a recorded double's final hand
+has more than one extra card (e.g. initial `6,5` but final `6,5,K,3`).
+
 The logic lives in the Streamlit-free `app/round_result.py` (outcome suggestion,
 decision review, and optional JSON persistence under the git-ignored
 `.blackjack_coach/web_rounds` tree) and is reached through `app/web_adapter.py`
