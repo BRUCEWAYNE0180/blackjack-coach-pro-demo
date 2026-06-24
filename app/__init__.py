@@ -26,6 +26,17 @@ from .correction_dashboard import (
     render_correction_dashboard,
     render_correction_dashboard_markdown,
 )
+from .correction_plan import (
+    CorrectionActionPlan,
+    CorrectionPlanExport,
+    CorrectionPlanItem,
+    build_correction_action_plan,
+    build_recommended_command,
+    classify_plan_action_type,
+    export_correction_plan,
+    render_correction_plan,
+    render_correction_plan_markdown,
+)
 from .counting import (
     CountingState,
     counting_summary,
@@ -277,7 +288,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.28.0"
+__version__ = "1.29.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -307,6 +318,9 @@ __all__ = [
     "CorrectionDashboardExport",
     "CorrectionDashboardSummary",
     "CorrectionSpotSummary",
+    "CorrectionActionPlan",
+    "CorrectionPlanExport",
+    "CorrectionPlanItem",
     "DrillPlan",
     "DrillResult",
     "DrillSpot",
@@ -380,6 +394,12 @@ __all__ = [
     "recommend_correction_next_actions",
     "render_correction_dashboard",
     "render_correction_dashboard_markdown",
+    "build_correction_action_plan",
+    "build_recommended_command",
+    "classify_plan_action_type",
+    "export_correction_plan",
+    "render_correction_plan",
+    "render_correction_plan_markdown",
     "build_drill_plan",
     "build_drill_spot_from_hand",
     "classify_drill_category",

@@ -372,6 +372,23 @@ As of v0.9 the project enforces these gates on every change:
   no network, cloud, or database. Exported dashboards live under the git-ignored
   `.blackjack_coach/reports` tree (unless the user passes an explicit `--output`
   path) and are never committed.
+- **Correction action plans are local and only suggest practice.** The
+  correction action plan (v1.29.0: `app/correction_plan.py`, the
+  `correction-plan` command) is local and read-only. It must never execute any
+  suggested command automatically, never change the main strategy
+  recommendation, the correct answers, or the engine math, and never change
+  `strategy_engine.recommend`, the Hi-Lo counting math, adaptive learning,
+  guided coaching, outcome / session history, the EV-snapshot history, the
+  Strategy-vs-EV engine, the reporting module, the dashboard, the drill
+  generator, the drill history, the review scheduler, the practice-pack
+  generator, the practice-pack completion history, the repeat-pack generator,
+  the repeat-pack completion history, or the correction dashboard. It must not
+  duplicate strategy logic (it reads local summaries and references existing
+  commands only), stores / exports no money, bankroll, real bets, accounts,
+  tokens, screenshots, or sensitive/personal data, and stays dependency-free
+  with no network, cloud, or database. Exported plans live under the
+  git-ignored `.blackjack_coach/reports` tree (unless the user passes an
+  explicit `--output` path) and are never committed.
 
 ## 8. Release Rules
 

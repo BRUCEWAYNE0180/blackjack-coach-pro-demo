@@ -7,6 +7,60 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [1.29.0] - 2026-06-23
+
+Local correction action plan. The v1.28.0 correction dashboard now drives a
+concrete, prioritised plan: a new `correction-plan` command turns corrected /
+improving / persistent / new spots into urgent repeats, focused review, data
+collection, and maintenance actions - each with a suggested existing command. It
+never executes any command and never changes the recommendation, the correct
+answers, or the Hi-Lo math.
+
+### Added
+
+- `app/correction_plan.py`: dataclasses `CorrectionPlanItem`,
+  `CorrectionActionPlan`, and `CorrectionPlanExport`, plus
+  `build_correction_action_plan` (priority PERSISTENT_MISS -> IMPROVING -> NEW ->
+  CORRECTED, with `focus` all / urgent / persistent / improving / new /
+  maintenance), `classify_plan_action_type`, `build_recommended_command` (safe
+  existing commands, no private paths), `render_correction_plan`,
+  `render_correction_plan_markdown` (a checklist), and `export_correction_plan`.
+- CLI `correction-plan` command with `--profile`, `--limit`, `--repeat-dir`,
+  `--focus`, `--markdown`, `--export`, and `--output`. With no correction
+  history it prints a clear message; it never runs the suggested commands.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **1.29.0**.
+
+### Quality
+
+- New suite `tests/test_correction_plan.py` (empty plan + clear note; urgent
+  items from persistent misses; maintenance items from corrected spots; profile
+  filter; limit; focus urgent / maintenance filtering; action-type
+  classification; recommended command includes the profile; text + Markdown
+  renderers; export saves a file; no sensitive field names; and that building it
+  never changes `recommend()`) plus `TestCliCorrectionPlan` in
+  `tests/test_cli.py` (no-data message, with data, `--focus urgent`,
+  `--profile`, `--markdown`, `--export --output`, and `--version` = 1.29.0).
+  Full suite passing; ruff clean.
+
+### Safety
+
+- The correction action plan is **local and read-only** and only *suggests*
+  practice: it never executes any command and never changes
+  `strategy_engine.recommend`, the Hi-Lo math, adaptive learning, guided
+  coaching, outcome / session history, the EV-snapshot history, the
+  Strategy-vs-EV engine, reporting, the dashboard, the drill generator, the
+  drill history, the review scheduler, the practice-pack generator, the
+  practice-pack completion history, the repeat-pack generator, the repeat-pack
+  completion history, or the correction dashboard. It does not duplicate strategy
+  logic (it only reads local summaries and references existing commands), stores
+  / exports no money, bankroll, real bets, accounts, tokens, screenshots, or any
+  sensitive/personal data, and uses no external dependencies, network, cloud, or
+  database. Exported plans live under the git-ignored `.blackjack_coach/reports`
+  tree (unless an explicit `--output` path is given) and are never committed.
+
 ## [1.28.0] - 2026-06-23
 
 Local missed-spot correction dashboard. Reading the repeat-pack completion
