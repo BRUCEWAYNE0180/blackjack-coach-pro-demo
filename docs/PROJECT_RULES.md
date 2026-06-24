@@ -452,6 +452,38 @@ As of v0.9 the project enforces these gates on every change:
   bankroll, bets, accounts, tokens, screenshots, or personal data (the session
   history is in-memory only), and add no camera / screen reading / scraping /
   external API / database / login. The CLI must keep working unchanged.
+- **The rule-profile comparison is a local/demo study aid only.** The v2.5.0
+  rule-profile comparison (`app/profile_comparison.py`, surfaced as the web
+  "Rule profile comparison" panel) auto-plays many simulated rounds under
+  several profiles - always following the coach - and reports WIN / LOSS / PUSH
+  behaviour per profile so the user can study which rules tend to be friendlier
+  or harder. It must reuse `app.practice_table.simulate_following_coach` and be
+  deterministic for a fixed seed. It is a study aid that **must never claim a
+  real-world edge or guarantee any result**, must not use EV as the decision,
+  and must not change `strategy_engine.recommend`, the Hi-Lo math, the coach
+  decisions, or the correct answers. `app/profile_comparison.py` must stay
+  Streamlit-free; it must involve no money, bankroll, real betting, casino
+  connectivity, camera, screen reading, scraping, external API, database, or
+  login, and the CLI must keep working unchanged.
+- **Net demo units and the loss audit are demo-only study aids, never profit.**
+  The v2.5.0 net-units accounting (1-unit base hand, DOUBLE +/-2, SURRENDER
+  -0.5), loss audit (correct vs mistake losses; bust / dealer-made-hand /
+  double / surrender losses) and coach sanity check are computed only from the
+  local auto-play simulation. They must **never be presented as real-world
+  profit, EV guidance, or a guarantee**, must not introduce money, bankroll, or
+  bets, and must keep decision quality separate from outcome (a correct decision
+  that loses is a correct loss, not a mistake). Natural blackjack is not paid
+  3:2 in the demo and this limitation must be stated, not hidden.
+- **The demo balance is practice points, never real money or a betting system.**
+  The v2.5.0 demo balance (`simulate_demo_balance` / `DemoBalanceResult`,
+  surfaced in the simulation and comparison panels) is a flat-bet running total
+  of **demo points only**. It must use a single flat base bet (no Martingale,
+  progressive, all-in, or any bet-after-result progression), must never let the
+  balance go negative (it stops early when it cannot cover the next bet), and
+  must never be presented as real money, bankroll advice, a betting strategy, or
+  a profit prediction. It must keep reusing the existing simulation engine and
+  must not change `strategy_engine.recommend`, the Hi-Lo math, or the coach
+  decisions.
 
 ## 8. Release Rules
 

@@ -7,6 +7,94 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [2.5.0] - 2026-06-24
+
+Rule Profile Simulator & Strategy Comparison. v2.5.0 adds a local/demo tool to
+compare rule profiles side by side and study which table configurations tend to
+behave more or less favorably for the player. It builds directly on the v2.4.0
+auto-play sanity simulation: it auto-plays many simulated rounds under each
+selected profile (always following the coach) and reports the WIN / LOSS / PUSH
+behaviour for each.
+
+This is a study aid only. It involves no money, bankroll, real betting, casino
+connectivity, network access, camera, screen reading, or scraping; it does not
+use EV as the decision; and it never claims a real-world edge or guaranteed
+result. The engine, the Hi-Lo math, `strategy_engine.recommend`, and the CLI are
+all unchanged.
+
+### Added
+
+- New `app/profile_comparison.py` (Streamlit-free, unit-testable):
+  `compare_profiles(profile_keys, rounds=1000, seed=42)` simulates each profile
+  with the same fixed seed (deterministic, de-duplicated, order-preserving) and
+  returns a `ProfileComparisonRow` per profile; `summarize_comparison(rows)`
+  returns a `ComparisonSummary` with the most favorable profile (highest win
+  rate), lowest loss rate, highest push rate, and the most difficult profile
+  (highest loss rate); plus `RULE_COMPARISON_NOTES` educational tendencies and
+  `DEFAULT_COMPARE_ROUNDS` / `DEFAULT_COMPARE_SEED`.
+- `web/streamlit_app.py` **Rule profile comparison** panel in the Practice table
+  (demo) page: a multi-select of profiles, a **Seed** field (default 42, so a
+  comparison is reproducible), a **Hands per profile** selector, a **Compare
+  selected profiles** button and a quick **Run 1,000 hands per profile** button
+  (with a spinner). Results are shown as a comparison table (Profile, total
+  hands, wins/losses/pushes counts + %, busts, surrenders, doubles, followed
+  coach % = 100%, and a plausibility status), followed by a summary (most
+  favorable by win %, lowest loss %, highest push %, most difficult profile),
+  educational notes (S17 vs H17, DAS, late surrender, more wins != better EV),
+  and a reminder that the comparison does not predict profit or guarantee
+  results.
+- **Net demo units, loss audit, and a coach sanity check** so the comparison
+  answers "am I really negative, or just losing more hands?":
+  - `SimulationResult` now also reports **net demo units** (1-unit base hand:
+    WIN +1, LOSS -1, PUSH 0, SURRENDER -0.5, DOUBLE +/-2, and a split sums
+    +/-1 per sub-hand), with `units_per_100` and `avg_units_per_hand`
+    properties. Natural blackjack is **not** paid 3:2 (`BLACKJACK_PAYOUT_NOTE`).
+  - A **loss audit** splits losses two consistent ways: by quality
+    (`correct_losses` = followed the coach but lost, vs `mistake_losses`) and by
+    mechanism (`bust_losses` + `dealer_made_hand_losses` + `double_losses` +
+    `surrender_losses` + `split_losses`); each dimension sums to the total
+    losses. New pure helpers `round_units(state)` and `loss_mechanism(state)`.
+  - A **coach sanity check** (`followed_coach_rounds`, `coach_deviations`,
+    `coach_sanity_ok`, `coach_sanity_note`) confirms auto-play follows the coach
+    100% of the time and keeps the frozen initial recommendation separate from
+    the recalculated current one.
+  - `ComparisonSummary` adds **best / worst profile by net units** and a note
+    when the most-winning profile is not the best by units (more wins != fewer
+    units lost). New `DEALER_EDGE_NOTES` explain why the dealer wins more hands
+    (the player acts first and can bust first) and that win % is not
+    profitability.
+  - The web comparison table adds **Net units, Units / 100 hands, Avg units /
+    hand, Correct losses, Mistake losses, Bust losses, Dealer-made-hand losses,
+    Double losses, Surrender losses** columns; the summary adds the net-unit
+    highlights; and the single-profile sanity panel now also shows net units, a
+    loss audit, the coach sanity note, and the dealer-edge explanation.
+- **Demo balance / practice points** so the simulation shows positive/negative
+  as a flat-bet running balance (demo points only - never real money, no real
+  bankroll, no betting system):
+  - New `simulate_demo_balance(profile_key, rounds, seed, starting_balance,
+    base_bet)` and `DemoBalanceResult` in `app/practice_table.py`. It runs
+    hand-by-hand and respects the balance: `final_balance == starting_balance +
+    net_units * base_bet`, with `profit_loss` and `return_pct` properties. The
+    balance never goes negative - the run **stops early** if it cannot cover the
+    next flat bet (`stopped_early`, `hands_played`), and DOUBLE / SPLIT are
+    disabled for a hand when the balance cannot cover the extra unit (downgraded
+    to the closest single-bet action). Flat bet only - no progressive /
+    Martingale / all-in logic. Raises on a non-positive bet or negative balance.
+  - The web simulation panel and the rule-profile comparison gain **Starting
+    demo balance** (default 1000) and **Base bet per hand** (default 10) inputs
+    (non-negative only) and display **Starting balance, Base bet, Final balance,
+    Demo profit/loss, Demo return %, Stopped early, Hands played** alongside net
+    units. The comparison table adds **Starting balance, Final balance, Demo
+    P/L, Demo return %, Stopped early, Hands played** columns. A visible
+    disclaimer (`DEMO_BALANCE_NOTE`) states the balance is local practice
+    accounting only - not real money, not bankroll advice, not a betting system.
+
+### Notes
+
+- Comparisons are deterministic for a fixed seed, the per-profile counts always
+  sum to the total hands, and the auto-player follows the coach 100% of the
+  time. Single-profile and many-profile selections are both supported.
+
 ## [2.4.0] - 2026-06-24
 
 Practice Table Learning Review. v2.4.0 makes the practice table's history

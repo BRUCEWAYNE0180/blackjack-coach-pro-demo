@@ -1728,7 +1728,7 @@ kept separate from the round outcome. Per `PROJECT_RULES.md` it stays a local,
 simulated, educational demo with no camera / screen reading / scraping / real
 money / bankroll / sensitive data.
 
-### v2.4.0 — Practice table learning review (current)
+### v2.4.0 — Practice table learning review
 
 Makes the practice-table history smarter. Beyond WIN / LOSS / PUSH, each round
 gets an outcome-aware explanation and a conclusion category, weak spots are
@@ -1759,6 +1759,86 @@ learning layer over `app/practice_table.TableRoundRecord`; `web/streamlit_app.py
 only renders. `strategy_engine`, the Hi-Lo math, and the coach decisions are
 untouched, the outcome never re-grades a decision, and per `PROJECT_RULES.md` it
 stays local, educational, and outcome-separated with no money or sensitive data.
+
+### v2.5.0 — Rule profile simulator & strategy comparison (current)
+
+Adds a local/demo tool to compare rule profiles side by side and study which
+table configurations tend to be friendlier or harder for the player. It builds
+on the v2.4.0 auto-play sanity simulation: it auto-plays many simulated rounds
+under each selected profile (always following the coach) and reports the
+WIN / LOSS / PUSH behaviour per profile. It is a study aid only and never claims
+a real-world edge, uses EV as a decision, or promises a result.
+
+Delivered:
+
+- **`app/profile_comparison.py`** (Streamlit-free, unit-testable):
+  `compare_profiles(profile_keys, rounds=1000, seed=42)` (deterministic per
+  fixed seed, de-duplicated, order-preserving) returning a `ProfileComparisonRow`
+  per profile; `summarize_comparison(rows)` returning a `ComparisonSummary`
+  (most favorable = highest win rate, lowest loss rate, highest push rate, most
+  difficult = highest loss rate); `RULE_COMPARISON_NOTES`; and
+  `DEFAULT_COMPARE_ROUNDS` / `DEFAULT_COMPARE_SEED`. It reuses
+  `app.practice_table.simulate_following_coach`.
+- **`web/streamlit_app.py`**: a **Rule profile comparison** panel in the
+  Practice table mode - a profile multi-select, a Seed field, a hands-per-profile
+  selector, Compare / Run-1,000 buttons (with a spinner), a comparison table
+  (wins/losses/pushes counts + %, busts, surrenders, doubles, followed-coach %,
+  plausibility), a summary, and educational notes.
+- **Tests**: `tests/test_profile_comparison.py` (determinism, counts sum,
+  single/many/empty/duplicate/unknown profiles, followed-coach 100%, summary
+  selection, educational notes, no-external-capture), plus extended streamlit
+  static / interaction tests; `--version` assertions updated to 2.5.0.
+
+Net-units / loss-audit / coach-sanity follow-up (same version, so win % is not
+the only answer to "am I really negative?"):
+
+- **Net demo units** on `SimulationResult` (1-unit base hand: WIN +1, LOSS -1,
+  PUSH 0, SURRENDER -0.5, DOUBLE +/-2; a split sums +/-1 per sub-hand; natural
+  blackjack is not paid 3:2 - `BLACKJACK_PAYOUT_NOTE`), with `units_per_100` /
+  `avg_units_per_hand`, plus pure helpers `round_units(state)` and
+  `loss_mechanism(state)`.
+- **Loss audit** that sums two consistent ways: by quality (`correct_losses`
+  vs `mistake_losses`) and by mechanism (`bust_losses`,
+  `dealer_made_hand_losses`, `double_losses`, `surrender_losses`,
+  `split_losses`). Auto-play follows the coach, so mistake losses are 0.
+- **Coach sanity** (`followed_coach_rounds`, `coach_deviations`,
+  `coach_sanity_ok`, `coach_sanity_note`) verifying the auto-play follows the
+  coach 100% and keeps the frozen initial recommendation separate from the
+  recalculated current one. `DEALER_EDGE_NOTES` explain why the dealer wins more
+  hands and that win % is not profitability.
+- `ComparisonSummary` adds best/worst-by-net-units and a "more wins != fewer
+  units" note; the web comparison table and the single-profile sanity panel
+  render net units, the loss audit, and the coach-sanity note. Tests cover unit
+  accounting for WIN/LOSS/PUSH/SURRENDER/DOUBLE, both loss-audit sums, net-unit
+  determinism, and the UI columns.
+
+Demo-balance / practice-points follow-up (same version, to read the simulation
+as a running positive/negative total):
+
+- **`simulate_demo_balance` + `DemoBalanceResult`** in `app/practice_table.py`:
+  a flat-bet demo balance (practice points, never real money). `final_balance ==
+  starting_balance + net_units * base_bet`, with `profit_loss` / `return_pct`.
+  The loop runs hand-by-hand and respects the balance - it **stops early** when
+  it cannot cover the next flat bet (`stopped_early`, `hands_played`) and
+  disables DOUBLE/SPLIT when the extra unit is unaffordable (downgraded to a
+  single-bet action). The balance never goes negative; flat bet only (no
+  progressive / Martingale / all-in). The plain loop and the balance loop share
+  one core (`_run_simulation`), so the existing sanity sim is unchanged.
+  `DEMO_BALANCE_NOTE` is the visible disclaimer.
+- `profile_comparison.compare_profiles` takes optional `starting_balance` /
+  `base_bet`; each row carries a `DemoBalanceResult`. The web simulation panel
+  and comparison gain Starting demo balance / Base bet inputs (non-negative) and
+  show starting/final balance, demo P/L, return %, stopped-early and hands
+  played. Tests cover the balance identity, P/L, return %, stop-early, no
+  negative balance, played-hands counts, and the flat-bet (no betting system)
+  guarantee.
+
+**Architecture:** `app/profile_comparison.py` is the testable, Streamlit-free
+comparison layer over `app.practice_table.simulate_following_coach`;
+`web/streamlit_app.py` only renders. `strategy_engine.recommend`, the Hi-Lo math,
+and the coach decisions are untouched, EV is never used as a decision, and per
+`PROJECT_RULES.md` it stays local, educational, with no money, bankroll, real
+betting, casino connectivity, network, camera, screen reading, or scraping.
 
 ### v2.x — Possible further web modes (if decided later)
 

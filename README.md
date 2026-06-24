@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v2.4.0 feature summary
+## v2.5.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -201,6 +201,26 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   it reports wins/losses/pushes (+%), busts, surrenders, doubles and a
   plausibility interpretation. It is a local demo check only: no money,
   bankroll, EV, casino, network, camera, or scraping.
+- **Rule profile simulator & strategy comparison** (v2.5.0): a **Rule profile
+  comparison** panel (in the Practice table demo page) auto-plays many simulated
+  rounds under several rule profiles at once - always following the coach - so
+  you can study which table rules tend to be friendlier or harder. Pick the
+  profiles, set a fixed **Seed** (default 42, reproducible) and the **hands per
+  profile**, then **Compare selected profiles** or **Run 1,000 hands per
+  profile**. It shows a comparison table (wins/losses/pushes counts + %, busts,
+  surrenders, doubles, followed-coach % = 100%, plausibility) plus a summary
+  (most favorable by win %, lowest loss %, highest push %, most difficult) and
+  educational notes (S17 vs H17, DAS, late surrender). It also reports **net
+  demo units** (units / 100 hands, avg units / hand), a **loss audit** (correct
+  vs mistake losses; bust / dealer-made-hand / double / surrender losses), and a
+  **coach sanity check** so you can see whether you are really negative or just
+  losing more hands. It also keeps an optional flat-bet **demo balance**
+  (practice points, default 1000 balance / 10 bet) showing final balance, demo
+  P/L and return % - never real money, never a betting system, and the balance
+  never goes negative (it stops early if it cannot cover the next flat bet).
+  Local/demo study only: no
+  money, bankroll, EV-as-decision, casino, network, camera, or scraping, and
+  more wins does not always mean better EV.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -725,6 +745,73 @@ win after a non-recommended play is never automatically a good habit. The logic
 lives in the Streamlit-free `app/practice_review.py` and **never changes
 `strategy_engine.recommend`, the Hi-Lo math, or the coach's decisions**. It is
 local / educational only and stores no money, bankroll, or sensitive data.
+
+## Rule Profile Simulator & Strategy Comparison (v2.5.0)
+
+v2.5.0 adds a **Rule profile comparison** panel to the Practice table (demo)
+page so you can study how different table rules behave. Pick one or more rule
+profiles, choose a fixed **Seed** (default 42) and the number of **hands per
+profile**, then click **Compare selected profiles** (or the quick **Run 1,000
+hands per profile**). The tool auto-plays that many simulated rounds for each
+profile - always following the coach - and shows a comparison table:
+
+- Profile, total hands, **wins / losses / pushes** counts and percentages,
+  **busts**, **surrenders**, **doubles**, **followed coach %** (always 100% in
+  auto-play), and a **plausibility** status.
+
+A short **summary** highlights the **most favorable** profile (highest simulated
+win rate), the **lowest loss %**, the **highest push %**, and the **most
+difficult** profile (highest simulated loss rate), followed by educational notes:
+S17 (dealer stands on soft 17) is usually friendlier than H17; double-after-split
+(DAS) usually helps a little; late surrender can reduce losses on the worst
+hands; and **more wins does not always mean better EV**.
+
+### Net demo units, loss audit, and coach sanity (v2.5.0)
+
+Win % alone does not answer "am I really negative, or just losing more hands?",
+so the simulation also reports **net demo units** using a 1-unit base hand
+(WIN +1, LOSS -1, PUSH 0, SURRENDER -0.5, DOUBLE +/-2; a split sums +/-1 per
+sub-hand). Natural blackjack is **not** paid 3:2 in the demo (it scores as a
+normal +1 win). The comparison table adds **Net units**, **Units / 100 hands**
+and **Avg units / hand**, and the summary adds the **best / worst profile by net
+units** plus a note when the most-winning profile is not the best by units.
+
+A **loss audit** explains *why* hands were lost, two consistent ways: by quality
+(**correct losses** - the auto-player followed the coach but still lost, vs
+**mistake losses**) and by mechanism (**bust**, **dealer made a hand**,
+**double**, **surrender**, split) - each set sums to the total losses. Because
+auto-play always follows the coach, mistake losses are 0 and every loss is a
+correct loss (normal variance, not an error). A **coach sanity check** confirms
+the auto-play followed the coach on 100% of initial decisions and kept the frozen
+initial recommendation separate from the recalculated current one. An
+educational note explains that the dealer wins more hands because the player acts
+first (and can bust before the dealer draws), and that win % is not the same as
+profitability.
+
+### Demo balance / practice points (v2.5.0)
+
+To see positive/negative as a running total, the simulation can also keep a
+flat-bet **demo balance** (practice points - **not real money, not a bankroll,
+not a betting system**). Set a **Starting demo balance** (default 1000) and a
+**Base bet per hand** (default 10); the simulation then runs hand-by-hand and
+shows the **Final balance**, **Demo profit/loss**, **Demo return %**, whether it
+**stopped early**, and the **hands played**. For example, starting 1000 with a
+base bet of 10 and net units of -22 gives a final balance of 780 (a -220 / -22%
+demo result). The balance **never goes negative**: the run stops with a clear
+message if it cannot cover the next flat bet, and DOUBLE / SPLIT are skipped for
+a hand when the balance cannot cover the extra unit. It is flat bet only - there
+is no Martingale, progressive, or all-in logic. The rule-profile comparison
+shows the same per profile (Starting balance, Final balance, Demo P/L, Demo
+return %, Stopped early, Hands played).
+
+Every comparison is **deterministic for a fixed seed**, the per-profile counts
+always sum to the total hands, and one or many profiles can be compared. The
+logic lives in the Streamlit-free, unit-testable `app/profile_comparison.py`
+(building on `app.practice_table.simulate_following_coach`). It is a local/demo
+study aid only: it uses **no money, bankroll, EV-as-decision, real betting,
+casino connectivity, network, camera, screen reading, or scraping**, never
+claims a real-world edge or guaranteed result, and **never changes
+`strategy_engine.recommend` or the Hi-Lo math**.
 
 ## Terminal visual polish (v1.1.0)
 

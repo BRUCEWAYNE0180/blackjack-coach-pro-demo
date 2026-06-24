@@ -1254,3 +1254,93 @@ decision, and stores no money, bankroll, or sensitive data.
 
 
 
+
+
+## Rule Profile Simulator & Strategy Comparison (v2.5.0)
+
+v2.5.0 adds a **Rule profile comparison** panel to the Practice table (demo)
+mode (no new command - it is part of the same local web page). Start the web UI
+the same way:
+
+```bash
+python -m pip install -e ".[web]"
+python -m streamlit run web/streamlit_app.py
+```
+
+The panel lets you compare rule profiles side by side:
+
+- **Profiles to compare** - select one or more rule profiles.
+- **Seed** (default 42) - makes every profile's simulation reproducible.
+- **Hands per profile** - how many demo rounds to auto-play per profile.
+- **Compare selected profiles** / **Run 1,000 hands per profile** - auto-play
+  that many rounds for each profile (always following the coach), with a spinner
+  while it runs.
+
+It then shows a **comparison table** (Profile, total hands, wins / losses /
+pushes counts and percentages, busts, surrenders, doubles, followed-coach %
+which is always 100% in auto-play, and a plausibility status), a **summary**
+(most favorable by win %, lowest loss %, highest push %, most difficult
+profile), and **educational notes** (S17 is usually friendlier than H17, DAS
+usually helps, late surrender can reduce losses, and more wins does not always
+mean better EV).
+
+Comparisons are **deterministic for a fixed seed**, the per-profile counts
+always sum to the total hands, and one or many profiles can be compared. The
+logic lives in the Streamlit-free `app/profile_comparison.py`
+(`compare_profiles`, `summarize_comparison`, `RULE_COMPARISON_NOTES`), which
+builds on `app.practice_table.simulate_following_coach`. It is a local/demo
+study aid only: it uses no money, bankroll, EV as the decision, real betting,
+casino connectivity, network, camera, screen reading, or scraping, never claims
+a real-world edge or guaranteed result, and never changes
+`strategy_engine.recommend`, the Hi-Lo math, the coach decisions, or the CLI.
+
+
+### Net demo units, loss audit & coach sanity (v2.5.0)
+
+Win % alone does not show whether you are really negative, so the simulation
+(both the single-profile sanity panel and the comparison table) also reports
+**net demo units**. Units use a 1-unit base hand: WIN +1, LOSS -1, PUSH 0,
+SURRENDER -0.5, DOUBLE +/-2, and a split sums +/-1 per sub-hand. Natural
+blackjack is not paid 3:2 in the demo (it scores as a normal +1 win). The table
+shows **Net units**, **Units / 100 hands** and **Avg units / hand**, and the
+summary adds the **best / worst profile by net units** with a note when the
+most-winning profile is not the best by units (more wins does not always mean
+fewer units lost).
+
+A **loss audit** explains why hands were lost, two consistent ways: by quality
+(**correct losses** - followed the coach but lost - vs **mistake losses**) and
+by mechanism (**bust**, **dealer made a hand**, **double**, **surrender**,
+split). Each set sums to the total losses. Because auto-play always follows the
+coach, mistake losses are 0 and every loss is a correct loss (normal variance,
+not an error). A **coach sanity check** confirms auto-play followed the coach on
+100% of initial decisions and kept the frozen initial recommendation separate
+from the recalculated current one. The helpers `round_units`, `loss_mechanism`,
+`coach_sanity_ok` and `coach_sanity_note` live in the Streamlit-free
+`app/practice_table.py`. Still local/demo only: no money, bankroll, EV as the
+decision, casino, network, camera, screen reading or scraping, and no profit
+prediction or guarantee.
+
+
+### Demo balance / practice points (v2.5.0)
+
+To read the simulation as positive/negative on a running total, set a flat-bet
+**demo balance** (practice points - **not real money, not a bankroll, not a
+betting system**). Both the single-profile simulation panel and the rule-profile
+comparison take a **Starting demo balance** (default 1000) and a **Base bet per
+hand** (default 10), and report **Starting balance, Final balance, Demo
+profit/loss, Demo return %, Stopped early** and **Hands played**.
+
+The accounting is simple and flat: `final balance = starting balance + net_units
+* base_bet`. For example, starting 1000 with a base bet of 10 and net units of
+-22 gives a final balance of 780 (a -220 / -22% demo result). The simulation
+runs hand-by-hand and **respects the balance**: it stops early with the message
+`Stopped early: demo balance could not cover the next base bet.` if it cannot
+afford the next flat bet, and it disables DOUBLE / SPLIT for a hand when the
+balance cannot cover the extra unit (downgrading to the closest single-bet
+action). The balance **never goes negative**, and there is **no Martingale /
+progressive / all-in** logic - flat bet only.
+
+The helpers `simulate_demo_balance` and `DemoBalanceResult` live in the
+Streamlit-free `app/practice_table.py`. Still local/demo only: demo points are a
+practice accounting aid, not real money, bankroll advice, or a betting system,
+and there is no profit prediction or guarantee.

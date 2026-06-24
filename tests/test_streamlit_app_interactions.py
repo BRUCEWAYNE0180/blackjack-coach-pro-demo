@@ -674,3 +674,190 @@ class TestPracticeTableSimulation:
         texts = [s.value for s in at.success] + [w.value for w in at.warning]
         assert any(
             "plausible" in t.lower() or "unusual" in t.lower() for t in texts)
+
+
+
+class TestProfileComparison:
+    """v2.5.0: rule-profile comparison panel."""
+
+    def test_panel_present_before_any_round(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        _assert_clean(at)
+        markdowns = _markdowns(at)
+        assert any("Rule profile comparison" in m for m in markdowns)
+        assert any(b.key == "compare_run" for b in at.button)
+        assert any(b.key == "compare_run_1000" for b in at.button)
+
+    def test_compare_two_profiles_populates_rows(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        at.multiselect(key="compare_profiles_select").set_value(
+            ["MULTI_DECK_H17_DAS_LS", "MULTI_DECK_S17_DAS_LS"]).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        rows = at.session_state["table_compare_rows"]
+        assert rows is not None
+        keys = [r.profile_key for r in rows]
+        assert keys == ["MULTI_DECK_H17_DAS_LS", "MULTI_DECK_S17_DAS_LS"]
+        # Counts add up and the auto-player always follows the coach.
+        for row in rows:
+            res = row.result
+            assert res.wins + res.losses + res.pushes == res.rounds == 100
+            assert res.followed_coach_pct == 100.0
+
+    def test_single_profile_does_not_break(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        at.multiselect(key="compare_profiles_select").set_value(
+            ["SINGLE_DECK_S17_DAS_LS"]).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        rows = at.session_state["table_compare_rows"]
+        assert len(rows) == 1
+        assert rows[0].profile_key == "SINGLE_DECK_S17_DAS_LS"
+
+    def test_seed_is_deterministic(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        at.number_input(key="compare_seed").set_value(99).run()
+        at.multiselect(key="compare_profiles_select").set_value(
+            ["MULTI_DECK_H17_DAS_LS"]).run()
+        at.button(key="compare_run").click().run()
+        first = at.session_state["table_compare_rows"][0].result
+        at.number_input(key="compare_seed").set_value(99).run()
+        at.button(key="compare_run").click().run()
+        second = at.session_state["table_compare_rows"][0].result
+        assert (first.wins, first.losses, first.pushes) == (
+            second.wins, second.losses, second.pushes)
+
+    def test_table_lists_all_selected_profiles(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        selection = ["MULTI_DECK_H17_DAS_LS", "MULTI_DECK_S17_DAS_LS",
+                     "SINGLE_DECK_S17_DAS_LS"]
+        at.multiselect(key="compare_profiles_select").set_value(selection).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        rows = at.session_state["table_compare_rows"]
+        assert [r.profile_key for r in rows] == selection
+        # A summary and educational notes are rendered after a comparison.
+        markdowns = _markdowns(at)
+        assert any("Most favorable by net units" in m for m in markdowns)
+
+    def test_empty_selection_warns_not_breaks(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.multiselect(key="compare_profiles_select").set_value([]).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        warnings = [w.value for w in at.warning]
+        assert any("at least one" in w.lower() for w in warnings)
+
+
+
+class TestProfileComparisonNetUnits:
+    """v2.5.0 follow-up: net units, loss audit and coach sanity in the UI."""
+
+    def test_comparison_shows_net_unit_summary(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        at.multiselect(key="compare_profiles_select").set_value(
+            ["MULTI_DECK_H17_DAS_LS", "EIGHT_DECK_H17_DAS_LS"]).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        markdowns = _markdowns(at)
+        assert any("Most favorable by net units" in m for m in markdowns)
+        assert any("Most difficult by net units" in m for m in markdowns)
+        # The dealer-edge explanation is shown.
+        assert any("dealer wins more hands" in m.lower() for m in markdowns)
+
+    def test_comparison_rows_have_unit_and_audit_data(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        at.multiselect(key="compare_profiles_select").set_value(
+            ["MULTI_DECK_H17_DAS_LS"]).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        rows = at.session_state["table_compare_rows"]
+        res = rows[0].result
+        assert res.correct_losses + res.mistake_losses == res.losses
+        mechanism = (
+            res.bust_losses + res.dealer_made_hand_losses
+            + res.double_losses + res.surrender_losses + res.split_losses)
+        assert mechanism == res.losses
+
+    def test_single_sim_panel_shows_net_units_and_audit(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.button(key="sim_run_100").click().run()
+        _assert_clean(at)
+        markdowns = _markdowns(at)
+        assert any("Net demo units" in m for m in markdowns)
+        # Loss audit appears when there are losses (100 hands always has some).
+        assert any("Loss audit" in m for m in markdowns)
+        # Coach sanity is surfaced.
+        successes = [s.value for s in at.success]
+        assert any("coach sanity ok" in s.lower() for s in successes)
+
+
+
+class TestDemoBalance:
+    """v2.5.0 follow-up: demo balance / practice points in the UI."""
+
+    def test_sim_panel_renders_demo_balance(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.button(key="sim_run_100").click().run()
+        _assert_clean(at)
+        balance = at.session_state["table_sim_balance"]
+        assert balance is not None
+        assert balance.starting_balance == 1000
+        assert balance.base_bet == 10
+        # final balance = start + net_units * base_bet
+        assert balance.final_balance == (
+            balance.starting_balance + balance.result.net_units * balance.base_bet)
+        markdowns = _markdowns(at)
+        assert any("Demo balance" in m for m in markdowns)
+
+    def test_sim_panel_custom_balance_and_bet(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.number_input(key="sim_start_balance").set_value(500).run()
+        at.number_input(key="sim_base_bet").set_value(25).run()
+        at.button(key="sim_run_100").click().run()
+        _assert_clean(at)
+        balance = at.session_state["table_sim_balance"]
+        assert balance.starting_balance == 500
+        assert balance.base_bet == 25
+        assert balance.final_balance >= 0
+
+    def test_comparison_renders_demo_balance(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        at.multiselect(key="compare_profiles_select").set_value(
+            ["MULTI_DECK_H17_DAS_LS", "EIGHT_DECK_H17_DAS_LS"]).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        rows = at.session_state["table_compare_rows"]
+        for row in rows:
+            assert row.balance is not None
+            assert row.balance.final_balance == (
+                row.balance.starting_balance
+                + row.result.net_units * row.balance.base_bet)
+
+    def test_demo_balance_disclaimer_shown(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.button(key="sim_run_100").click().run()
+        _assert_clean(at)
+        infos = [i.value for i in at.info]
+        assert any("not real money" in i.lower() for i in infos)
+        assert any("not a betting system" in i.lower() for i in infos)

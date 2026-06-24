@@ -43,9 +43,10 @@ suggest drills. Decision quality is always kept separate from the round outcome
 
 from __future__ import annotations
 
+import pandas as pd
 import streamlit as st
 
-from app import __version__, practice_review, practice_table
+from app import __version__, practice_review, practice_table, profile_comparison
 from app.rules import DEFAULT_PROFILE, PROFILES
 from app.web_adapter import (
     DOUBLE_PLAY_NOTE,
@@ -107,6 +108,10 @@ def _init_state() -> None:
     # v2.4.0 auto-play simulation / sanity-check state.
     st.session_state.setdefault("table_sim_result", None)
     st.session_state.setdefault("table_sim_rounds", 0)
+    # v2.5.0 demo-balance + rule-profile comparison state.
+    st.session_state.setdefault("table_sim_balance", None)
+    st.session_state.setdefault("table_compare_rows", None)
+    st.session_state.setdefault("table_compare_summary", None)
 
 
 def _add_player_card(rank: str) -> None:
@@ -233,16 +238,40 @@ def _clear_table_history() -> None:
     st.session_state.table_history = []
 
 
-def _table_run_simulation(profile_key: str, rounds: int, seed: int) -> None:
-    """Auto-play ``rounds`` demo hands following the coach; store the result.
+def _table_run_simulation(
+        profile_key: str, rounds: int, seed: int,
+        starting_balance: float, base_bet: float) -> None:
+    """Auto-play ``rounds`` demo hands following the coach, tracking a flat-bet
+    demo balance; store both the stats and the demo-balance result.
 
     Local sanity check only - reuses the same dealing / dealer-play / outcome
-    code as the interactive table. No money, bankroll, EV, casino, network,
-    camera or scraping is involved.
+    code as the interactive table. Demo points only: no real money, no real
+    bankroll, no betting system, no casino, network, camera or scraping.
     """
-    st.session_state.table_sim_result = practice_table.simulate_following_coach(
-        profile_key, rounds=rounds, seed=seed)
+    balance = practice_table.simulate_demo_balance(
+        profile_key, rounds=rounds, seed=seed,
+        starting_balance=starting_balance, base_bet=base_bet)
+    st.session_state.table_sim_balance = balance
+    st.session_state.table_sim_result = balance.result
     st.session_state.table_sim_rounds = rounds
+
+
+def _table_run_comparison(
+        profile_keys: list[str], rounds: int, seed: int,
+        starting_balance: float, base_bet: float) -> None:
+    """Auto-play ``rounds`` demo hands per profile and store the comparison.
+
+    Local/demo study only - it reuses the same dealing / dealer-play / outcome
+    code per profile, always follows the coach, and tracks a flat-bet demo
+    balance per profile. Demo points only: no real money, no real bankroll, no
+    betting system, no casino, network, camera or scraping.
+    """
+    rows = profile_comparison.compare_profiles(
+        profile_keys, rounds=rounds, seed=seed,
+        starting_balance=starting_balance, base_bet=base_bet)
+    st.session_state.table_compare_rows = rows
+    st.session_state.table_compare_summary = (
+        profile_comparison.summarize_comparison(rows))
 
 
 # --- Rendering helpers -----------------------------------------------------
@@ -731,6 +760,18 @@ def _render_table_simulation(profile_key: str) -> None:
         "Seed", min_value=0, max_value=2_000_000_000, value=42, step=1,
         key="table_sim_seed",
         help="Fixed seed makes the simulation deterministic and repeatable.")
+    bal_col, bet_col = st.columns(2)
+    starting_balance = bal_col.number_input(
+        "Starting demo balance", min_value=0, max_value=1_000_000, value=1000,
+        step=50, key="sim_start_balance",
+        help="Demo points only - not real money. Flat bet, no negative balance.")
+    base_bet = bet_col.number_input(
+        "Base bet per hand", min_value=1, max_value=100_000, value=10, step=5,
+        key="sim_base_bet",
+        help="Flat demo points wagered each hand. No Martingale / progressive.")
+    st.caption(
+        "These are **demo points** for local practice accounting, not real "
+        "money. Flat bet only.")
     run_100_col, run_1000_col = st.columns(2)
     run_100 = run_100_col.button(
         "Run 100 auto-play hands", key="sim_run_100",
@@ -742,7 +783,9 @@ def _render_table_simulation(profile_key: str) -> None:
     if run_100 or run_1000:
         rounds = 100 if run_100 else 1000
         with st.spinner(f"Auto-playing {rounds:,} demo hands..."):
-            _table_run_simulation(profile_key, rounds, int(seed))
+            _table_run_simulation(
+                profile_key, rounds, int(seed),
+                float(starting_balance), float(base_bet))
 
     result = st.session_state.table_sim_result
     if result is None:
@@ -760,6 +803,61 @@ def _render_table_simulation(profile_key: str) -> None:
     sim_g.metric("Doubles", result.doubles)
     sim_h.metric("Followed coach", f"{result.followed_coach_pct:.0f}%")
 
+    # Net demo units answer "am I really negative, or just losing more hands?"
+    st.markdown("**Net demo units (profitability proxy, not win %):**")
+    unit_a, unit_b, unit_c = st.columns(3)
+    unit_a.metric("Net units", f"{result.net_units:+.1f}")
+    unit_b.metric("Units / 100 hands", f"{result.units_per_100:+.2f}")
+    unit_c.metric("Avg units / hand", f"{result.avg_units_per_hand:+.3f}")
+    st.caption(
+        "1-unit base hand: WIN +1, LOSS -1, PUSH 0, SURRENDER -0.5, DOUBLE "
+        "+/-2; a split sums +/-1 per sub-hand. "
+        + practice_table.BLACKJACK_PAYOUT_NOTE)
+
+    # Demo balance: flat-bet practice points (never real money).
+    balance = st.session_state.table_sim_balance
+    if balance is not None:
+        st.markdown("**Demo balance (practice points, not real money):**")
+        bal_a, bal_b, bal_c = st.columns(3)
+        bal_a.metric("Starting balance", f"{balance.starting_balance:,.0f}")
+        bal_b.metric("Base bet", f"{balance.base_bet:,.0f}")
+        bal_c.metric("Final balance", f"{balance.final_balance:,.0f}")
+        bal_d, bal_e, bal_f = st.columns(3)
+        bal_d.metric(
+            "Demo profit/loss", f"{balance.profit_loss:+,.0f}")
+        bal_e.metric("Demo return %", f"{balance.return_pct:+.1f}%")
+        bal_f.metric("Hands played", balance.hands_played)
+        if balance.stopped_early:
+            st.warning(
+                "Stopped early: demo balance could not cover the next base "
+                f"bet (after {balance.hands_played} hands).")
+        else:
+            st.caption("Stopped early: no - all requested hands were played.")
+        st.info(practice_table.DEMO_BALANCE_NOTE)
+    if result.losses:
+        st.markdown("**Loss audit (why hands were lost):**")
+        loss_a, loss_b, loss_c = st.columns(3)
+        loss_a.metric("Correct losses", result.correct_losses)
+        loss_b.metric("Mistake losses", result.mistake_losses)
+        loss_c.metric("Player busts", result.bust_losses)
+        loss_d, loss_e, loss_f = st.columns(3)
+        loss_d.metric("Dealer made a hand", result.dealer_made_hand_losses)
+        loss_e.metric("Double losses", result.double_losses)
+        loss_f.metric("Surrender losses", result.surrender_losses)
+        st.caption(
+            "Correct losses followed the coach but still lost - that is normal "
+            "variance, not a mistake.")
+
+    sanity_note = practice_table.coach_sanity_note(result)
+    if practice_table.coach_sanity_ok(result):
+        st.success(sanity_note)
+    else:
+        st.warning(sanity_note)
+
+    st.markdown("**Why the dealer wins more hands than the player:**")
+    for note in practice_table.DEALER_EDGE_NOTES:
+        st.markdown(f"- {note}")
+
     interpretation = practice_table.simulation_interpretation(result)
     if practice_table.simulation_looks_plausible(result):
         st.success(interpretation)
@@ -769,6 +867,164 @@ def _render_table_simulation(profile_key: str) -> None:
         "This is a local demo sanity check. It does not predict profit or "
         "guarantee winnings. Blackjack can lose many hands even when following "
         "correct strategy.")
+
+
+def _render_profile_comparison(default_profile_key: str) -> None:
+    """Render the rule-profile comparison panel (v2.5.0).
+
+    Auto-plays many demo rounds under several rule profiles (always following
+    the coach) so the user can study which table rules behave more or less
+    favorably. Local/demo study only: no money, bankroll, EV decision, real
+    betting, casino, network, camera or scraping.
+    """
+    st.markdown("#### Rule profile comparison")
+    st.caption(
+        "Auto-play demo rounds under several rule profiles to study which "
+        "tables behave more or less favorably. Local demo only - no money, no "
+        "bankroll, no casino, no network.")
+
+    all_keys = sorted(PROFILES)
+    default_selection = [default_profile_key]
+    other = next((k for k in all_keys if k != default_profile_key), None)
+    if other is not None:
+        default_selection.append(other)
+    selected = st.multiselect(
+        "Profiles to compare",
+        options=all_keys,
+        default=default_selection,
+        format_func=lambda key: PROFILES[key].name,
+        key="compare_profiles_select",
+        help="Pick one or more rule profiles to simulate and compare.")
+
+    seed = st.number_input(
+        "Seed", min_value=0, max_value=2_000_000_000, value=42, step=1,
+        key="compare_seed",
+        help="Fixed seed makes every profile's simulation reproducible.")
+    rounds = st.select_slider(
+        "Hands per profile", options=[100, 250, 500, 1000, 2000],
+        value=profile_comparison.DEFAULT_COMPARE_ROUNDS, key="compare_rounds",
+        help="More hands give a steadier picture but take a little longer.")
+    bal_col, bet_col = st.columns(2)
+    starting_balance = bal_col.number_input(
+        "Starting demo balance", min_value=0, max_value=1_000_000, value=1000,
+        step=50, key="compare_start_balance",
+        help="Demo points only - not real money. Flat bet, no negative balance.")
+    base_bet = bet_col.number_input(
+        "Base bet per hand", min_value=1, max_value=100_000, value=10, step=5,
+        key="compare_base_bet",
+        help="Flat demo points wagered each hand. No Martingale / progressive.")
+    st.caption(
+        "Balances are **demo points** for local practice accounting, not real "
+        "money. Flat bet only.")
+
+    compare_col, quick_col = st.columns(2)
+    compare = compare_col.button(
+        "Compare selected profiles", key="compare_run",
+        use_container_width=True)
+    quick = quick_col.button(
+        "Run 1,000 hands per profile", key="compare_run_1000",
+        use_container_width=True)
+
+    if compare or quick:
+        if not selected:
+            st.warning("Select at least one rule profile to compare.")
+        else:
+            run_rounds = 1000 if quick else int(rounds)
+            with st.spinner(
+                    f"Auto-playing {run_rounds:,} demo hands for "
+                    f"{len(selected)} profile(s)..."):
+                _table_run_comparison(
+                    selected, run_rounds, int(seed),
+                    float(starting_balance), float(base_bet))
+
+    rows = st.session_state.table_compare_rows
+    if not rows:
+        return
+
+    table_data = [
+        {
+            "Profile": row.profile_name,
+            "Total hands": row.result.rounds,
+            "Wins": row.result.wins,
+            "Win %": f"{row.result.win_rate * 100:.1f}%",
+            "Losses": row.result.losses,
+            "Loss %": f"{row.result.loss_rate * 100:.1f}%",
+            "Pushes": row.result.pushes,
+            "Push %": f"{row.result.push_rate * 100:.1f}%",
+            "Net units": f"{row.result.net_units:+.1f}",
+            "Units / 100 hands": f"{row.result.units_per_100:+.2f}",
+            "Avg units / hand": f"{row.result.avg_units_per_hand:+.3f}",
+            "Starting balance": (
+                f"{row.balance.starting_balance:,.0f}" if row.balance else "-"),
+            "Final balance": (
+                f"{row.balance.final_balance:,.0f}" if row.balance else "-"),
+            "Demo P/L": (
+                f"{row.balance.profit_loss:+,.0f}" if row.balance else "-"),
+            "Demo return %": (
+                f"{row.balance.return_pct:+.1f}%" if row.balance else "-"),
+            "Stopped early": (
+                ("yes" if row.balance.stopped_early else "no")
+                if row.balance else "-"),
+            "Hands played": (
+                row.balance.hands_played if row.balance else row.result.rounds),
+            "Busts": row.result.busts,
+            "Surrenders": row.result.surrenders,
+            "Doubles": row.result.doubles,
+            "Correct losses": row.result.correct_losses,
+            "Mistake losses": row.result.mistake_losses,
+            "Bust losses": row.result.bust_losses,
+            "Dealer-made-hand losses": row.result.dealer_made_hand_losses,
+            "Double losses": row.result.double_losses,
+            "Surrender losses": row.result.surrender_losses,
+            "Followed coach %": f"{row.result.followed_coach_pct:.0f}%",
+            "Plausibility": "plausible" if row.plausible else "unusual",
+        }
+        for row in rows
+    ]
+    st.dataframe(
+        pd.DataFrame(table_data), use_container_width=True, hide_index=True)
+    st.caption(
+        "Net demo units use a 1-unit base hand: WIN +1, LOSS -1, PUSH 0, "
+        "SURRENDER -0.5, DOUBLE +/-2; a split sums +/-1 per sub-hand. "
+        + practice_table.BLACKJACK_PAYOUT_NOTE)
+    st.info(practice_table.DEMO_BALANCE_NOTE)
+
+    summary = st.session_state.table_compare_summary
+    if summary is not None and summary.most_favorable_key is not None:
+        st.markdown("**Summary (local demo behaviour only):**")
+        st.markdown(
+            f"- Most favorable by net units: **{summary.best_units_name}**")
+        st.markdown(
+            f"- Most difficult by net units: **{summary.worst_units_name}**")
+        st.markdown(f"- Best win %: **{summary.most_favorable_name}**")
+        st.markdown(f"- Lowest loss %: **{summary.lowest_loss_name}**")
+        st.markdown(f"- Highest push %: **{summary.highest_push_name}**")
+        st.markdown(
+            f"- Most difficult by loss %: **{summary.most_difficult_name}**")
+        if summary.units_beats_winrate_note:
+            st.info(summary.units_beats_winrate_note)
+
+    # Coach sanity check (auto-play must follow the coach 100%).
+    worst_sanity = min(
+        (row.result for row in rows),
+        key=lambda res: res.followed_coach_pct, default=None)
+    if worst_sanity is not None:
+        sanity_note = practice_table.coach_sanity_note(worst_sanity)
+        if practice_table.coach_sanity_ok(worst_sanity):
+            st.success(sanity_note)
+        else:
+            st.warning(sanity_note)
+
+    st.markdown("**Why the dealer wins more hands than the player:**")
+    for note in practice_table.DEALER_EDGE_NOTES:
+        st.markdown(f"- {note}")
+
+    st.markdown("**What rule differences usually mean:**")
+    for note in profile_comparison.RULE_COMPARISON_NOTES:
+        st.markdown(f"- {note}")
+    st.info(
+        "This comparison is a local demo study. It does not predict profit or "
+        "guarantee winnings, and more wins does not always mean better EV.")
 
 
 def _render_table_round_result(state) -> None:
@@ -826,6 +1082,7 @@ def _render_practice_table(profile_key: str) -> None:
         st.info("Press **Start demo round / Deal** to deal a local hand.")
         _render_table_history()
         _render_table_simulation(profile_key)
+        _render_profile_comparison(profile_key)
         return
 
     # Player hand.
@@ -881,6 +1138,7 @@ def _render_practice_table(profile_key: str) -> None:
 
     _render_table_history()
     _render_table_simulation(profile_key)
+    _render_profile_comparison(profile_key)
 
 
 def _render_sidebar() -> dict:

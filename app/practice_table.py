@@ -44,6 +44,28 @@ EDUCATIONAL_NOTE = (
     "bankroll, and no guarantee of winnings."
 )
 
+# Why the dealer wins more hands, and why win % is not profitability. Shown
+# alongside the net-units / loss-audit study. Educational only.
+DEALER_EDGE_NOTES: tuple[str, ...] = (
+    "The dealer wins more hands because the player acts first and can bust "
+    "before the dealer ever draws a card.",
+    "A higher winning-hand percentage is not the same as profitability - what "
+    "matters is net units, not how many hands you win.",
+    "Doubles, surrenders, splits and payouts all change the net demo units, so "
+    "a profile can win fewer hands yet lose fewer units.",
+    "This is a local demo: it does not predict profit or guarantee any result.",
+)
+
+# Blackjack pays 3:2 at a real table, but this demo resolves a natural simply
+# as a total of 21 (no payout modelling, since no money is involved).
+BLACKJACK_PAYOUT_NOTE = (
+    "Blackjack payout not modeled yet: a natural 21 is scored as a normal win "
+    "(+1 unit), not 3:2."
+)
+
+# Demo unit values for a non-doubled, non-surrendered single hand.
+_BASE_UNIT = {"WIN": 1.0, "LOSS": -1.0, "PUSH": 0.0}
+
 # The five actions the player can take (same vocabulary as the coach).
 ACTIONS: tuple[str, ...] = ("HIT", "STAND", "DOUBLE", "SPLIT", "SURRENDER")
 OUTCOMES: tuple[str, ...] = ("WIN", "LOSS", "PUSH")
@@ -447,7 +469,20 @@ def describe_total(cards: list[str] | tuple[str, ...]) -> str:
 
 @dataclass(frozen=True)
 class SimulationResult:
-    """Win/loss/push counts from an auto-played sanity simulation (no money)."""
+    """Win/loss/push counts plus demo-unit accounting and a loss audit from an
+    auto-played sanity simulation (no money, no bankroll).
+
+    Demo units use a 1-unit base hand: WIN +1, LOSS -1, PUSH 0, SURRENDER -0.5,
+    DOUBLE win/loss +2/-2, and a split sums +/-1 per sub-hand. Natural blackjack
+    is not paid 3:2 (see :data:`BLACKJACK_PAYOUT_NOTE`).
+
+    The loss audit splits losses two ways. By *quality*: ``correct_losses``
+    (the auto-player followed the coach but still lost) vs ``mistake_losses``
+    (the action differed from the coach and lost) - these sum to ``losses``. By
+    *mechanism*: ``bust_losses`` + ``dealer_made_hand_losses`` +
+    ``double_losses`` + ``surrender_losses`` + ``split_losses`` also sum to
+    ``losses``.
+    """
 
     rounds: int
     wins: int
@@ -456,6 +491,21 @@ class SimulationResult:
     busts: int = 0
     surrenders: int = 0
     doubles: int = 0
+    # Demo-unit accounting.
+    net_units: float = 0.0
+    # Loss audit - quality dimension (sums to losses).
+    correct_losses: int = 0
+    mistake_losses: int = 0
+    # Loss audit - mechanism dimension (sums to losses).
+    bust_losses: int = 0
+    dealer_made_hand_losses: int = 0
+    double_losses: int = 0
+    surrender_losses: int = 0
+    split_losses: int = 0
+    # Coach sanity: rounds whose initial action matched the frozen coach, and
+    # decisions that could not follow the coach (illegal recommendation).
+    followed_coach_rounds: int = 0
+    coach_deviations: int = 0
 
     @property
     def win_rate(self) -> float:
@@ -470,42 +520,157 @@ class SimulationResult:
         return self.pushes / self.rounds if self.rounds else 0.0
 
     @property
+    def units_per_100(self) -> float:
+        """Net demo units per 100 hands (a scale-free profitability proxy)."""
+        return self.net_units / self.rounds * 100 if self.rounds else 0.0
+
+    @property
+    def avg_units_per_hand(self) -> float:
+        return self.net_units / self.rounds if self.rounds else 0.0
+
+    @property
     def followed_coach_pct(self) -> float:
-        # The simulation always follows the coach, by construction.
-        return 100.0 if self.rounds else 0.0
+        # The simulation always follows the coach's initial decision, by
+        # construction; this reports the measured rate to confirm it.
+        return (
+            100.0 * self.followed_coach_rounds / self.rounds
+            if self.rounds else 0.0
+        )
 
 
-def simulate_following_coach(
-    profile_key: str = DEFAULT_PROFILE.key,
-    rounds: int = 1000,
-    seed: int | None = None,
-) -> SimulationResult:
-    """Auto-play ``rounds`` demo rounds always following the *current* coach
-    recommendation, and report WIN / LOSS / PUSH counts.
+def round_units(state: TableState) -> float:
+    """Return the net demo units for one finished round (1-unit base hand).
 
-    A local sanity check only: it deals from its own simulated shoe and uses the
-    same dealing, dealer-play and outcome code as the interactive table, so a
-    grossly skewed result would reveal a bug (bad dealer play, mis-counted
-    outcome, mishandled HIT/DOUBLE/STAND, mis-used hole card, etc.). It involves
-    no money, bankroll, EV, casino, network, or scraping. Deterministic for a
-    given ``seed``.
+    WIN +1, LOSS -1, PUSH 0; SURRENDER -0.5; a DOUBLE doubles the result
+    (+2 / -2 / 0); a SPLIT sums +/-1 per sub-hand. Natural blackjack is scored
+    as a normal win (no 3:2 payout - see :data:`BLACKJACK_PAYOUT_NOTE`).
+
+    Raises:
+        ValueError: If the round is not finished.
+    """
+    if state.phase != PHASE_DONE or state.outcome is None:
+        raise ValueError("The round is not over yet.")
+    if state.surrendered:
+        return -0.5
+    if state.was_split:
+        return float(sum(_BASE_UNIT[o] for o in state.split_outcomes))
+    multiplier = 2.0 if state.doubled else 1.0
+    return _BASE_UNIT[state.outcome] * multiplier
+
+
+def loss_mechanism(state: TableState) -> str | None:
+    """Classify *how* a finished round was lost, or ``None`` if it was not a loss.
+
+    Returns one mutually-exclusive label so the mechanism counts sum to the
+    total losses: ``"surrender"``, ``"split"``, ``"bust"``, ``"double"`` or
+    ``"dealer_made_hand"`` (the dealer finished higher without anyone busting -
+    a hard, unavoidable result when the coach was followed).
+    """
+    if state.phase != PHASE_DONE or state.outcome != "LOSS":
+        return None
+    if state.surrendered:
+        return "surrender"
+    if state.was_split:
+        return "split"
+    if evaluate_hand(state.player_cards).is_bust:
+        return "bust"
+    if state.doubled:
+        return "double"
+    return "dealer_made_hand"
+
+
+def _auto_play_round(
+    profile_key: str,
+    shoe: list[str],
+    max_bet_units: int = 2,
+) -> tuple[TableState, int, bool]:
+    """Deal and auto-play one round following the *current* coach recommendation.
+
+    ``max_bet_units`` caps the demo bet exposure: ``2`` (default) allows DOUBLE
+    and SPLIT, while ``1`` disables those extra-bet actions (the demo balance
+    cannot cover the extra unit) and downgrades them to the closest single-bet
+    action (HIT, a double is "hit once"; else STAND). Flat bet only - never any
+    progressive / Martingale / all-in logic.
+
+    Returns the finished state, the count of true engine deviations (a
+    recommendation that was illegal even ignoring the bet cap, defaulted to
+    STAND) and whether the *initial* action was a balance downgrade.
+    """
+    player = [draw_card(shoe), draw_card(shoe)]
+    dealer = [draw_card(shoe), draw_card(shoe)]
+    state = build_table_state(profile_key, player, dealer, shoe)
+    true_deviations = 0
+    first_was_downgrade = False
+    step = 0
+    while state.phase == PHASE_PLAYER:
+        recommended = state.current_coach_action or state.coach_action
+        legal = legal_actions(state)
+        if max_bet_units < 2 and recommended in ("DOUBLE", "SPLIT"):
+            # Cannot afford the extra demo bet: downgrade to a single-bet action.
+            action = "HIT" if "HIT" in legal else "STAND"
+            if step == 0:
+                first_was_downgrade = True
+        elif recommended not in legal:
+            action = "STAND"
+            true_deviations += 1
+        else:
+            action = recommended
+        apply_action(state, action)
+        step += 1
+    return state, true_deviations, first_was_downgrade
+
+
+def _run_simulation(
+    profile_key: str,
+    rounds: int,
+    seed: int | None,
+    demo_balance: tuple[float, float] | None = None,
+) -> tuple[SimulationResult, tuple[float, float, float, bool] | None]:
+    """Core auto-play loop shared by the plain sanity sim and the demo-balance
+    sim.
+
+    When ``demo_balance`` is ``(starting_balance, base_bet)`` the loop runs
+    hand-by-hand and respects the balance: it stops before a round it cannot
+    afford and disables DOUBLE/SPLIT when the balance cannot cover the extra
+    unit. The balance never goes negative. Returns the
+    :class:`SimulationResult` over the hands actually played, plus a balance
+    tuple ``(starting_balance, base_bet, final_balance, stopped_early)`` (or
+    ``None`` when not in demo-balance mode).
     """
     profile = get_profile(profile_key)
     rng = random.Random(seed)
     shoe: list[str] = []
     wins = losses = pushes = 0
     busts = surrenders = doubles = 0
+    net_units = 0.0
+    correct_losses = mistake_losses = 0
+    bust_losses = dealer_made_hand_losses = 0
+    double_losses = surrender_losses = split_losses = 0
+    followed_coach_rounds = coach_deviations = 0
+
+    balance = base_bet = start_balance = None
+    stopped_early = False
+    if demo_balance is not None:
+        start_balance, base_bet = demo_balance
+        balance = float(start_balance)
+
     for _ in range(max(0, rounds)):
+        if balance is not None and balance < base_bet:
+            # Not enough demo balance to place the next flat bet.
+            stopped_early = True
+            break
         if cards_remaining(shoe) < _RESHUFFLE_AT:
             shoe = shuffle_shoe(build_shoe(profile.decks), seed=rng.randrange(2 ** 31))
-        player = [draw_card(shoe), draw_card(shoe)]
-        dealer = [draw_card(shoe), draw_card(shoe)]
-        state = build_table_state(profile_key, player, dealer, shoe)
-        while state.phase == PHASE_PLAYER:
-            action = state.current_coach_action or state.coach_action
-            if action not in legal_actions(state):
-                action = "STAND"
-            apply_action(state, action)
+        max_units = 2
+        if balance is not None and balance < 2 * base_bet:
+            max_units = 1
+        state, dev, first_downgrade = _auto_play_round(
+            profile_key, shoe, max_bet_units=max_units)
+        coach_deviations += dev
+        units = round_units(state)
+        if balance is not None:
+            balance += units * base_bet
+        net_units += units
         if state.outcome == "WIN":
             wins += 1
         elif state.outcome == "LOSS":
@@ -518,9 +683,64 @@ def simulate_following_coach(
             surrenders += 1
         if not state.was_split and evaluate_hand(state.player_cards).is_bust:
             busts += 1
-    return SimulationResult(
+        # The auto-player follows the coach; a balance downgrade still counts as
+        # following the coach as closely as the demo balance allowed.
+        followed = state.first_action == state.coach_action or first_downgrade
+        if followed:
+            followed_coach_rounds += 1
+        if state.outcome == "LOSS":
+            if followed:
+                correct_losses += 1
+            else:
+                mistake_losses += 1
+            mechanism = loss_mechanism(state)
+            if mechanism == "bust":
+                bust_losses += 1
+            elif mechanism == "dealer_made_hand":
+                dealer_made_hand_losses += 1
+            elif mechanism == "double":
+                double_losses += 1
+            elif mechanism == "surrender":
+                surrender_losses += 1
+            elif mechanism == "split":
+                split_losses += 1
+
+    result = SimulationResult(
         rounds=wins + losses + pushes, wins=wins, losses=losses, pushes=pushes,
-        busts=busts, surrenders=surrenders, doubles=doubles)
+        busts=busts, surrenders=surrenders, doubles=doubles,
+        net_units=net_units,
+        correct_losses=correct_losses, mistake_losses=mistake_losses,
+        bust_losses=bust_losses,
+        dealer_made_hand_losses=dealer_made_hand_losses,
+        double_losses=double_losses, surrender_losses=surrender_losses,
+        split_losses=split_losses,
+        followed_coach_rounds=followed_coach_rounds,
+        coach_deviations=coach_deviations)
+    balance_info = None
+    if demo_balance is not None:
+        balance_info = (
+            float(start_balance), float(base_bet), float(balance), stopped_early)
+    return result, balance_info
+
+
+def simulate_following_coach(
+    profile_key: str = DEFAULT_PROFILE.key,
+    rounds: int = 1000,
+    seed: int | None = None,
+) -> SimulationResult:
+    """Auto-play ``rounds`` demo rounds always following the *current* coach
+    recommendation, and report WIN / LOSS / PUSH counts, net demo units, and a
+    loss audit.
+
+    A local sanity check only: it deals from its own simulated shoe and uses the
+    same dealing, dealer-play and outcome code as the interactive table, so a
+    grossly skewed result would reveal a bug (bad dealer play, mis-counted
+    outcome, mishandled HIT/DOUBLE/STAND, mis-used hole card, etc.). It involves
+    no money, bankroll, EV, casino, network, or scraping. Deterministic for a
+    given ``seed``.
+    """
+    result, _ = _run_simulation(profile_key, rounds, seed)
+    return result
 
 
 def simulation_looks_plausible(result: SimulationResult) -> bool:
@@ -543,3 +763,121 @@ def simulation_interpretation(result: SimulationResult) -> str:
     if simulation_looks_plausible(result):
         return "Simulation looks plausible; short losing streaks can be normal."
     return "Result looks unusual; review table logic."
+
+
+def coach_sanity_ok(result: SimulationResult) -> bool:
+    """Return whether the auto-play faithfully followed the coach.
+
+    The simulation always follows the coach's initial decision, so a faithful
+    run reports ``followed_coach_pct == 100``. A lower value would mean the
+    auto-play loop took an action different from the coach - a bug worth fixing.
+    """
+    if result.rounds < 1:
+        return True
+    return result.followed_coach_pct == 100.0
+
+
+def coach_sanity_note(result: SimulationResult) -> str:
+    """Return a human-readable coach-sanity message for a simulation result."""
+    if result.rounds < 1:
+        return "No hands simulated yet."
+    if not coach_sanity_ok(result):
+        return (
+            "Possible bug: auto-play did not always follow the coach "
+            f"({result.followed_coach_pct:.1f}% followed)."
+        )
+    note = (
+        "Coach sanity OK: auto-play followed the coach on 100% of initial "
+        "decisions, and the current recommendation (recalculated after each "
+        "hit) stays separate from the frozen initial one."
+    )
+    if result.coach_deviations:
+        note += (
+            f" Note: {result.coach_deviations} later decision(s) defaulted to "
+            "STAND because the recommended action was not legal for the current "
+            "hand (e.g. DOUBLE after a hit)."
+        )
+    return note
+
+
+# Educational disclaimer for the demo-balance accounting.
+DEMO_BALANCE_NOTE = (
+    "Demo balance is for local practice accounting only. It is not real money, "
+    "not bankroll advice, and not a betting system. Blackjack can lose demo "
+    "points even when following correct strategy."
+)
+
+
+@dataclass(frozen=True)
+class DemoBalanceResult:
+    """A flat-bet demo-balance run (practice points only - never real money).
+
+    Each hand risks a fixed ``base_bet`` of demo points (a DOUBLE/SPLIT risks
+    one extra unit). The balance is updated by ``net_units * base_bet`` and is
+    never allowed to go negative; the run stops early if the balance cannot
+    cover the next flat bet. There is no progressive / Martingale / all-in
+    logic - flat bet only.
+    """
+
+    starting_balance: float
+    base_bet: float
+    final_balance: float
+    hands_played: int
+    stopped_early: bool
+    result: SimulationResult
+
+    @property
+    def profit_loss(self) -> float:
+        return self.final_balance - self.starting_balance
+
+    @property
+    def return_pct(self) -> float:
+        return (
+            self.profit_loss / self.starting_balance * 100
+            if self.starting_balance else 0.0
+        )
+
+    @property
+    def net_units(self) -> float:
+        return self.result.net_units
+
+    @property
+    def units_per_100(self) -> float:
+        return self.result.units_per_100
+
+
+def simulate_demo_balance(
+    profile_key: str = DEFAULT_PROFILE.key,
+    rounds: int = 1000,
+    seed: int | None = None,
+    starting_balance: float = 1000.0,
+    base_bet: float = 10.0,
+) -> DemoBalanceResult:
+    """Auto-play up to ``rounds`` demo rounds following the coach, tracking a
+    flat-bet **demo balance** (practice points, never real money).
+
+    ``final_balance == starting_balance + net_units * base_bet`` over the hands
+    actually played. The balance never goes negative: the run stops early if it
+    cannot cover the next flat bet, and DOUBLE / SPLIT are disabled for a hand
+    when the balance cannot cover the extra unit. Flat bet only - no
+    progressive / Martingale / all-in logic. Deterministic for a given ``seed``.
+
+    Raises:
+        ValueError: If ``base_bet`` is not positive or ``starting_balance`` is
+            negative.
+    """
+    if base_bet <= 0:
+        raise ValueError("base bet must be a positive number of demo points.")
+    if starting_balance < 0:
+        raise ValueError("starting demo balance cannot be negative.")
+    result, info = _run_simulation(
+        profile_key, rounds, seed,
+        demo_balance=(float(starting_balance), float(base_bet)))
+    start_b, base_b, final_b, stopped = info
+    return DemoBalanceResult(
+        starting_balance=start_b,
+        base_bet=base_b,
+        final_balance=final_b,
+        hands_played=result.rounds,
+        stopped_early=stopped,
+        result=result)
