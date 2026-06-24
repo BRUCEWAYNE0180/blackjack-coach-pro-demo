@@ -24,13 +24,21 @@ LOSS / PUSH outcome, then see a decision review that keeps **decision quality**
 can still lose. The dealer's final cards are used only here and never change the
 recommendation, which still depends solely on the player cards and dealer
 upcard.
+
+v2.3.0 adds a **Practice table (demo)** mode: the app deals its own local,
+simulated cards (it never reads cards from a camera, screen, or real casino),
+freezes the coach recommendation, lets the player act (HIT / STAND / DOUBLE /
+SURRENDER; SPLIT is auto-played), plays the dealer out automatically per the
+profile, computes WIN / LOSS / PUSH, and auto-saves a decision review to a
+session history. Local / simulated / educational only - no real money, no
+bankroll.
 """
 
 from __future__ import annotations
 
 import streamlit as st
 
-from app import __version__
+from app import __version__, practice_table
 from app.rules import DEFAULT_PROFILE, PROFILES
 from app.web_adapter import (
     DOUBLE_PLAY_NOTE,
@@ -86,6 +94,9 @@ def _init_state() -> None:
     # The coach decision frozen at the initial (two-card) decision point, used
     # by the round review so it never drifts with the final/grown cards.
     st.session_state.setdefault("coach_decision", None)
+    # v2.3.0 practice-table (demo game) state.
+    st.session_state.setdefault("table_state", None)
+    st.session_state.setdefault("table_history", [])
 
 
 def _add_player_card(rank: str) -> None:
@@ -174,6 +185,42 @@ def _copy_initial_into_round(player_str: str, dealer_str: str) -> None:
 
 def _clear_round_history() -> None:
     st.session_state.round_history = []
+
+
+# --- Practice-table callbacks (v2.3.0) ------------------------------------
+
+def _table_deal(profile_key: str) -> None:
+    """Deal a new demo round, continuing the current shoe when possible."""
+    previous = st.session_state.table_state
+    shoe = previous.shoe if previous is not None else None
+    st.session_state.table_state = practice_table.start_round(
+        profile_key, shoe=shoe)
+
+
+def _table_new_shoe(profile_key: str) -> None:
+    """Shuffle a fresh shoe and deal a new demo round."""
+    st.session_state.table_state = practice_table.start_round(
+        profile_key, shoe=None)
+
+
+def _table_action(action: str) -> None:
+    """Apply a player action; auto-record the round to history when it ends."""
+    state = st.session_state.table_state
+    if state is None or state.phase != practice_table.PHASE_PLAYER:
+        return
+    try:
+        practice_table.apply_action(state, action)
+    except ValueError:
+        return
+    if state.is_round_over and not state.recorded:
+        record = practice_table.build_round_record(state)
+        st.session_state.table_history.append(
+            practice_table.round_history_row(record))
+        state.recorded = True
+
+
+def _clear_table_history() -> None:
+    st.session_state.table_history = []
 
 
 # --- Rendering helpers -----------------------------------------------------
@@ -593,9 +640,127 @@ def _render_round_result(profile_key: str) -> None:
     _render_round_history()
 
 
+# --- Practice-table rendering (v2.3.0) ------------------------------------
+
+def _render_table_history() -> None:
+    """Render this session's demo-round history with a small summary."""
+    history = st.session_state.table_history
+    if not history:
+        return
+    st.markdown("#### Session history")
+    wins = sum(1 for r in history if r["Outcome"] == "WIN")
+    losses = sum(1 for r in history if r["Outcome"] == "LOSS")
+    pushes = sum(1 for r in history if r["Outcome"] == "PUSH")
+    followed = sum(1 for r in history if r["Followed coach"] == "yes")
+    followed_but_lost = sum(
+        1 for r in history
+        if r["Followed coach"] == "yes" and r["Outcome"] == "LOSS")
+    st.caption(
+        f"{len(history)} round(s) - {wins}W / {losses}L / {pushes}P - "
+        f"followed coach {followed}/{len(history)} "
+        f"(incl. {followed_but_lost} correct decision(s) that still lost)")
+    st.table(list(reversed(history)))
+    st.button(
+        "Clear session history", key="table_clear_history",
+        on_click=_clear_table_history, use_container_width=True)
+
+
+def _render_table_round_result(state) -> None:
+    """Render a finished demo round: outcome, decision review, conclusion."""
+    record = practice_table.build_round_record(state)
+    outcome_color = _OUTCOME_COLOR.get(record.outcome, "gray")
+    with st.container(border=True):
+        st.caption("ROUND RESULT")
+        st.markdown(f"## :{outcome_color}[{record.outcome}]")
+        st.write(record.conclusion)
+
+    st.markdown("#### Decision review")
+    st.markdown(
+        f"- **Initial hand:** {record.initial_hand} vs dealer "
+        f"{record.dealer_upcard}")
+    st.markdown(f"- **Coach recommended action:** {record.coach_action}")
+    st.markdown(f"- **Player action taken:** {record.action_taken}")
+    st.markdown(f"- **Player final cards:** {record.player_final}")
+    st.markdown(f"- **Dealer final cards:** {record.dealer_final}")
+    decision_color = "green" if record.followed_coach else "orange"
+    review_word = "correct" if record.followed_coach else "different from coach"
+    st.markdown(
+        f"- **Decision review:** :{decision_color}[{record.decision_label}] "
+        f"({review_word})")
+    st.caption(record.note)
+
+
+def _render_practice_table(profile_key: str) -> None:
+    """Render the local demo blackjack table (deal, play, auto-resolve)."""
+    st.markdown("### Practice table (demo)")
+    st.caption(practice_table.EDUCATIONAL_NOTE)
+
+    deal_col, shoe_col = st.columns(2)
+    deal_col.button(
+        "Start demo round / Deal", key="table_deal", type="primary",
+        on_click=_table_deal, args=(profile_key,), use_container_width=True)
+    shoe_col.button(
+        "Shuffle new shoe", key="table_new_shoe",
+        on_click=_table_new_shoe, args=(profile_key,), use_container_width=True)
+
+    state = st.session_state.table_state
+    if state is None:
+        st.info("Press **Start demo round / Deal** to deal a local hand.")
+        _render_table_history()
+        return
+
+    # Player hand.
+    st.markdown(
+        f"**Your hand:** {_card_badges(state.player_cards)} "
+        f"- total {practice_table.describe_total(state.player_cards)}")
+
+    # Dealer hand: only the upcard is shown until the hand is resolved.
+    if state.dealer_revealed:
+        st.markdown(
+            f"**Dealer:** {_card_badges(state.dealer_cards)} "
+            f"- total {practice_table.describe_total(state.dealer_cards)}")
+    else:
+        st.markdown(
+            f"**Dealer shows:** :red-background[{state.dealer_upcard}] "
+            f"+ hidden card")
+
+    # Frozen coach recommendation for the initial hand.
+    coach_color = _ACTION_COLOR.get(state.coach_action, "gray")
+    st.markdown(
+        f"**Coach recommends:** :{coach_color}[{state.coach_action}]")
+    if state.coach_reason:
+        st.caption(state.coach_reason)
+
+    if state.phase == practice_table.PHASE_PLAYER:
+        actions = practice_table.legal_actions(state)
+        if "DOUBLE" in actions:
+            st.caption(DOUBLE_PLAY_NOTE)
+        if "SPLIT" in actions:
+            st.caption(
+                "Splitting plays both hands automatically in the demo "
+                "(re-splitting is out of scope).")
+        columns = st.columns(len(actions))
+        for column, act in zip(columns, actions):
+            column.button(
+                act, key=f"table_act_{act}", on_click=_table_action,
+                args=(act,), use_container_width=True)
+        st.caption("Choose your action. The dealer then plays automatically.")
+    else:
+        _render_table_round_result(state)
+        st.button(
+            "Deal next round", key="table_next", type="primary",
+            on_click=_table_deal, args=(profile_key,), use_container_width=True)
+
+    _render_table_history()
+
+
 def _render_sidebar() -> dict:
     """Render the sidebar controls and return the collected options."""
     st.sidebar.header("Settings")
+    mode = st.sidebar.radio(
+        "Mode", ("Coach", "Practice table (demo)"), index=0,
+        help="Coach: get a recommendation for a hand you enter. "
+             "Practice table: play a full local demo round.")
     input_mode = st.sidebar.radio(
         "Input mode", ("Card buttons", "Manual text"), index=0,
         help="Use tappable card buttons (default) or type cards manually.")
@@ -630,6 +795,7 @@ def _render_sidebar() -> dict:
         "allow_double": allow_double,
         "allow_surrender": allow_surrender,
         "allow_split": allow_split,
+        "mode": mode,
     }
 
 
@@ -664,6 +830,13 @@ def main() -> None:
 
     options = _render_sidebar()
     input_mode = options["input_mode"]
+
+    if options["mode"] == "Practice table (demo)":
+        st.markdown(
+            "Play a full local demo round: the app deals its own cards, the "
+            "coach recommends, you act, and the dealer plays out automatically.")
+        _render_practice_table(options["profile_key"])
+        return
 
     st.markdown("Pick your hand and the dealer's upcard, then ask the coach.")
     player_cards, dealer_upcard = _collect_inputs(input_mode)

@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v2.2.0 feature summary
+## v2.3.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -181,6 +181,13 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   separate from the round outcome. A correct play can still lose, so a LOSS is
   never marked a bad decision. The initial recommendation still uses only the
   player cards and dealer upcard.
+- **Local blackjack practice table** (v2.3.0): a **Practice table (demo)** mode
+  in the local web page deals its own simulated cards so you can play a full
+  round - the app deals, the coach recommends, you act (HIT / STAND / DOUBLE /
+  SURRENDER; SPLIT is auto-played), the dealer plays out automatically, and the
+  WIN / LOSS / PUSH outcome, decision review, and a session history are recorded
+  for you. Local / simulated / educational only: no camera, no screen reading,
+  no scraping, no real casino, no real money or bankroll.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -633,6 +640,38 @@ solely to log the round (never to change the recommendation), and it stores no
 money, bankroll, bets, accounts, or personal data. The in-web history is
 session-only; optional local persistence (the `app.round_result` module) follows
 the project's existing pattern under the git-ignored `.blackjack_coach/` tree.
+
+## Local Blackjack Practice Table (v2.3.0)
+
+v2.3.0 adds a **Practice table (demo)** mode so you can practise a whole round
+without typing every card. Pick "Practice table (demo)" in the sidebar "Mode"
+selector, then:
+
+1. Press **Start demo round / Deal**. The app deals two player cards plus the
+   dealer's upcard and a hidden hole card from its own local shoe.
+2. The dealer shows only the upcard; the coach freezes its recommendation
+   (HIT / STAND / DOUBLE / SPLIT / SURRENDER) for the initial hand.
+3. Choose your action with the buttons. HIT draws a card (and you can keep
+   playing); DOUBLE takes exactly one card and ends your turn; STAND ends your
+   turn; SURRENDER forfeits; SPLIT is played out automatically by basic
+   strategy (re-splitting is out of scope for the demo).
+4. The dealer then plays automatically per the rule profile (H17 / S17), the
+   app computes **WIN / LOSS / PUSH**, and shows a colour-coded result with a
+   **decision review**: the initial hand, the coach's recommended action, the
+   action you took, the player/dealer final cards, whether the decision was
+   *correct / different from coach*, and the outcome.
+5. The round is **auto-saved** to a **session history** (with a summary that
+   includes how many correct decisions still lost). Press **Deal next round**
+   to continue with the same shoe, or **Shuffle new shoe** to start fresh.
+
+This is a **local, simulated, educational demo**: the app builds, shuffles and
+deals from its own shoe and always knows its own cards. It never uses a camera,
+never reads the screen, never scrapes, never connects to a real casino, never
+automates real bets, and never involves real money or a bankroll. The game logic
+lives in the Streamlit-free `app/practice_table.py`, which reuses the existing
+shoe, dealer-play and outcome code and **never changes `strategy_engine.recommend`,
+the Hi-Lo math, or the coach's decisions**. As always, decision quality is kept
+separate from the round outcome - a correct play can still lose.
 
 ## Terminal visual polish (v1.1.0)
 

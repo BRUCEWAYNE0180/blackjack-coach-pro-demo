@@ -1188,6 +1188,41 @@ decision review, and optional JSON persistence under the git-ignored
 answers, the Hi-Lo math, or the CLI, uses no EV as the main decision, runs no
 external commands, and stores no money, bankroll, bets, or sensitive data.
 
+## Local Blackjack Practice Table (v2.3.0)
+
+v2.3.0 adds a **Practice table (demo)** mode to the local web page, selected from
+the sidebar "Mode" control. Start the web UI the same way:
+
+```bash
+python -m pip install -e ".[web]"
+python -m streamlit run web/streamlit_app.py
+```
+
+It lets you play a whole demo round without typing every card:
+
+- **Start demo round / Deal** deals two player cards, the dealer upcard, and a
+  hidden hole card from the app's own local shoe (Shuffle new shoe starts a
+  fresh shoe).
+- The dealer shows only the upcard; the coach **freezes** its recommendation for
+  the initial hand.
+- Action buttons: **HIT** (draw and keep playing), **STAND** (end turn), **DOUBLE**
+  (exactly one card, then end turn), **SURRENDER** (forfeit), and **SPLIT**
+  (auto-played by basic strategy; re-splitting is out of scope for the demo).
+- The dealer then plays automatically per the profile (H17 / S17), the app
+  computes **WIN / LOSS / PUSH**, and shows a colour-coded result with a
+  **decision review** (initial hand, coach recommended action, action taken,
+  player/dealer final cards, decision correct / different from coach, outcome).
+- The round is auto-saved to a **session history** (with a summary, including
+  correct decisions that still lost); **Deal next round** continues the shoe.
+
+This is a local, simulated, educational demo: the app deals and knows its own
+cards. It never uses a camera, never reads the screen, never scrapes, never
+connects to a real casino, never automates real bets, and never involves real
+money or bankroll. The game logic lives in the Streamlit-free
+`app/practice_table.py` (which reuses the existing shoe, dealer-play and outcome
+code) and never changes `strategy_engine.recommend`, the Hi-Lo math, the coach
+decisions, or the CLI. Decision quality is kept separate from the outcome.
+
 
 
 

@@ -1649,7 +1649,7 @@ testable, Streamlit-free boundary and the new helpers are display/input only;
 `strategy_engine`, `guided_coach`, and `probability_advisor` are untouched. Per
 `PROJECT_RULES.md` the UI remains a local presentation layer only.
 
-### v2.2.0 — Web round-result tracker (current)
+### v2.2.0 — Web round-result tracker
 
 Closes the loop on a played hand. The initial recommendation uses only the
 player cards and the dealer *upcard* (the hole card must not change it), but
@@ -1689,6 +1689,44 @@ persistence boundary; `app/web_adapter.py` wraps it for the UI;
 `probability_advisor` are untouched, and the recommendation is never recomputed
 from the final cards. Per `PROJECT_RULES.md` it stays local, educational, and
 outcome-separated, with no money or sensitive data.
+
+### v2.3.0 — Local blackjack practice table (current)
+
+Lets the user practise a full round without typing every card. A **Practice
+table (demo)** mode deals the app's own local, simulated cards, freezes the
+coach recommendation, lets the player act, plays the dealer out automatically,
+and records WIN / LOSS / PUSH plus a decision review to a session history. It is
+a local demo game: the app generates and knows its own cards - no camera, no
+screen reading, no scraping, no real casino, no real money or bankroll.
+
+Delivered:
+
+- **`app/practice_table.py`** (Streamlit-free, unit-testable): a demo-round
+  state machine - `TableState`, `start_round` / `build_table_state`,
+  `legal_actions`, `apply_action` (HIT / STAND / DOUBLE / SURRENDER played
+  interactively; SPLIT auto-played by basic strategy), the frozen coach
+  recommendation (via `strategy_engine.recommend`), automatic dealer play and
+  outcome resolution (reusing `simulator.play_dealer_hand` / `resolve_outcome`),
+  and `TableRoundRecord` / `build_round_record` / `round_history_row` /
+  `describe_total`. The simulator's outcome enum is mapped to WIN / LOSS / PUSH;
+  no strategy is duplicated and the engine is unchanged.
+- **`web/streamlit_app.py`**: a "Practice table (demo)" sidebar mode with Deal /
+  Shuffle, the player hand + total, the dealer upcard (hole hidden until the
+  round resolves), the frozen coach recommendation, legal-action buttons,
+  automatic dealer play, a colour-coded round result + decision review, a Deal
+  next round button, and a session history with summary and clear.
+- **Tests**: `tests/test_practice_table.py`, extended
+  `tests/test_streamlit_app_interactions.py` and `tests/test_streamlit_app_static.py`;
+  `--version` assertions updated to 2.3.0.
+
+**Architecture:** `app/practice_table.py` is the testable, Streamlit-free game /
+state-machine boundary; it reuses `shoe`, `simulator` (dealer play + outcome),
+`hand_evaluator`, `strategy_engine.recommend`, and `round_result`'s
+decision-review note. `web/streamlit_app.py` only renders. `strategy_engine`,
+the Hi-Lo math, and the coach decisions are untouched, and decision quality is
+kept separate from the round outcome. Per `PROJECT_RULES.md` it stays a local,
+simulated, educational demo with no camera / screen reading / scraping / real
+money / bankroll / sensitive data.
 
 ### v2.x — Possible further web modes (if decided later)
 

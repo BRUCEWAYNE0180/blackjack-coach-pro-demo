@@ -7,6 +7,79 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [2.3.0] - 2026-06-24
+
+Local Blackjack Practice Table. v2.3.0 adds a **Practice table (demo)** mode to
+the local Streamlit Web Coach UI so the user can play a full round without
+typing every card: the app deals its own local, simulated cards, freezes the
+coach recommendation, lets the player act, plays the dealer out automatically,
+computes WIN / LOSS / PUSH, and auto-saves a decision review to a session
+history.
+
+It is a **local demo game only** - the app builds, shuffles and deals from its
+own shoe and always *knows* its own cards. It never uses a camera, never reads
+the screen, never scrapes, never connects to a real casino, and never involves
+real money or a bankroll. Decision quality is kept separate from the round
+outcome (a correct play can still lose). The CLI and the existing coach /
+round-result features are unchanged.
+
+### Added
+
+- New `app/practice_table.py` (Streamlit-free, unit-testable): a demo-round
+  state machine - `TableState`, `start_round` / `build_table_state`,
+  `legal_actions`, `apply_action` (HIT / STAND / DOUBLE / SURRENDER played
+  interactively; SPLIT auto-played by basic strategy), the frozen coach
+  recommendation (via `strategy_engine.recommend`), automatic dealer play and
+  outcome resolution (reusing `simulator.play_dealer_hand` /
+  `resolve_outcome`), plus `TableRoundRecord`, `build_round_record`,
+  `round_history_row`, and `describe_total`. It maps the simulator's outcome
+  enum to WIN / LOSS / PUSH and never duplicates strategy or changes the engine.
+- `web/streamlit_app.py` **Practice table (demo)** mode (sidebar "Mode"): a
+  Deal / Start demo round button (and Shuffle new shoe), the player's hand and
+  total, the dealer's upcard (the hole card stays hidden until the round
+  resolves), the frozen coach recommendation, legal-action buttons, automatic
+  dealer play, a colour-coded round result with a decision review (initial hand,
+  coach recommended action, player action taken, player/dealer final cards,
+  decision correct / different from coach, and the outcome), a "Deal next round"
+  button, and a session history with a small summary (including correct
+  decisions that still lost) and a clear control.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **2.3.0** (local web practice
+  table only; the engine, the recommendations, the Hi-Lo math, EV (advisory),
+  and the CLI are unchanged and fully backward compatible).
+- The CLI `web` command output mentions the new Practice table (demo) mode
+  (still instructions only - it launches no process).
+
+### Quality
+
+- New `tests/test_practice_table.py` (deal; legal actions incl. pair-split and
+  surrender; HIT continue / HIT bust = loss without dealer draw; STAND triggers
+  dealer play; DOUBLE takes exactly one card then resolves; SURRENDER = loss;
+  SPLIT auto-played; illegal-action and round-over errors; the round record
+  separates decision quality from outcome - a correct play that loses still
+  "Followed coach"; history-row keys; `describe_total`; no sensitive field
+  names; `recommend()` unchanged). Extended
+  `tests/test_streamlit_app_interactions.py` (enter the table, deal, hidden
+  dealer hole, stand records history, clear history, frozen coach unchanged by
+  acting) and `tests/test_streamlit_app_static.py`. Updated the `--version`
+  assertions to 2.3.0. Full suite passing (with and without Streamlit
+  installed); ruff clean across `app tests web`.
+
+### Safety
+
+- The practice table is a **local, simulated, educational demo only**. The app
+  generates and knows its own cards; it never uses a camera, never reads the
+  screen, never scrapes, never connects to a real casino, never automates real
+  bets, and never involves real money or a bankroll. It never changes
+  `strategy_engine.recommend`, the Hi-Lo math, the coach decisions, or the
+  correct answers, and never uses EV as the main decision. `app/practice_table.py`
+  stays Streamlit-free; the in-web session history holds no money, bankroll,
+  bets, accounts, tokens, screenshots, or personal data. No FastAPI, no Telegram,
+  no external API, no database, no login/auth. The CLI continues to work exactly
+  as before.
+
 ## [2.2.0] - 2026-06-24
 
 Web round-result tracker. v2.2.0 adds a **Round result** section to the local

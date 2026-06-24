@@ -1406,11 +1406,11 @@ class TestCliEVSnapshotHistory:
         assert exit_code == 0
         assert "No saved EV snapshots yet" in out
 
-    def test_version_prints_2_2_0(self, capsys):
+    def test_version_prints_2_3_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 2.2.0"
+        assert out.strip() == "blackjack-coach 2.3.0"
 
 
 
@@ -1733,11 +1733,11 @@ class TestCliDashboard:
         assert out_file.exists()
         assert str(out_file) in out
 
-    def test_version_prints_2_2_0(self, capsys):
+    def test_version_prints_2_3_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 2.2.0"
+        assert out.strip() == "blackjack-coach 2.3.0"
 
 
 
@@ -1817,11 +1817,11 @@ class TestCliDrill:
         assert exit_code == 0
         assert "Profile     : SIX_DECK_H17_DAS_LS" in out
 
-    def test_version_prints_2_2_0(self, capsys):
+    def test_version_prints_2_3_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 2.2.0"
+        assert out.strip() == "blackjack-coach 2.3.0"
 
 
 
@@ -2006,11 +2006,11 @@ class TestCliReviewQueue:
         assert out_file.exists()
         assert "Saved review queue" in out
 
-    def test_version_prints_2_2_0(self, capsys):
+    def test_version_prints_2_3_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 2.2.0"
+        assert out.strip() == "blackjack-coach 2.3.0"
 
 
 
@@ -2080,11 +2080,11 @@ class TestCliPracticePack:
         assert out_file.exists()
         assert "Saved practice pack" in out
 
-    def test_version_prints_2_2_0(self, capsys):
+    def test_version_prints_2_3_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 2.2.0"
+        assert out.strip() == "blackjack-coach 2.3.0"
 
 
 
@@ -2169,11 +2169,11 @@ class TestCliPracticePackHistory:
         assert "Saved practice pack" in out
         assert "Saved pack completion" in out
 
-    def test_version_prints_2_2_0(self, capsys):
+    def test_version_prints_2_3_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 2.2.0"
+        assert out.strip() == "blackjack-coach 2.3.0"
 
 
 
@@ -2236,11 +2236,11 @@ class TestCliRepeatPack:
         assert out_file.exists()
         assert "Saved repeat pack" in out
 
-    def test_version_prints_2_2_0(self, capsys):
+    def test_version_prints_2_3_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 2.2.0"
+        assert out.strip() == "blackjack-coach 2.3.0"
 
 
 
@@ -2315,11 +2315,11 @@ class TestCliRepeatPackHistory:
         assert "Saved repeat pack" in out
         assert "Saved repeat completion" in out
 
-    def test_version_prints_2_2_0(self, capsys):
+    def test_version_prints_2_3_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 2.2.0"
+        assert out.strip() == "blackjack-coach 2.3.0"
 
 
 
@@ -2392,11 +2392,11 @@ class TestCliCorrectionDashboard:
         assert out_file.exists()
         assert "Saved correction dashboard" in out
 
-    def test_version_prints_2_2_0(self, capsys):
+    def test_version_prints_2_3_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 2.2.0"
+        assert out.strip() == "blackjack-coach 2.3.0"
 
 
 
@@ -2480,11 +2480,11 @@ class TestCliCorrectionPlan:
         assert out_file.exists()
         assert "Saved correction plan" in out
 
-    def test_version_prints_2_2_0(self, capsys):
+    def test_version_prints_2_3_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 2.2.0"
+        assert out.strip() == "blackjack-coach 2.3.0"
 
 
 
@@ -2504,8 +2504,8 @@ class TestCliWeb:
         assert exit_code == 0
         assert "streamlit run web/streamlit_app.py" in out
 
-    def test_version_prints_2_2_0(self, capsys):
+    def test_version_prints_2_3_0(self, capsys):
         exit_code = cli.main(["--version"])
         out = capsys.readouterr().out
         assert exit_code == 0
-        assert out.strip() == "blackjack-coach 2.2.0"
+        assert out.strip() == "blackjack-coach 2.3.0"
