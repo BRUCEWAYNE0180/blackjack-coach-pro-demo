@@ -452,6 +452,19 @@ As of v0.9 the project enforces these gates on every change:
   bankroll, bets, accounts, tokens, screenshots, or personal data (the session
   history is in-memory only), and add no camera / screen reading / scraping /
   external API / database / login. The CLI must keep working unchanged.
+- **The rule-profile comparison is a local/demo study aid only.** The v2.5.0
+  rule-profile comparison (`app/profile_comparison.py`, surfaced as the web
+  "Rule profile comparison" panel) auto-plays many simulated rounds under
+  several profiles - always following the coach - and reports WIN / LOSS / PUSH
+  behaviour per profile so the user can study which rules tend to be friendlier
+  or harder. It must reuse `app.practice_table.simulate_following_coach` and be
+  deterministic for a fixed seed. It is a study aid that **must never claim a
+  real-world edge or guarantee any result**, must not use EV as the decision,
+  and must not change `strategy_engine.recommend`, the Hi-Lo math, the coach
+  decisions, or the correct answers. `app/profile_comparison.py` must stay
+  Streamlit-free; it must involve no money, bankroll, real betting, casino
+  connectivity, camera, screen reading, scraping, external API, database, or
+  login, and the CLI must keep working unchanged.
 
 ## 8. Release Rules
 

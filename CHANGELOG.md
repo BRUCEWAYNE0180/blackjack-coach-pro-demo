@@ -7,6 +7,49 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [2.5.0] - 2026-06-24
+
+Rule Profile Simulator & Strategy Comparison. v2.5.0 adds a local/demo tool to
+compare rule profiles side by side and study which table configurations tend to
+behave more or less favorably for the player. It builds directly on the v2.4.0
+auto-play sanity simulation: it auto-plays many simulated rounds under each
+selected profile (always following the coach) and reports the WIN / LOSS / PUSH
+behaviour for each.
+
+This is a study aid only. It involves no money, bankroll, real betting, casino
+connectivity, network access, camera, screen reading, or scraping; it does not
+use EV as the decision; and it never claims a real-world edge or guaranteed
+result. The engine, the Hi-Lo math, `strategy_engine.recommend`, and the CLI are
+all unchanged.
+
+### Added
+
+- New `app/profile_comparison.py` (Streamlit-free, unit-testable):
+  `compare_profiles(profile_keys, rounds=1000, seed=42)` simulates each profile
+  with the same fixed seed (deterministic, de-duplicated, order-preserving) and
+  returns a `ProfileComparisonRow` per profile; `summarize_comparison(rows)`
+  returns a `ComparisonSummary` with the most favorable profile (highest win
+  rate), lowest loss rate, highest push rate, and the most difficult profile
+  (highest loss rate); plus `RULE_COMPARISON_NOTES` educational tendencies and
+  `DEFAULT_COMPARE_ROUNDS` / `DEFAULT_COMPARE_SEED`.
+- `web/streamlit_app.py` **Rule profile comparison** panel in the Practice table
+  (demo) page: a multi-select of profiles, a **Seed** field (default 42, so a
+  comparison is reproducible), a **Hands per profile** selector, a **Compare
+  selected profiles** button and a quick **Run 1,000 hands per profile** button
+  (with a spinner). Results are shown as a comparison table (Profile, total
+  hands, wins/losses/pushes counts + %, busts, surrenders, doubles, followed
+  coach % = 100%, and a plausibility status), followed by a summary (most
+  favorable by win %, lowest loss %, highest push %, most difficult profile),
+  educational notes (S17 vs H17, DAS, late surrender, more wins != better EV),
+  and a reminder that the comparison does not predict profit or guarantee
+  results.
+
+### Notes
+
+- Comparisons are deterministic for a fixed seed, the per-profile counts always
+  sum to the total hands, and the auto-player follows the coach 100% of the
+  time. Single-profile and many-profile selections are both supported.
+
 ## [2.4.0] - 2026-06-24
 
 Practice Table Learning Review. v2.4.0 makes the practice table's history

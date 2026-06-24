@@ -43,9 +43,10 @@ suggest drills. Decision quality is always kept separate from the round outcome
 
 from __future__ import annotations
 
+import pandas as pd
 import streamlit as st
 
-from app import __version__, practice_review, practice_table
+from app import __version__, practice_review, practice_table, profile_comparison
 from app.rules import DEFAULT_PROFILE, PROFILES
 from app.web_adapter import (
     DOUBLE_PLAY_NOTE,
@@ -107,6 +108,9 @@ def _init_state() -> None:
     # v2.4.0 auto-play simulation / sanity-check state.
     st.session_state.setdefault("table_sim_result", None)
     st.session_state.setdefault("table_sim_rounds", 0)
+    # v2.5.0 rule-profile comparison state.
+    st.session_state.setdefault("table_compare_rows", None)
+    st.session_state.setdefault("table_compare_summary", None)
 
 
 def _add_player_card(rank: str) -> None:
@@ -243,6 +247,21 @@ def _table_run_simulation(profile_key: str, rounds: int, seed: int) -> None:
     st.session_state.table_sim_result = practice_table.simulate_following_coach(
         profile_key, rounds=rounds, seed=seed)
     st.session_state.table_sim_rounds = rounds
+
+
+def _table_run_comparison(
+        profile_keys: list[str], rounds: int, seed: int) -> None:
+    """Auto-play ``rounds`` demo hands per profile and store the comparison.
+
+    Local/demo study only - it reuses the same dealing / dealer-play / outcome
+    code per profile and always follows the coach. No money, bankroll, EV
+    decision, real betting, casino, network, camera or scraping.
+    """
+    rows = profile_comparison.compare_profiles(
+        profile_keys, rounds=rounds, seed=seed)
+    st.session_state.table_compare_rows = rows
+    st.session_state.table_compare_summary = (
+        profile_comparison.summarize_comparison(rows))
 
 
 # --- Rendering helpers -----------------------------------------------------
@@ -771,6 +790,102 @@ def _render_table_simulation(profile_key: str) -> None:
         "correct strategy.")
 
 
+def _render_profile_comparison(default_profile_key: str) -> None:
+    """Render the rule-profile comparison panel (v2.5.0).
+
+    Auto-plays many demo rounds under several rule profiles (always following
+    the coach) so the user can study which table rules behave more or less
+    favorably. Local/demo study only: no money, bankroll, EV decision, real
+    betting, casino, network, camera or scraping.
+    """
+    st.markdown("#### Rule profile comparison")
+    st.caption(
+        "Auto-play demo rounds under several rule profiles to study which "
+        "tables behave more or less favorably. Local demo only - no money, no "
+        "bankroll, no casino, no network.")
+
+    all_keys = sorted(PROFILES)
+    default_selection = [default_profile_key]
+    other = next((k for k in all_keys if k != default_profile_key), None)
+    if other is not None:
+        default_selection.append(other)
+    selected = st.multiselect(
+        "Profiles to compare",
+        options=all_keys,
+        default=default_selection,
+        format_func=lambda key: PROFILES[key].name,
+        key="compare_profiles_select",
+        help="Pick one or more rule profiles to simulate and compare.")
+
+    seed = st.number_input(
+        "Seed", min_value=0, max_value=2_000_000_000, value=42, step=1,
+        key="compare_seed",
+        help="Fixed seed makes every profile's simulation reproducible.")
+    rounds = st.select_slider(
+        "Hands per profile", options=[100, 250, 500, 1000, 2000],
+        value=profile_comparison.DEFAULT_COMPARE_ROUNDS, key="compare_rounds",
+        help="More hands give a steadier picture but take a little longer.")
+
+    compare_col, quick_col = st.columns(2)
+    compare = compare_col.button(
+        "Compare selected profiles", key="compare_run",
+        use_container_width=True)
+    quick = quick_col.button(
+        "Run 1,000 hands per profile", key="compare_run_1000",
+        use_container_width=True)
+
+    if compare or quick:
+        if not selected:
+            st.warning("Select at least one rule profile to compare.")
+        else:
+            run_rounds = 1000 if quick else int(rounds)
+            with st.spinner(
+                    f"Auto-playing {run_rounds:,} demo hands for "
+                    f"{len(selected)} profile(s)..."):
+                _table_run_comparison(selected, run_rounds, int(seed))
+
+    rows = st.session_state.table_compare_rows
+    if not rows:
+        return
+
+    table_data = [
+        {
+            "Profile": row.profile_name,
+            "Total hands": row.result.rounds,
+            "Wins": row.result.wins,
+            "Win %": f"{row.result.win_rate * 100:.1f}%",
+            "Losses": row.result.losses,
+            "Loss %": f"{row.result.loss_rate * 100:.1f}%",
+            "Pushes": row.result.pushes,
+            "Push %": f"{row.result.push_rate * 100:.1f}%",
+            "Busts": row.result.busts,
+            "Surrenders": row.result.surrenders,
+            "Doubles": row.result.doubles,
+            "Followed coach %": f"{row.result.followed_coach_pct:.0f}%",
+            "Plausibility": "plausible" if row.plausible else "unusual",
+        }
+        for row in rows
+    ]
+    st.dataframe(
+        pd.DataFrame(table_data), use_container_width=True, hide_index=True)
+
+    summary = st.session_state.table_compare_summary
+    if summary is not None and summary.most_favorable_key is not None:
+        st.markdown("**Summary (local demo behaviour only):**")
+        st.markdown(
+            f"- Most favorable by win %: **{summary.most_favorable_name}**")
+        st.markdown(f"- Lowest loss %: **{summary.lowest_loss_name}**")
+        st.markdown(f"- Highest push %: **{summary.highest_push_name}**")
+        st.markdown(f"- Most difficult profile: **{summary.most_difficult_name}**")
+
+    st.markdown("**What rule differences usually mean:**")
+    for note in profile_comparison.RULE_COMPARISON_NOTES:
+        st.markdown(f"- {note}")
+    st.info(
+        "This comparison is a local demo study. It does not predict profit or "
+        "guarantee winnings, and more wins does not always mean better EV.")
+
+
 def _render_table_round_result(state) -> None:
     """Render a finished demo round: outcome, decision review, conclusion."""
     record = practice_table.build_round_record(state)
@@ -826,6 +941,7 @@ def _render_practice_table(profile_key: str) -> None:
         st.info("Press **Start demo round / Deal** to deal a local hand.")
         _render_table_history()
         _render_table_simulation(profile_key)
+        _render_profile_comparison(profile_key)
         return
 
     # Player hand.
@@ -881,6 +997,7 @@ def _render_practice_table(profile_key: str) -> None:
 
     _render_table_history()
     _render_table_simulation(profile_key)
+    _render_profile_comparison(profile_key)
 
 
 def _render_sidebar() -> dict:

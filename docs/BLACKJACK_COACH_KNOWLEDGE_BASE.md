@@ -1728,7 +1728,7 @@ kept separate from the round outcome. Per `PROJECT_RULES.md` it stays a local,
 simulated, educational demo with no camera / screen reading / scraping / real
 money / bankroll / sensitive data.
 
-### v2.4.0 — Practice table learning review (current)
+### v2.4.0 — Practice table learning review
 
 Makes the practice-table history smarter. Beyond WIN / LOSS / PUSH, each round
 gets an outcome-aware explanation and a conclusion category, weak spots are
@@ -1759,6 +1759,42 @@ learning layer over `app/practice_table.TableRoundRecord`; `web/streamlit_app.py
 only renders. `strategy_engine`, the Hi-Lo math, and the coach decisions are
 untouched, the outcome never re-grades a decision, and per `PROJECT_RULES.md` it
 stays local, educational, and outcome-separated with no money or sensitive data.
+
+### v2.5.0 — Rule profile simulator & strategy comparison (current)
+
+Adds a local/demo tool to compare rule profiles side by side and study which
+table configurations tend to be friendlier or harder for the player. It builds
+on the v2.4.0 auto-play sanity simulation: it auto-plays many simulated rounds
+under each selected profile (always following the coach) and reports the
+WIN / LOSS / PUSH behaviour per profile. It is a study aid only and never claims
+a real-world edge, uses EV as a decision, or promises a result.
+
+Delivered:
+
+- **`app/profile_comparison.py`** (Streamlit-free, unit-testable):
+  `compare_profiles(profile_keys, rounds=1000, seed=42)` (deterministic per
+  fixed seed, de-duplicated, order-preserving) returning a `ProfileComparisonRow`
+  per profile; `summarize_comparison(rows)` returning a `ComparisonSummary`
+  (most favorable = highest win rate, lowest loss rate, highest push rate, most
+  difficult = highest loss rate); `RULE_COMPARISON_NOTES`; and
+  `DEFAULT_COMPARE_ROUNDS` / `DEFAULT_COMPARE_SEED`. It reuses
+  `app.practice_table.simulate_following_coach`.
+- **`web/streamlit_app.py`**: a **Rule profile comparison** panel in the
+  Practice table mode - a profile multi-select, a Seed field, a hands-per-profile
+  selector, Compare / Run-1,000 buttons (with a spinner), a comparison table
+  (wins/losses/pushes counts + %, busts, surrenders, doubles, followed-coach %,
+  plausibility), a summary, and educational notes.
+- **Tests**: `tests/test_profile_comparison.py` (determinism, counts sum,
+  single/many/empty/duplicate/unknown profiles, followed-coach 100%, summary
+  selection, educational notes, no-external-capture), plus extended streamlit
+  static / interaction tests; `--version` assertions updated to 2.5.0.
+
+**Architecture:** `app/profile_comparison.py` is the testable, Streamlit-free
+comparison layer over `app.practice_table.simulate_following_coach`;
+`web/streamlit_app.py` only renders. `strategy_engine.recommend`, the Hi-Lo math,
+and the coach decisions are untouched, EV is never used as a decision, and per
+`PROJECT_RULES.md` it stays local, educational, with no money, bankroll, real
+betting, casino connectivity, network, camera, screen reading, or scraping.
 
 ### v2.x — Possible further web modes (if decided later)
 

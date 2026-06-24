@@ -230,6 +230,60 @@ class TestStreamlitAppV24Simulation:
         assert "simulation_interpretation" in source
 
 
+class TestStreamlitAppV25ProfileComparison:
+    """v2.5.0: rule-profile comparison panel."""
+
+    def test_has_comparison_section(self):
+        assert "Rule profile comparison" in _source()
+
+    def test_has_profile_multiselect(self):
+        source = _source()
+        assert "st.multiselect(" in source
+        assert "Profiles to compare" in source
+        assert "compare_profiles_select" in source
+
+    def test_has_compare_buttons(self):
+        source = _source()
+        assert "Compare selected profiles" in source
+        assert "Run 1,000 hands per profile" in source
+        assert "compare_run" in source
+        assert "compare_run_1000" in source
+
+    def test_has_seed_and_rounds_controls(self):
+        source = _source()
+        assert "compare_seed" in source
+        assert "compare_rounds" in source
+
+    def test_uses_profile_comparison_module(self):
+        source = _source()
+        assert "profile_comparison" in source
+        assert "compare_profiles" in source
+        assert "summarize_comparison" in source
+        assert "RULE_COMPARISON_NOTES" in source
+
+    def test_shows_loading_spinner(self):
+        assert "st.spinner(" in _source()
+
+    def test_renders_comparison_table_columns(self):
+        source = _source()
+        for label in ("Profile", "Total hands", "Win %", "Loss %", "Push %",
+                      "Busts", "Surrenders", "Doubles", "Followed coach %",
+                      "Plausibility"):
+            assert label in source
+
+    def test_shows_summary_highlights(self):
+        source = _source()
+        assert "Most favorable by win %" in source
+        assert "Lowest loss %" in source
+        assert "Highest push %" in source
+        assert "Most difficult profile" in source
+
+    def test_has_educational_message(self):
+        source = _source()
+        assert "does not predict profit" in source
+        assert "more wins does not always mean better EV" in source
+
+
 class TestStreamlitAppNoExternalCapture:
     """The whole app must never read cards from the outside world.
 

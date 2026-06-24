@@ -1254,3 +1254,42 @@ decision, and stores no money, bankroll, or sensitive data.
 
 
 
+
+
+## Rule Profile Simulator & Strategy Comparison (v2.5.0)
+
+v2.5.0 adds a **Rule profile comparison** panel to the Practice table (demo)
+mode (no new command - it is part of the same local web page). Start the web UI
+the same way:
+
+```bash
+python -m pip install -e ".[web]"
+python -m streamlit run web/streamlit_app.py
+```
+
+The panel lets you compare rule profiles side by side:
+
+- **Profiles to compare** - select one or more rule profiles.
+- **Seed** (default 42) - makes every profile's simulation reproducible.
+- **Hands per profile** - how many demo rounds to auto-play per profile.
+- **Compare selected profiles** / **Run 1,000 hands per profile** - auto-play
+  that many rounds for each profile (always following the coach), with a spinner
+  while it runs.
+
+It then shows a **comparison table** (Profile, total hands, wins / losses /
+pushes counts and percentages, busts, surrenders, doubles, followed-coach %
+which is always 100% in auto-play, and a plausibility status), a **summary**
+(most favorable by win %, lowest loss %, highest push %, most difficult
+profile), and **educational notes** (S17 is usually friendlier than H17, DAS
+usually helps, late surrender can reduce losses, and more wins does not always
+mean better EV).
+
+Comparisons are **deterministic for a fixed seed**, the per-profile counts
+always sum to the total hands, and one or many profiles can be compared. The
+logic lives in the Streamlit-free `app/profile_comparison.py`
+(`compare_profiles`, `summarize_comparison`, `RULE_COMPARISON_NOTES`), which
+builds on `app.practice_table.simulate_following_coach`. It is a local/demo
+study aid only: it uses no money, bankroll, EV as the decision, real betting,
+casino connectivity, network, camera, screen reading, or scraping, never claims
+a real-world edge or guaranteed result, and never changes
+`strategy_engine.recommend`, the Hi-Lo math, the coach decisions, or the CLI.

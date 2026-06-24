@@ -674,3 +674,86 @@ class TestPracticeTableSimulation:
         texts = [s.value for s in at.success] + [w.value for w in at.warning]
         assert any(
             "plausible" in t.lower() or "unusual" in t.lower() for t in texts)
+
+
+
+class TestProfileComparison:
+    """v2.5.0: rule-profile comparison panel."""
+
+    def test_panel_present_before_any_round(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        _assert_clean(at)
+        markdowns = _markdowns(at)
+        assert any("Rule profile comparison" in m for m in markdowns)
+        assert any(b.key == "compare_run" for b in at.button)
+        assert any(b.key == "compare_run_1000" for b in at.button)
+
+    def test_compare_two_profiles_populates_rows(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        at.multiselect(key="compare_profiles_select").set_value(
+            ["MULTI_DECK_H17_DAS_LS", "MULTI_DECK_S17_DAS_LS"]).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        rows = at.session_state["table_compare_rows"]
+        assert rows is not None
+        keys = [r.profile_key for r in rows]
+        assert keys == ["MULTI_DECK_H17_DAS_LS", "MULTI_DECK_S17_DAS_LS"]
+        # Counts add up and the auto-player always follows the coach.
+        for row in rows:
+            res = row.result
+            assert res.wins + res.losses + res.pushes == res.rounds == 100
+            assert res.followed_coach_pct == 100.0
+
+    def test_single_profile_does_not_break(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        at.multiselect(key="compare_profiles_select").set_value(
+            ["SINGLE_DECK_S17_DAS_LS"]).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        rows = at.session_state["table_compare_rows"]
+        assert len(rows) == 1
+        assert rows[0].profile_key == "SINGLE_DECK_S17_DAS_LS"
+
+    def test_seed_is_deterministic(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        at.number_input(key="compare_seed").set_value(99).run()
+        at.multiselect(key="compare_profiles_select").set_value(
+            ["MULTI_DECK_H17_DAS_LS"]).run()
+        at.button(key="compare_run").click().run()
+        first = at.session_state["table_compare_rows"][0].result
+        at.number_input(key="compare_seed").set_value(99).run()
+        at.button(key="compare_run").click().run()
+        second = at.session_state["table_compare_rows"][0].result
+        assert (first.wins, first.losses, first.pushes) == (
+            second.wins, second.losses, second.pushes)
+
+    def test_table_lists_all_selected_profiles(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        selection = ["MULTI_DECK_H17_DAS_LS", "MULTI_DECK_S17_DAS_LS",
+                     "SINGLE_DECK_S17_DAS_LS"]
+        at.multiselect(key="compare_profiles_select").set_value(selection).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        rows = at.session_state["table_compare_rows"]
+        assert [r.profile_key for r in rows] == selection
+        # A summary and educational notes are rendered after a comparison.
+        markdowns = _markdowns(at)
+        assert any("Most favorable by win %" in m for m in markdowns)
+
+    def test_empty_selection_warns_not_breaks(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.multiselect(key="compare_profiles_select").set_value([]).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        warnings = [w.value for w in at.warning]
+        assert any("at least one" in w.lower() for w in warnings)
