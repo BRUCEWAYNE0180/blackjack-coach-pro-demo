@@ -188,3 +188,46 @@ class TestEducationalNotesAndSafety:
                           ".screenshot(", "import stripe", "import mss",
                           "videocapture"):
             assert forbidden not in source
+
+
+
+class TestCompareProfilesDemoBalance:
+    """Demo-balance accounting inside a comparison (practice points only)."""
+
+    def test_rows_have_no_balance_without_settings(self):
+        rows = profile_comparison.compare_profiles(TWO, rounds=80, seed=42)
+        assert all(row.balance is None for row in rows)
+
+    def test_rows_carry_balance_when_settings_given(self):
+        rows = profile_comparison.compare_profiles(
+            TWO, rounds=200, seed=42, starting_balance=1000, base_bet=10)
+        for row in rows:
+            assert row.balance is not None
+            assert row.balance.starting_balance == 1000
+            assert row.balance.base_bet == 10
+            assert row.balance.final_balance == pytest.approx(
+                1000 + row.result.net_units * 10)
+
+    def test_balance_comparison_is_deterministic(self):
+        a = profile_comparison.compare_profiles(
+            TWO, rounds=200, seed=5, starting_balance=1000, base_bet=10)
+        b = profile_comparison.compare_profiles(
+            TWO, rounds=200, seed=5, starting_balance=1000, base_bet=10)
+        for ra, rb in zip(a, b):
+            assert ra.balance.final_balance == rb.balance.final_balance
+            assert ra.balance.hands_played == rb.balance.hands_played
+
+    def test_single_profile_balance_does_not_break(self):
+        rows = profile_comparison.compare_profiles(
+            ["MULTI_DECK_H17_DAS_LS"], rounds=150, seed=42,
+            starting_balance=500, base_bet=25)
+        assert len(rows) == 1
+        assert rows[0].balance.final_balance >= 0
+
+    def test_balance_can_stop_early_in_comparison(self):
+        rows = profile_comparison.compare_profiles(
+            ["EIGHT_DECK_H17_DAS_LS"], rounds=100000, seed=1,
+            starting_balance=100, base_bet=10)
+        bal = rows[0].balance
+        assert bal.stopped_early is True
+        assert bal.hands_played == rows[0].result.rounds

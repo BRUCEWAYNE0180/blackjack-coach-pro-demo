@@ -68,6 +68,26 @@ all unchanged.
     Double losses, Surrender losses** columns; the summary adds the net-unit
     highlights; and the single-profile sanity panel now also shows net units, a
     loss audit, the coach sanity note, and the dealer-edge explanation.
+- **Demo balance / practice points** so the simulation shows positive/negative
+  as a flat-bet running balance (demo points only - never real money, no real
+  bankroll, no betting system):
+  - New `simulate_demo_balance(profile_key, rounds, seed, starting_balance,
+    base_bet)` and `DemoBalanceResult` in `app/practice_table.py`. It runs
+    hand-by-hand and respects the balance: `final_balance == starting_balance +
+    net_units * base_bet`, with `profit_loss` and `return_pct` properties. The
+    balance never goes negative - the run **stops early** if it cannot cover the
+    next flat bet (`stopped_early`, `hands_played`), and DOUBLE / SPLIT are
+    disabled for a hand when the balance cannot cover the extra unit (downgraded
+    to the closest single-bet action). Flat bet only - no progressive /
+    Martingale / all-in logic. Raises on a non-positive bet or negative balance.
+  - The web simulation panel and the rule-profile comparison gain **Starting
+    demo balance** (default 1000) and **Base bet per hand** (default 10) inputs
+    (non-negative only) and display **Starting balance, Base bet, Final balance,
+    Demo profit/loss, Demo return %, Stopped early, Hands played** alongside net
+    units. The comparison table adds **Starting balance, Final balance, Demo
+    P/L, Demo return %, Stopped early, Hands played** columns. A visible
+    disclaimer (`DEMO_BALANCE_NOTE`) states the balance is local practice
+    accounting only - not real money, not bankroll advice, not a betting system.
 
 ### Notes
 

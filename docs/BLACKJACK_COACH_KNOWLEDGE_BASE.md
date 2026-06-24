@@ -1812,6 +1812,27 @@ the only answer to "am I really negative?"):
   accounting for WIN/LOSS/PUSH/SURRENDER/DOUBLE, both loss-audit sums, net-unit
   determinism, and the UI columns.
 
+Demo-balance / practice-points follow-up (same version, to read the simulation
+as a running positive/negative total):
+
+- **`simulate_demo_balance` + `DemoBalanceResult`** in `app/practice_table.py`:
+  a flat-bet demo balance (practice points, never real money). `final_balance ==
+  starting_balance + net_units * base_bet`, with `profit_loss` / `return_pct`.
+  The loop runs hand-by-hand and respects the balance - it **stops early** when
+  it cannot cover the next flat bet (`stopped_early`, `hands_played`) and
+  disables DOUBLE/SPLIT when the extra unit is unaffordable (downgraded to a
+  single-bet action). The balance never goes negative; flat bet only (no
+  progressive / Martingale / all-in). The plain loop and the balance loop share
+  one core (`_run_simulation`), so the existing sanity sim is unchanged.
+  `DEMO_BALANCE_NOTE` is the visible disclaimer.
+- `profile_comparison.compare_profiles` takes optional `starting_balance` /
+  `base_bet`; each row carries a `DemoBalanceResult`. The web simulation panel
+  and comparison gain Starting demo balance / Base bet inputs (non-negative) and
+  show starting/final balance, demo P/L, return %, stopped-early and hands
+  played. Tests cover the balance identity, P/L, return %, stop-early, no
+  negative balance, played-hands counts, and the flat-bet (no betting system)
+  guarantee.
+
 **Architecture:** `app/profile_comparison.py` is the testable, Streamlit-free
 comparison layer over `app.practice_table.simulate_following_coach`;
 `web/streamlit_app.py` only renders. `strategy_engine.recommend`, the Hi-Lo math,

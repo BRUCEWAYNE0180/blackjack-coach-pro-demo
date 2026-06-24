@@ -214,7 +214,11 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   demo units** (units / 100 hands, avg units / hand), a **loss audit** (correct
   vs mistake losses; bust / dealer-made-hand / double / surrender losses), and a
   **coach sanity check** so you can see whether you are really negative or just
-  losing more hands. Local/demo study only: no
+  losing more hands. It also keeps an optional flat-bet **demo balance**
+  (practice points, default 1000 balance / 10 bet) showing final balance, demo
+  P/L and return % - never real money, never a betting system, and the balance
+  never goes negative (it stops early if it cannot cover the next flat bet).
+  Local/demo study only: no
   money, bankroll, EV-as-decision, casino, network, camera, or scraping, and
   more wins does not always mean better EV.
 
@@ -783,6 +787,22 @@ initial recommendation separate from the recalculated current one. An
 educational note explains that the dealer wins more hands because the player acts
 first (and can bust before the dealer draws), and that win % is not the same as
 profitability.
+
+### Demo balance / practice points (v2.5.0)
+
+To see positive/negative as a running total, the simulation can also keep a
+flat-bet **demo balance** (practice points - **not real money, not a bankroll,
+not a betting system**). Set a **Starting demo balance** (default 1000) and a
+**Base bet per hand** (default 10); the simulation then runs hand-by-hand and
+shows the **Final balance**, **Demo profit/loss**, **Demo return %**, whether it
+**stopped early**, and the **hands played**. For example, starting 1000 with a
+base bet of 10 and net units of -22 gives a final balance of 780 (a -220 / -22%
+demo result). The balance **never goes negative**: the run stops with a clear
+message if it cannot cover the next flat bet, and DOUBLE / SPLIT are skipped for
+a hand when the balance cannot cover the extra unit. It is flat bet only - there
+is no Martingale, progressive, or all-in logic. The rule-profile comparison
+shows the same per profile (Starting balance, Final balance, Demo P/L, Demo
+return %, Stopped early, Hands played).
 
 Every comparison is **deterministic for a fixed seed**, the per-profile counts
 always sum to the total hands, and one or many profiles can be compared. The

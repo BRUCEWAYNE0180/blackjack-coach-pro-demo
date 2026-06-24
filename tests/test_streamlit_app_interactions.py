@@ -805,3 +805,59 @@ class TestProfileComparisonNetUnits:
         # Coach sanity is surfaced.
         successes = [s.value for s in at.success]
         assert any("coach sanity ok" in s.lower() for s in successes)
+
+
+
+class TestDemoBalance:
+    """v2.5.0 follow-up: demo balance / practice points in the UI."""
+
+    def test_sim_panel_renders_demo_balance(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.button(key="sim_run_100").click().run()
+        _assert_clean(at)
+        balance = at.session_state["table_sim_balance"]
+        assert balance is not None
+        assert balance.starting_balance == 1000
+        assert balance.base_bet == 10
+        # final balance = start + net_units * base_bet
+        assert balance.final_balance == (
+            balance.starting_balance + balance.result.net_units * balance.base_bet)
+        markdowns = _markdowns(at)
+        assert any("Demo balance" in m for m in markdowns)
+
+    def test_sim_panel_custom_balance_and_bet(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.number_input(key="sim_start_balance").set_value(500).run()
+        at.number_input(key="sim_base_bet").set_value(25).run()
+        at.button(key="sim_run_100").click().run()
+        _assert_clean(at)
+        balance = at.session_state["table_sim_balance"]
+        assert balance.starting_balance == 500
+        assert balance.base_bet == 25
+        assert balance.final_balance >= 0
+
+    def test_comparison_renders_demo_balance(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        at.multiselect(key="compare_profiles_select").set_value(
+            ["MULTI_DECK_H17_DAS_LS", "EIGHT_DECK_H17_DAS_LS"]).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        rows = at.session_state["table_compare_rows"]
+        for row in rows:
+            assert row.balance is not None
+            assert row.balance.final_balance == (
+                row.balance.starting_balance
+                + row.result.net_units * row.balance.base_bet)
+
+    def test_demo_balance_disclaimer_shown(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.button(key="sim_run_100").click().run()
+        _assert_clean(at)
+        infos = [i.value for i in at.info]
+        assert any("not real money" in i.lower() for i in infos)
+        assert any("not a betting system" in i.lower() for i in infos)

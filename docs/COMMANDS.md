@@ -1319,3 +1319,28 @@ from the recalculated current one. The helpers `round_units`, `loss_mechanism`,
 `app/practice_table.py`. Still local/demo only: no money, bankroll, EV as the
 decision, casino, network, camera, screen reading or scraping, and no profit
 prediction or guarantee.
+
+
+### Demo balance / practice points (v2.5.0)
+
+To read the simulation as positive/negative on a running total, set a flat-bet
+**demo balance** (practice points - **not real money, not a bankroll, not a
+betting system**). Both the single-profile simulation panel and the rule-profile
+comparison take a **Starting demo balance** (default 1000) and a **Base bet per
+hand** (default 10), and report **Starting balance, Final balance, Demo
+profit/loss, Demo return %, Stopped early** and **Hands played**.
+
+The accounting is simple and flat: `final balance = starting balance + net_units
+* base_bet`. For example, starting 1000 with a base bet of 10 and net units of
+-22 gives a final balance of 780 (a -220 / -22% demo result). The simulation
+runs hand-by-hand and **respects the balance**: it stops early with the message
+`Stopped early: demo balance could not cover the next base bet.` if it cannot
+afford the next flat bet, and it disables DOUBLE / SPLIT for a hand when the
+balance cannot cover the extra unit (downgrading to the closest single-bet
+action). The balance **never goes negative**, and there is **no Martingale /
+progressive / all-in** logic - flat bet only.
+
+The helpers `simulate_demo_balance` and `DemoBalanceResult` live in the
+Streamlit-free `app/practice_table.py`. Still local/demo only: demo points are a
+practice accounting aid, not real money, bankroll advice, or a betting system,
+and there is no profit prediction or guarantee.

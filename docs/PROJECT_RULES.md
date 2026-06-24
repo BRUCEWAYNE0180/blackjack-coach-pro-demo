@@ -474,6 +474,16 @@ As of v0.9 the project enforces these gates on every change:
   bets, and must keep decision quality separate from outcome (a correct decision
   that loses is a correct loss, not a mistake). Natural blackjack is not paid
   3:2 in the demo and this limitation must be stated, not hidden.
+- **The demo balance is practice points, never real money or a betting system.**
+  The v2.5.0 demo balance (`simulate_demo_balance` / `DemoBalanceResult`,
+  surfaced in the simulation and comparison panels) is a flat-bet running total
+  of **demo points only**. It must use a single flat base bet (no Martingale,
+  progressive, all-in, or any bet-after-result progression), must never let the
+  balance go negative (it stops early when it cannot cover the next bet), and
+  must never be presented as real money, bankroll advice, a betting strategy, or
+  a profit prediction. It must keep reusing the existing simulation engine and
+  must not change `strategy_engine.recommend`, the Hi-Lo math, or the coach
+  decisions.
 
 ## 8. Release Rules
 

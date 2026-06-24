@@ -205,7 +205,9 @@ class TestStreamlitAppV24Simulation:
 
     def test_uses_simulate_following_coach(self):
         source = _source()
-        assert "simulate_following_coach" in source
+        # The single-profile panel now runs a balance-aware simulation, which
+        # follows the coach hand-by-hand under the hood.
+        assert "simulate_demo_balance" in source
         assert "simulation_interpretation" in source
         assert "simulation_looks_plausible" in source
 
@@ -324,6 +326,68 @@ class TestStreamlitAppV25NetUnitsAndLossAudit:
         source = _source()
         assert "coach_sanity_note" in source
         assert "coach_sanity_ok" in source
+
+
+class TestStreamlitAppV25DemoBalance:
+    """v2.5.0 follow-up: demo balance / practice points."""
+
+    def test_has_demo_balance_controls(self):
+        source = _source()
+        assert "Starting demo balance" in source
+        assert "Base bet per hand" in source
+        assert "sim_start_balance" in source
+        assert "sim_base_bet" in source
+        assert "compare_start_balance" in source
+        assert "compare_base_bet" in source
+
+    def test_default_balance_and_bet(self):
+        source = _source()
+        assert "value=1000" in source
+        assert "value=10" in source
+
+    def test_balance_inputs_disallow_negative(self):
+        # Both balance and bet number_inputs use a non-negative minimum.
+        source = _source()
+        assert "min_value=0" in source   # starting balance
+        assert "min_value=1" in source   # base bet (positive)
+
+    def test_shows_demo_balance_results(self):
+        source = _source()
+        for label in ("Starting balance", "Base bet", "Final balance",
+                      "Demo profit/loss", "Demo return %", "Hands played"):
+            assert label in source
+
+    def test_comparison_has_demo_balance_columns(self):
+        source = _source()
+        for label in ("Final balance", "Demo P/L", "Demo return %",
+                      "Stopped early", "Hands played"):
+            assert label in source
+
+    def test_uses_demo_balance_helpers(self):
+        source = _source()
+        assert "simulate_demo_balance" in source
+        assert "DEMO_BALANCE_NOTE" in source
+        assert "profit_loss" in source
+        assert "return_pct" in source
+
+    def test_shows_stopped_early_message(self):
+        assert "Stopped early: demo balance could not cover the next base" in (
+            _source())
+
+    def test_has_demo_balance_disclaimer(self):
+        # The educational disclaimer text lives in the engine module and is
+        # surfaced via DEMO_BALANCE_NOTE; the UI must reference it.
+        assert "DEMO_BALANCE_NOTE" in _source()
+        assert "demo points" in _source().lower()
+
+    def test_no_betting_system_logic(self):
+        # Flat bet only: the bet must never be escalated in code. Check for
+        # progressive / Martingale-style reassignment patterns (these are code
+        # constructs, not the disclaimer wording that mentions "Martingale").
+        source = _source()
+        for forbidden in ("base_bet *=", "base_bet +=", "bet *=", "bet +=",
+                          "*= base_bet", "bet = bet *", "bet *= 2"):
+            assert forbidden not in source
 
 
 class TestStreamlitAppNoExternalCapture:

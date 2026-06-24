@@ -17,7 +17,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .practice_table import (
+    DemoBalanceResult,
     SimulationResult,
+    simulate_demo_balance,
     simulate_following_coach,
     simulation_interpretation,
     simulation_looks_plausible,
@@ -52,6 +54,7 @@ class ProfileComparisonRow:
     result: SimulationResult
     plausible: bool
     interpretation: str
+    balance: DemoBalanceResult | None = None
 
 
 @dataclass(frozen=True)
@@ -90,6 +93,8 @@ def compare_profiles(
     profile_keys: list[str],
     rounds: int = DEFAULT_COMPARE_ROUNDS,
     seed: int | None = DEFAULT_COMPARE_SEED,
+    starting_balance: float | None = None,
+    base_bet: float | None = None,
 ) -> list[ProfileComparisonRow]:
     """Simulate ``rounds`` auto-play hands for each profile and return a row
     per profile.
@@ -98,11 +103,24 @@ def compare_profiles(
     reproducible and deterministic. Duplicate keys are collapsed while
     preserving the first occurrence order. Unknown keys raise ``KeyError`` (via
     :func:`app.rules.get_profile`).
+
+    When both ``starting_balance`` and ``base_bet`` are given, each profile is
+    run as a flat-bet **demo-balance** simulation (practice points only); the
+    row's ``balance`` holds the :class:`DemoBalanceResult` and ``result`` is its
+    result over the hands actually played.
     """
+    use_balance = starting_balance is not None and base_bet is not None
     rows: list[ProfileComparisonRow] = []
     for key in _dedupe_preserving_order(list(profile_keys)):
         profile = get_profile(key)
-        result = simulate_following_coach(key, rounds=rounds, seed=seed)
+        balance = None
+        if use_balance:
+            balance = simulate_demo_balance(
+                key, rounds=rounds, seed=seed,
+                starting_balance=starting_balance, base_bet=base_bet)
+            result = balance.result
+        else:
+            result = simulate_following_coach(key, rounds=rounds, seed=seed)
         rows.append(
             ProfileComparisonRow(
                 profile_key=key,
@@ -110,6 +128,7 @@ def compare_profiles(
                 result=result,
                 plausible=simulation_looks_plausible(result),
                 interpretation=simulation_interpretation(result),
+                balance=balance,
             )
         )
     return rows
