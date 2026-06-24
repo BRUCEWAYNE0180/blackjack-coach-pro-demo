@@ -119,6 +119,38 @@ class TestStreamlitAppV22RoundResult:
         assert "DOUBLE_PLAY_NOTE" in source
         assert "double_round_card_warning" in source
 
+
+class TestStreamlitAppV23PracticeTable:
+    """v2.3.0 local demo practice table."""
+
+    def test_has_practice_table_mode(self):
+        source = _source()
+        assert "Practice table (demo)" in source
+        assert "practice_table" in source
+
+    def test_has_deal_and_action_controls(self):
+        source = _source()
+        assert "table_deal" in source
+        assert "_table_action" in source
+        assert "Start demo round" in source
+
+    def test_uses_state_machine_helpers(self):
+        source = _source()
+        assert "start_round" in source
+        assert "legal_actions" in source
+        assert "build_round_record" in source
+
+    def test_has_session_history(self):
+        source = _source()
+        assert "table_history" in source
+        assert "Session history" in source
+
+    def test_shows_current_recommendation_after_hit(self):
+        # Bug fix: HIT recalculates and shows a current recommendation.
+        source = _source()
+        assert "Current coach recommendation" in source
+        assert "current_coach_action" in source
+
     def test_player_and_dealer_pickers(self):
         source = _source()
         assert "Your hand" in source

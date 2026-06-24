@@ -422,6 +422,22 @@ As of v0.9 the project enforces these gates on every change:
   accounts, tokens, screenshots, or personal data. The in-web history is
   session-only; optional JSON persistence must live under the git-ignored
   `.blackjack_coach/` tree and must never be committed.
+- **The practice table is a local, simulated demo only.** The v2.3.0 practice
+  table (`app/practice_table.py`, surfaced as the web "Practice table (demo)"
+  mode) is a local game that **generates and knows its own cards**: it builds,
+  shuffles and deals from its own shoe. It must never use a camera, never read
+  the screen, never scrape, never connect to a real casino, never automate real
+  bets, and never involve real money or a bankroll. It must keep **decision
+  quality separate from the round outcome** (a correct play that loses is never
+  a bad decision) and must freeze the coach recommendation at the initial
+  decision point. It must not change `strategy_engine.recommend`, the Hi-Lo
+  math, the coach decisions, or the correct answers, and must not use EV as the
+  main decision. `app/practice_table.py` must stay Streamlit-free and reuse the
+  existing shoe / dealer-play / outcome code rather than duplicating strategy.
+  It must store no money, bankroll, bets, wagers, balances, accounts, tokens,
+  screenshots, or personal data; the in-web session history is session-only. No
+  FastAPI, no Telegram, no external API, no database, no login/auth, and the CLI
+  must keep working unchanged.
 
 ## 8. Release Rules
 

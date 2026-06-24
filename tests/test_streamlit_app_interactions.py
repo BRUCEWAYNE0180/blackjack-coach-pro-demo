@@ -144,7 +144,7 @@ class TestClearResetUndo:
 class TestManualTextMode:
     def test_manual_mode_default_renders_clean(self):
         at = _fresh()
-        at.radio[0].set_value("Manual text").run()
+        _set_input_mode(at, "Manual text")
         # Default manual inputs are A,7 vs 9; evaluate on the decision button.
         at.button(key="get_decision").click().run()
         _assert_clean(at)
@@ -152,7 +152,7 @@ class TestManualTextMode:
 
     def test_manual_mode_custom_hand(self):
         at = _fresh()
-        at.radio[0].set_value("Manual text").run()
+        _set_input_mode(at, "Manual text")
         at.text_input[0].set_value("8,8").run()
         at.text_input[1].set_value("10").run()
         at.button(key="get_decision").click().run()
@@ -161,7 +161,7 @@ class TestManualTextMode:
 
     def test_manual_mode_invalid_input_warns_not_errors(self):
         at = _fresh()
-        at.radio[0].set_value("Manual text").run()
+        _set_input_mode(at, "Manual text")
         at.text_input[0].set_value("ZZ").run()
         at.button(key="get_decision").click().run()
         # Invalid input must surface a friendly warning, never a red error block.
@@ -482,3 +482,92 @@ class TestDoublePlayHelp:
         _assert_clean(at)
         assert any(
             "one additional card" in w.lower() for w in self._warnings(at))
+
+
+
+def _enter_practice_table(at):
+    for radio in at.radio:
+        if radio.label == "Mode":
+            radio.set_value("Practice table (demo)").run()
+            return
+    raise AssertionError("Mode radio not found")
+
+
+class TestPracticeTable:
+    """v2.3.0: local demo blackjack table."""
+
+    def test_mode_shows_table_and_deal(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        _assert_clean(at)
+        assert any(m.value == "### Practice table (demo)" for m in at.markdown)
+        assert any(b.key == "table_deal" for b in at.button)
+
+    def test_deal_then_stand_records_history(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.button(key="table_deal").click().run()
+        _assert_clean(at)
+        state = at.session_state["table_state"]
+        assert state is not None
+        assert len(state.player_cards) == 2
+        # Action buttons exist while it's the player's turn.
+        assert any(b.key.startswith("table_act_") for b in at.button)
+        at.button(key="table_act_STAND").click().run()
+        _assert_clean(at)
+        ended = at.session_state["table_state"]
+        assert ended.is_round_over
+        assert ended.outcome in ("WIN", "LOSS", "PUSH")
+        assert len(at.session_state["table_history"]) == 1
+
+    def test_dealer_hole_hidden_during_player_turn(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.button(key="table_deal").click().run()
+        # Before resolving, the dealer's hole card is hidden.
+        assert any("hidden card" in m.value for m in at.markdown)
+        assert not at.session_state["table_state"].dealer_revealed
+
+    def test_clear_history(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.button(key="table_deal").click().run()
+        at.button(key="table_act_STAND").click().run()
+        assert len(at.session_state["table_history"]) == 1
+        at.button(key="table_clear_history").click().run()
+        _assert_clean(at)
+        assert at.session_state["table_history"] == []
+
+    def test_coach_recommendation_shown_and_frozen(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.button(key="table_deal").click().run()
+        coach = at.session_state["table_state"].coach_action
+        assert any(
+            "Current coach recommendation" in m.value for m in at.markdown)
+        # Acting does not change the frozen initial coach recommendation.
+        first_action = next(
+            b.key for b in at.button if b.key.startswith("table_act_"))
+        at.button(key=first_action).click().run()
+        assert at.session_state["table_state"].coach_action == coach
+
+    def test_hit_keeps_round_active_and_recalculates(self):
+        # Inject a deterministic non-busting state so HIT keeps the player's
+        # turn and the current recommendation recalculates.
+        from app import practice_table as pt
+        at = _fresh()
+        _enter_practice_table(at)
+        at.session_state["table_state"] = pt.build_table_state(
+            "MULTI_DECK_H17_DAS_LS", ["A", "A", "4"], ["Q", "7"], ["5"])
+        at.run()
+        at.button(key="table_act_HIT").click().run()
+        _assert_clean(at)
+        state = at.session_state["table_state"]
+        assert state.phase == pt.PHASE_PLAYER          # HIT did not end the turn
+        assert state.player_cards == ["A", "A", "4", "5"]
+        assert state.current_coach_action == "STAND"   # recalculated
+        assert state.coach_action == "HIT"             # frozen initial kept
+        # Action buttons are shown again after the HIT.
+        assert any(b.key.startswith("table_act_") for b in at.button)
+        assert any(
+            "Current coach recommendation" in m.value for m in at.markdown)

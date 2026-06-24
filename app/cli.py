@@ -3302,6 +3302,13 @@ def build_web_output() -> str:
                          "clear / reset, and a polished colour-coded result. A "
                          "manual text-entry mode is still available."),
         "",
+        format_kv("New in v2.3.0", "a local Practice table (demo) mode deals "
+                                   "its own cards so you can play a full round "
+                                   "- coach recommendation, your action, "
+                                   "automatic dealer play and outcome, and a "
+                                   "session history. Local/simulated only: no "
+                                   "camera, no screen reading, no real money."),
+        "",
         format_kv("Note", "Local practice / training only - no real bets, no "
                           "casino connectivity, no money handling. The CLI "
                           "keeps working exactly as before."),
