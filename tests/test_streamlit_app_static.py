@@ -87,3 +87,22 @@ class TestStreamlitAppSafety:
         source = _source().lower()
         for forbidden in ("token", "secret", "password", "api_key", "apikey"):
             assert forbidden not in source
+
+    def test_no_unsafe_allow_html(self):
+        # Raw HTML injection via unsafe_allow_html caused the dynamic-DOM
+        # "removeChild" frontend error; the UI must use native components only.
+        assert "unsafe_allow_html=True" not in _source()
+
+    def test_no_streamlit_rerun(self):
+        # Avoid forcing reruns, which can also trigger unstable re-rendering.
+        assert "st.rerun(" not in _source()
+        assert "experimental_rerun" not in _source()
+
+    def test_all_buttons_have_unique_keys(self):
+        source = _source()
+        # Every Streamlit button call in the app passes an explicit key= so the
+        # frontend can reconcile widgets stably across reruns.
+        button_calls = source.count(".button(")
+        key_args = source.count("key=")
+        assert button_calls >= 6
+        assert key_args >= button_calls

@@ -89,13 +89,26 @@ def _load_example(player: tuple[str, ...], dealer: str) -> None:
 
 # --- Rendering helpers -----------------------------------------------------
 
-def _render_chip(label: str, color: str = "#37474f") -> str:
-    """Return HTML for a small rounded card chip (display only)."""
-    return (
-        f"<span style='display:inline-block;margin:2px 4px;padding:4px 12px;"
-        f"border-radius:14px;background:{color};color:white;font-weight:600;"
-        f"font-size:16px;'>{label}</span>"
-    )
+# Native Streamlit colour names per action (used for stable colour-highlight
+# markdown - no raw HTML, so React reconciliation stays sane between reruns).
+# This is display-only and never changes the recommendation.
+_ACTION_COLOR = {
+    "HIT": "blue",
+    "STAND": "green",
+    "DOUBLE": "orange",
+    "SPLIT": "violet",
+    "SURRENDER": "red",
+}
+
+
+def _card_badges(cards) -> str:
+    """Return native colour-highlight markdown for a list of card ranks.
+
+    Uses Streamlit's built-in ``:colour-background[...]`` markdown directive
+    (rendered by Streamlit, not via ``unsafe_allow_html``), which avoids the
+    dynamic-DOM ``removeChild`` errors that raw HTML injection can trigger.
+    """
+    return " ".join(f":gray-background[{rank}]" for rank in cards)
 
 
 def _render_rank_buttons(prefix: str, on_click) -> None:
@@ -122,17 +135,16 @@ def _render_card_picker() -> None:
 
     player_cards = st.session_state.player_cards
     if player_cards:
-        chips = "".join(_render_chip(rank) for rank in player_cards)
-        st.markdown(f"**Selected:** {chips}", unsafe_allow_html=True)
+        st.markdown(f"**Selected:** {_card_badges(player_cards)}")
     else:
         st.markdown("**Selected:** _no cards yet_")
 
     undo_col, clear_col = st.columns(2)
     undo_col.button(
-        "Undo last card", on_click=_undo_player_card,
+        "Undo last card", key="undo_player", on_click=_undo_player_card,
         use_container_width=True, disabled=not player_cards)
     clear_col.button(
-        "Clear hand", on_click=_clear_player_cards,
+        "Clear hand", key="clear_player", on_click=_clear_player_cards,
         use_container_width=True, disabled=not player_cards)
 
     st.markdown("#### Dealer upcard")
@@ -141,13 +153,11 @@ def _render_card_picker() -> None:
 
     dealer_upcard = st.session_state.dealer_upcard
     if dealer_upcard:
-        st.markdown(
-            f"**Dealer shows:** {_render_chip(dealer_upcard, '#b71c1c')}",
-            unsafe_allow_html=True)
+        st.markdown(f"**Dealer shows:** :red-background[{dealer_upcard}]")
     else:
         st.markdown("**Dealer shows:** _not set_")
     st.button(
-        "Clear dealer", on_click=_clear_dealer_upcard,
+        "Clear dealer", key="clear_dealer", on_click=_clear_dealer_upcard,
         use_container_width=True, disabled=not dealer_upcard)
 
 
@@ -170,19 +180,19 @@ def _render_quick_examples() -> None:
 
 
 def _render_recommendation_banner(output) -> None:
-    """Render the polished, colour-coded recommended-action banner."""
+    """Render the polished, colour-coded recommended-action banner.
+
+    Built entirely from native Streamlit components (a bordered container plus
+    colour-highlight markdown) - no ``unsafe_allow_html`` - so it renders
+    without the dynamic-DOM ``removeChild`` error and stays display-only.
+    """
     visual = action_visual(output.final_action)
-    st.markdown(
-        f"<div style='padding:18px;border-radius:12px;background:{visual['color']};"
-        f"color:white;text-align:center;margin-bottom:8px;'>"
-        f"<div style='font-size:14px;letter-spacing:1px;opacity:0.85;'>"
-        f"RECOMMENDED ACTION</div>"
-        f"<div style='font-size:34px;font-weight:800;margin-top:4px;'>"
-        f"{visual['action']}</div>"
-        f"<div style='font-size:15px;margin-top:6px;opacity:0.95;'>"
-        f"{visual['description']}</div></div>",
-        unsafe_allow_html=True,
-    )
+    action = visual["action"]
+    color = _ACTION_COLOR.get(action, "gray")
+    with st.container(border=True):
+        st.caption("RECOMMENDED ACTION")
+        st.markdown(f"## :{color}[{action}]")
+        st.write(visual["description"])
     st.caption(format_web_action(output.final_action))
 
 
@@ -296,9 +306,11 @@ def main() -> None:
     st.markdown("---")
     decide_col, reset_col = st.columns([2, 1])
     evaluate_clicked = decide_col.button(
-        "Get Coach Decision", type="primary", use_container_width=True)
+        "Get Coach Decision", key="get_decision", type="primary",
+        use_container_width=True)
     reset_col.button(
-        "Reset all", on_click=_reset_all, use_container_width=True)
+        "Reset all", key="reset_all", on_click=_reset_all,
+        use_container_width=True)
 
     # In button mode the result is shown live once the hand is complete, so it
     # persists while you keep adding cards. In manual mode it waits for the
@@ -309,31 +321,36 @@ def main() -> None:
         and bool(st.session_state.dealer_upcard)
     )
 
-    if evaluate_clicked or auto_ready:
-        web_input = WebCoachInput(
-            player_cards=player_cards,
-            dealer_upcard=dealer_upcard,
-            profile_key=options["profile_key"],
-            true_count=options["true_count"],
-            show_odds=options["show_odds"],
-            composition_aware=options["composition_aware"],
-            seen_cards=options["seen_cards"] or None,
-            allow_double=options["allow_double"],
-            allow_surrender=options["allow_surrender"],
-            allow_split=options["allow_split"],
-        )
-        try:
-            output = build_web_coach_output(web_input)
-        except (ValueError, KeyError) as exc:
-            # validate_web_cards raises clear, user-facing messages (e.g.
-            # "Enter at least two player cards" / "Enter the dealer upcard").
-            st.warning(f"Cannot give a decision yet: {exc}")
+    # Render the result inside a single stable container so the DOM node at this
+    # position is consistent across reruns (this, plus dropping unsafe_allow_html
+    # and giving every widget a unique key, avoids the React removeChild error).
+    result_area = st.container()
+    with result_area:
+        if evaluate_clicked or auto_ready:
+            web_input = WebCoachInput(
+                player_cards=player_cards,
+                dealer_upcard=dealer_upcard,
+                profile_key=options["profile_key"],
+                true_count=options["true_count"],
+                show_odds=options["show_odds"],
+                composition_aware=options["composition_aware"],
+                seen_cards=options["seen_cards"] or None,
+                allow_double=options["allow_double"],
+                allow_surrender=options["allow_surrender"],
+                allow_split=options["allow_split"],
+            )
+            try:
+                output = build_web_coach_output(web_input)
+            except (ValueError, KeyError) as exc:
+                # validate_web_cards raises clear, user-facing messages (e.g.
+                # "Enter at least two player cards" / "Enter the dealer upcard").
+                st.warning(f"Cannot give a decision yet: {exc}")
+            else:
+                _render_output(output)
         else:
-            _render_output(output)
-    else:
-        st.info(
-            "Add at least two player cards and the dealer's upcard, then press "
-            "**Get Coach Decision**.")
+            st.info(
+                "Add at least two player cards and the dealer's upcard, then "
+                "press **Get Coach Decision**.")
 
     st.markdown("---")
     st.markdown("### Practice tools (run these in your terminal)")

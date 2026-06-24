@@ -183,9 +183,17 @@ class TestActionVisual:
 
 class TestNoStreamlitDependency:
     def test_web_adapter_does_not_import_streamlit(self):
-        # Importing the adapter must not pull in streamlit.
-        import app.web_adapter  # noqa: F401
-        assert "streamlit" not in sys.modules
+        # Importing the adapter must not pull in streamlit. Run in a clean
+        # subprocess so that unrelated tests which legitimately import streamlit
+        # (e.g. the AppTest interaction tests) cannot pollute the shared
+        # sys.modules and make this check order-dependent.
+        import subprocess
+        code = (
+            "import sys, app.web_adapter; "
+            "sys.exit(1 if 'streamlit' in sys.modules else 0)"
+        )
+        result = subprocess.run([sys.executable, "-c", code])
+        assert result.returncode == 0
 
     def test_web_adapter_source_has_no_streamlit_import(self):
         import app.web_adapter as wa
