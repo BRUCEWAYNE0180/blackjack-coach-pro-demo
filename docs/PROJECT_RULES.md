@@ -357,6 +357,21 @@ As of v0.9 the project enforces these gates on every change:
   database. Completion files live under the git-ignored
   `.blackjack_coach/repeat_packs` tree (unless the user passes a `--repeat-dir`
   path) and are never committed.
+- **The correction dashboard is local and only summarises practice.** The
+  missed-spot correction dashboard (v1.28.0: `app/correction_dashboard.py`, the
+  `correction-dashboard` command) is local and read-only. It must never change
+  the main strategy recommendation, the correct answers, or the engine math, and
+  must never change `strategy_engine.recommend`, the Hi-Lo counting math,
+  adaptive learning, guided coaching, outcome / session history, the EV-snapshot
+  history, the Strategy-vs-EV engine, the reporting module, the dashboard, the
+  drill generator, the drill history, the review scheduler, the practice-pack
+  generator, the practice-pack completion history, the repeat-pack generator, or
+  the repeat-pack completion history. It stores / exports no money, bankroll,
+  real bets, accounts, tokens, screenshots, or sensitive/personal data,
+  summarises practice without promising results, and stays dependency-free with
+  no network, cloud, or database. Exported dashboards live under the git-ignored
+  `.blackjack_coach/reports` tree (unless the user passes an explicit `--output`
+  path) and are never committed.
 
 ## 8. Release Rules
 

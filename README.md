@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.27.0 feature summary
+## v1.28.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -152,6 +152,12 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   streaks), and `repeat-pack --progress` summarises correction progress and
   flags persistent misses. Local and read-only; it never changes the correct
   answers or the recommendation.
+- **Missed-spot correction dashboard** (v1.28.0): `correction-dashboard` shows
+  a clear local view of which errors are **corrected**, **improving**,
+  **persistent misses**, or **new**, with per-spot accuracy and concrete
+  next-practice priorities. Print it, show it as Markdown, or `--export` it.
+  Local and read-only; it never changes the correct answers or the
+  recommendation.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -461,6 +467,27 @@ so clearly. Per-spot statuses: NEW, IMPROVING, CORRECTED, PERSISTENT_MISS.
 Completion records are a local summary only - no money, accounts, or sensitive
 data - and are never committed.
 
+## Missed-Spot Correction Dashboard (v1.28.0)
+
+`correction-dashboard` reads your repeat-pack completion history (v1.27.0) and
+shows, at a glance, which previously-missed spots are now **corrected**,
+**improving**, **persistent misses**, or **new** - with per-spot repeat accuracy
+and a concrete next-practice priority list. It is read-only and never changes
+the correct answers or the recommendation.
+
+```bash
+blackjack-coach correction-dashboard
+blackjack-coach correction-dashboard --profile SIX_DECK_H17_DAS_LS
+blackjack-coach correction-dashboard --markdown
+blackjack-coach correction-dashboard --export --output correction_dashboard.md
+```
+
+`--profile` / `--limit` scope the data; `--markdown` prints a Markdown table;
+`--export` (with optional `--output`) saves it under `./.blackjack_coach/reports`;
+and `--repeat-dir` points at a custom completion folder. With no saved repeat
+completions it says so clearly, and it is useful even with a single record. The
+dashboard stores no sensitive data and is never committed.
+
 ## Terminal visual polish (v1.1.0)
 
 v1.1.0 makes the CLI clearer and more pleasant to practise with. Output now has
@@ -568,6 +595,8 @@ blackjack-coach repeat-pack
 blackjack-coach repeat-pack --markdown
 blackjack-coach repeat-pack --complete
 blackjack-coach repeat-pack --progress
+blackjack-coach correction-dashboard
+blackjack-coach correction-dashboard --markdown
 ```
 
 Without installing, run it as a module from the repository root:

@@ -152,6 +152,14 @@ tool relies on and the project's evolution.
   `summarize_repeat_pack_history`, and `render_repeat_pack_progress_summary`.
   Records which missed spots were corrected vs still missed; never changes the
   correct answers or the recommendation.
+- `app/correction_dashboard.py` — Local missed-spot correction dashboard:
+  `CorrectionSpotSummary`, `CorrectionDashboardSummary`,
+  `CorrectionDashboardExport`, plus `build_correction_dashboard`,
+  `classify_correction_trend`, `recommend_correction_next_actions`,
+  `render_correction_dashboard`, `render_correction_dashboard_markdown`, and
+  `export_correction_dashboard`. Summarises corrected / improving / persistent /
+  new spots from the repeat-pack completion history; never changes the correct
+  answers or the recommendation.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -181,8 +189,8 @@ tool relies on and the project's evolution.
   `audit`, `outcomes`, `coach`, `coach-play`, `odds`, `learn`, `ev-review`,
   `report`, and `dashboard` subcommands, plus `drill` (with `--save` /
   `--review`) and `review-queue` and `practice-pack` (with `--complete` /
-  `--progress`) and `repeat-pack` (with `--complete` / `--progress`);
-  `odds`/`coach --show-odds` accept
+  `--progress`) and `repeat-pack` (with `--complete` / `--progress`) and
+  `correction-dashboard`; `odds`/`coach --show-odds` accept
   `--explain-ev` and `ev-review` accepts `--explain` / `--large-gaps-only`).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
@@ -1455,7 +1463,7 @@ promising results, keeps exported files under the git-ignored
 `.blackjack_coach/reports` tree (unless an `--output` path is given), and uses no
 external dependencies, network, cloud, or database.
 
-### v1.27.0 — Repeat Pack Completion History (current)
+### v1.27.0 — Repeat Pack Completion History (done)
 
 Builds on the v1.26.0 repeat-pack generator. The generator could rebuild
 missed-spot practice but not record whether those errors were actually fixed;
@@ -1493,6 +1501,38 @@ completion history, or the repeat-pack generator. Per `PROJECT_RULES.md` it
 stores no sensitive data, keeps files under the git-ignored
 `.blackjack_coach/repeat_packs` tree (unless a `--repeat-dir` is given), and uses
 no external dependencies, network, cloud, or database.
+
+### v1.28.0 — Missed-Spot Correction Dashboard (current)
+
+Builds on the v1.27.0 repeat-pack completion history. The history recorded
+corrected vs still-missed spots; v1.28.0 turns that into a clear local dashboard
+that groups spots by correction status and surfaces what to practise first. It
+is read-only and never changes play.
+
+Delivered:
+
+- **`app/correction_dashboard.py`**: `CorrectionSpotSummary`,
+  `CorrectionDashboardSummary`, and `CorrectionDashboardExport`, plus
+  `build_correction_dashboard` (groups `build_repeat_spot_progress` output by
+  status CORRECTED / IMPROVING / PERSISTENT_MISS / NEW and builds priorities),
+  `classify_correction_trend`, `recommend_correction_next_actions`,
+  `render_correction_dashboard`, `render_correction_dashboard_markdown` (a status
+  table + checklist), and `export_correction_dashboard`.
+- **CLI**: new `correction-dashboard` command with `--profile`, `--limit`,
+  `--repeat-dir`, `--markdown`, `--export`, and `--output`.
+- **Tests**: new `tests/test_correction_dashboard.py` and
+  `TestCliCorrectionDashboard` in `tests/test_cli.py`.
+
+**Limits / honesty:** the correction dashboard is a local, read-only practice
+summary. It never changes `strategy_engine.recommend`, the Hi-Lo math, adaptive
+learning, guided coaching, outcome / session history, the EV-snapshot history,
+the Strategy-vs-EV engine, reporting, the dashboard, the drill generator, the
+drill history, the review scheduler, the practice-pack generator, the
+practice-pack completion history, the repeat-pack generator, or the repeat-pack
+completion history. Per `PROJECT_RULES.md` it stores no sensitive data, keeps
+exported files under the git-ignored `.blackjack_coach/reports` tree (unless an
+`--output` path is given), and uses no external dependencies, network, cloud, or
+database.
 
 ### v2.0 — Possible Web UI (if decided later)
 

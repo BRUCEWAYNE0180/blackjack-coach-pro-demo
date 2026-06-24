@@ -15,6 +15,17 @@ from .adaptive_learning import (
     classify_hand_spot,
     format_learning_summary,
 )
+from .correction_dashboard import (
+    CorrectionDashboardExport,
+    CorrectionDashboardSummary,
+    CorrectionSpotSummary,
+    build_correction_dashboard,
+    classify_correction_trend,
+    export_correction_dashboard,
+    recommend_correction_next_actions,
+    render_correction_dashboard,
+    render_correction_dashboard_markdown,
+)
 from .counting import (
     CountingState,
     counting_summary,
@@ -266,7 +277,7 @@ from .strategy_engine import (
     should_take_insurance,
 )
 
-__version__ = "1.27.0"
+__version__ = "1.28.0"
 
 __all__ = [
     "ACTION_NOTES",
@@ -293,6 +304,9 @@ __all__ = [
     "DashboardProfileSummary",
     "DashboardSummary",
     "DashboardTrendPoint",
+    "CorrectionDashboardExport",
+    "CorrectionDashboardSummary",
+    "CorrectionSpotSummary",
     "DrillPlan",
     "DrillResult",
     "DrillSpot",
@@ -360,6 +374,12 @@ __all__ = [
     "render_dashboard_text",
     "render_dashboard_markdown",
     "export_dashboard",
+    "build_correction_dashboard",
+    "classify_correction_trend",
+    "export_correction_dashboard",
+    "recommend_correction_next_actions",
+    "render_correction_dashboard",
+    "render_correction_dashboard_markdown",
     "build_drill_plan",
     "build_drill_spot_from_hand",
     "classify_drill_category",
