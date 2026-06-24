@@ -160,6 +160,13 @@ tool relies on and the project's evolution.
   `export_correction_dashboard`. Summarises corrected / improving / persistent /
   new spots from the repeat-pack completion history; never changes the correct
   answers or the recommendation.
+- `app/correction_plan.py` — Local correction action plan:
+  `CorrectionPlanItem`, `CorrectionActionPlan`, `CorrectionPlanExport`, plus
+  `build_correction_action_plan`, `classify_plan_action_type`,
+  `build_recommended_command`, `render_correction_plan`,
+  `render_correction_plan_markdown`, and `export_correction_plan`. Turns the
+  correction dashboard into a prioritised plan with suggested existing commands;
+  never executes commands or changes the correct answers / recommendation.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -190,7 +197,7 @@ tool relies on and the project's evolution.
   `report`, and `dashboard` subcommands, plus `drill` (with `--save` /
   `--review`) and `review-queue` and `practice-pack` (with `--complete` /
   `--progress`) and `repeat-pack` (with `--complete` / `--progress`) and
-  `correction-dashboard`; `odds`/`coach --show-odds` accept
+  `correction-dashboard` and `correction-plan`; `odds`/`coach --show-odds` accept
   `--explain-ev` and `ev-review` accepts `--explain` / `--large-gaps-only`).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
@@ -1502,7 +1509,7 @@ stores no sensitive data, keeps files under the git-ignored
 `.blackjack_coach/repeat_packs` tree (unless a `--repeat-dir` is given), and uses
 no external dependencies, network, cloud, or database.
 
-### v1.28.0 — Missed-Spot Correction Dashboard (current)
+### v1.28.0 — Missed-Spot Correction Dashboard (done)
 
 Builds on the v1.27.0 repeat-pack completion history. The history recorded
 corrected vs still-missed spots; v1.28.0 turns that into a clear local dashboard
@@ -1533,6 +1540,36 @@ completion history. Per `PROJECT_RULES.md` it stores no sensitive data, keeps
 exported files under the git-ignored `.blackjack_coach/reports` tree (unless an
 `--output` path is given), and uses no external dependencies, network, cloud, or
 database.
+
+### v1.29.0 — Correction Action Plan (current)
+
+Builds on the v1.28.0 correction dashboard. The dashboard showed correction
+status; v1.29.0 turns it into a prioritised, command-by-command action plan so
+the user knows exactly what to run next. It is read-only, never executes
+commands, and never changes play.
+
+Delivered:
+
+- **`app/correction_plan.py`**: `CorrectionPlanItem`, `CorrectionActionPlan`,
+  and `CorrectionPlanExport`, plus `build_correction_action_plan` (priority
+  PERSISTENT_MISS -> IMPROVING -> NEW -> CORRECTED; `focus` all / urgent /
+  persistent / improving / new / maintenance), `classify_plan_action_type`,
+  `build_recommended_command` (safe existing commands only),
+  `render_correction_plan`, `render_correction_plan_markdown` (a checklist), and
+  `export_correction_plan`.
+- **CLI**: new `correction-plan` command with `--profile`, `--limit`,
+  `--repeat-dir`, `--focus`, `--markdown`, `--export`, and `--output`.
+- **Tests**: new `tests/test_correction_plan.py` and `TestCliCorrectionPlan` in
+  `tests/test_cli.py`.
+
+**Limits / honesty:** the correction action plan is local and read-only and only
+suggests practice - it never executes any command. It does not duplicate strategy
+logic (it reads the correction dashboard / repeat-pack progress and references
+existing commands) and never changes `strategy_engine.recommend`, the Hi-Lo math,
+or any upstream feature module. Per `PROJECT_RULES.md` it stores no sensitive
+data, keeps exported files under the git-ignored `.blackjack_coach/reports` tree
+(unless an `--output` path is given), and uses no external dependencies,
+network, cloud, or database.
 
 ### v2.0 — Possible Web UI (if decided later)
 

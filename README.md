@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.28.0 feature summary
+## v1.29.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -157,6 +157,11 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   **persistent misses**, or **new**, with per-spot accuracy and concrete
   next-practice priorities. Print it, show it as Markdown, or `--export` it.
   Local and read-only; it never changes the correct answers or the
+  recommendation.
+- **Correction action plan** (v1.29.0): `correction-plan` turns the correction
+  dashboard into a prioritised plan - urgent repeats, focused review, data
+  collection, and maintenance - each with a suggested existing command (never
+  executed). Local and read-only; it never changes the correct answers or the
   recommendation.
 
 ## EV Snapshot History & Review (v1.17.0)
@@ -488,6 +493,30 @@ and `--repeat-dir` points at a custom completion folder. With no saved repeat
 completions it says so clearly, and it is useful even with a single record. The
 dashboard stores no sensitive data and is never committed.
 
+## Correction Action Plan (v1.29.0)
+
+`correction-plan` turns the missed-spot correction dashboard (v1.28.0) into a
+concrete, prioritised plan: which spots to **repeat urgently**, which to
+**review**, which need **more data**, and which only need **maintenance** - each
+with a suggested existing command. It never executes any command and never
+changes the correct answers or the recommendation.
+
+```bash
+blackjack-coach correction-plan
+blackjack-coach correction-plan --focus urgent
+blackjack-coach correction-plan --profile SIX_DECK_H17_DAS_LS
+blackjack-coach correction-plan --markdown
+blackjack-coach correction-plan --export --output correction_plan.md
+```
+
+`--focus` is one of `all` / `urgent` / `persistent` / `improving` / `new` /
+`maintenance`; `--profile` / `--limit` scope the data; `--markdown` prints a
+Markdown checklist; `--export` (with optional `--output`) saves it under
+`./.blackjack_coach/reports`; and `--repeat-dir` points at a custom completion
+folder. Priority order: persistent misses, then improving, then new, then
+corrected. With no saved repeat completions it says so clearly. The plan only
+shows suggested commands - you run them yourself - and stores no sensitive data.
+
 ## Terminal visual polish (v1.1.0)
 
 v1.1.0 makes the CLI clearer and more pleasant to practise with. Output now has
@@ -597,6 +626,8 @@ blackjack-coach repeat-pack --complete
 blackjack-coach repeat-pack --progress
 blackjack-coach correction-dashboard
 blackjack-coach correction-dashboard --markdown
+blackjack-coach correction-plan
+blackjack-coach correction-plan --focus urgent
 ```
 
 Without installing, run it as a module from the repository root:

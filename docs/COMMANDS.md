@@ -1048,6 +1048,42 @@ The dashboard is local practice only - it stores no sensitive data, never
 changes the correct answers or the strategy recommendation, and is never
 committed.
 
+## Correction action plan (v1.29.0)
+
+### correction-plan
+
+```bash
+blackjack-coach correction-plan
+blackjack-coach correction-plan --focus urgent
+blackjack-coach correction-plan --profile SIX_DECK_H17_DAS_LS
+blackjack-coach correction-plan --markdown
+blackjack-coach correction-plan --export --output correction_plan.md
+```
+
+Turns the correction dashboard into a prioritised action plan: urgent repeats
+(persistent misses), focused review (improving), data collection (new), and
+maintenance (corrected) - each with a suggested existing command that you run
+yourself. Priority order: PERSISTENT_MISS, then IMPROVING, then NEW, then
+CORRECTED.
+
+Flags:
+
+- `--profile <KEY>` - scope the plan to one rule profile.
+- `--limit N` - use only the most recent N repeat-pack completions.
+- `--repeat-dir <path>` - repeat-pack completion directory (default
+  `./.blackjack_coach/repeat_packs`).
+- `--focus all|urgent|persistent|improving|new|maintenance` - which actions to
+  include (default `all`).
+- `--markdown` - print a Markdown checklist instead of text.
+- `--export` / `--output <path>` - save a Markdown file (default under
+  `./.blackjack_coach/reports`) and print the path.
+
+The plan **never executes** any suggested command - it only shows it. With no
+saved repeat completions it prints "No correction history yet. Use repeat-pack
+--complete first." It is local practice only - it stores no sensitive data,
+never changes the correct answers or the strategy recommendation, and is never
+committed.
+
 
 
 
