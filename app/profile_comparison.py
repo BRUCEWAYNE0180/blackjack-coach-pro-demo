@@ -66,6 +66,14 @@ class ComparisonSummary:
     highest_push_name: str | None = None
     most_difficult_key: str | None = None
     most_difficult_name: str | None = None
+    # Net demo units (profitability proxy, not win %).
+    best_units_key: str | None = None
+    best_units_name: str | None = None
+    worst_units_key: str | None = None
+    worst_units_name: str | None = None
+    # Set when the profile that wins the most hands is NOT the one with the
+    # best net units (i.e. fewer wins can still mean fewer units lost).
+    units_beats_winrate_note: str | None = None
 
 
 def _dedupe_preserving_order(keys: list[str]) -> list[str]:
@@ -110,9 +118,12 @@ def compare_profiles(
 def summarize_comparison(rows: list[ProfileComparisonRow]) -> ComparisonSummary:
     """Pick the friendliest / hardest profiles from a comparison.
 
-    "Most favorable" is the highest simulated win rate; "most difficult" is the
-    highest simulated loss rate. These describe the local demo only and never
-    claim a real-world edge or any guaranteed outcome.
+    "Most favorable" is the highest simulated win rate and "most difficult" is
+    the highest simulated loss rate, while ``best_units`` / ``worst_units`` rank
+    by net demo units (a profitability proxy). Win % and net units can disagree,
+    so a note is set when the most-winning profile is not the best by units.
+    These describe the local demo only and never claim a real-world edge or any
+    guaranteed outcome.
     """
     if not rows:
         return ComparisonSummary()
@@ -121,6 +132,17 @@ def summarize_comparison(rows: list[ProfileComparisonRow]) -> ComparisonSummary:
     lowest_loss = min(rows, key=lambda r: r.result.loss_rate)
     highest_push = max(rows, key=lambda r: r.result.push_rate)
     most_difficult = max(rows, key=lambda r: r.result.loss_rate)
+    best_units = max(rows, key=lambda r: r.result.units_per_100)
+    worst_units = min(rows, key=lambda r: r.result.units_per_100)
+
+    units_note = None
+    if len(rows) > 1 and best_units.profile_key != most_favorable.profile_key:
+        units_note = (
+            f"{most_favorable.profile_name} wins the most hands, but "
+            f"{best_units.profile_name} has the best net units - winning more "
+            "hands does not always mean losing fewer units."
+        )
+
     return ComparisonSummary(
         most_favorable_key=most_favorable.profile_key,
         most_favorable_name=most_favorable.profile_name,
@@ -130,4 +152,9 @@ def summarize_comparison(rows: list[ProfileComparisonRow]) -> ComparisonSummary:
         highest_push_name=highest_push.profile_name,
         most_difficult_key=most_difficult.profile_key,
         most_difficult_name=most_difficult.profile_name,
+        best_units_key=best_units.profile_key,
+        best_units_name=best_units.profile_name,
+        worst_units_key=worst_units.profile_key,
+        worst_units_name=worst_units.profile_name,
+        units_beats_winrate_note=units_note,
     )

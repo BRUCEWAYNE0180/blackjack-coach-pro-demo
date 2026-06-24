@@ -779,6 +779,42 @@ def _render_table_simulation(profile_key: str) -> None:
     sim_g.metric("Doubles", result.doubles)
     sim_h.metric("Followed coach", f"{result.followed_coach_pct:.0f}%")
 
+    # Net demo units answer "am I really negative, or just losing more hands?"
+    st.markdown("**Net demo units (profitability proxy, not win %):**")
+    unit_a, unit_b, unit_c = st.columns(3)
+    unit_a.metric("Net units", f"{result.net_units:+.1f}")
+    unit_b.metric("Units / 100 hands", f"{result.units_per_100:+.2f}")
+    unit_c.metric("Avg units / hand", f"{result.avg_units_per_hand:+.3f}")
+    st.caption(
+        "1-unit base hand: WIN +1, LOSS -1, PUSH 0, SURRENDER -0.5, DOUBLE "
+        "+/-2; a split sums +/-1 per sub-hand. "
+        + practice_table.BLACKJACK_PAYOUT_NOTE)
+
+    # Loss audit: were the lost hands correct (followed coach) or mistakes?
+    if result.losses:
+        st.markdown("**Loss audit (why hands were lost):**")
+        loss_a, loss_b, loss_c = st.columns(3)
+        loss_a.metric("Correct losses", result.correct_losses)
+        loss_b.metric("Mistake losses", result.mistake_losses)
+        loss_c.metric("Player busts", result.bust_losses)
+        loss_d, loss_e, loss_f = st.columns(3)
+        loss_d.metric("Dealer made a hand", result.dealer_made_hand_losses)
+        loss_e.metric("Double losses", result.double_losses)
+        loss_f.metric("Surrender losses", result.surrender_losses)
+        st.caption(
+            "Correct losses followed the coach but still lost - that is normal "
+            "variance, not a mistake.")
+
+    sanity_note = practice_table.coach_sanity_note(result)
+    if practice_table.coach_sanity_ok(result):
+        st.success(sanity_note)
+    else:
+        st.warning(sanity_note)
+
+    st.markdown("**Why the dealer wins more hands than the player:**")
+    for note in practice_table.DEALER_EDGE_NOTES:
+        st.markdown(f"- {note}")
+
     interpretation = practice_table.simulation_interpretation(result)
     if practice_table.simulation_looks_plausible(result):
         st.success(interpretation)
@@ -858,9 +894,18 @@ def _render_profile_comparison(default_profile_key: str) -> None:
             "Loss %": f"{row.result.loss_rate * 100:.1f}%",
             "Pushes": row.result.pushes,
             "Push %": f"{row.result.push_rate * 100:.1f}%",
+            "Net units": f"{row.result.net_units:+.1f}",
+            "Units / 100 hands": f"{row.result.units_per_100:+.2f}",
+            "Avg units / hand": f"{row.result.avg_units_per_hand:+.3f}",
             "Busts": row.result.busts,
             "Surrenders": row.result.surrenders,
             "Doubles": row.result.doubles,
+            "Correct losses": row.result.correct_losses,
+            "Mistake losses": row.result.mistake_losses,
+            "Bust losses": row.result.bust_losses,
+            "Dealer-made-hand losses": row.result.dealer_made_hand_losses,
+            "Double losses": row.result.double_losses,
+            "Surrender losses": row.result.surrender_losses,
             "Followed coach %": f"{row.result.followed_coach_pct:.0f}%",
             "Plausibility": "plausible" if row.plausible else "unusual",
         }
@@ -868,15 +913,40 @@ def _render_profile_comparison(default_profile_key: str) -> None:
     ]
     st.dataframe(
         pd.DataFrame(table_data), use_container_width=True, hide_index=True)
+    st.caption(
+        "Net demo units use a 1-unit base hand: WIN +1, LOSS -1, PUSH 0, "
+        "SURRENDER -0.5, DOUBLE +/-2; a split sums +/-1 per sub-hand. "
+        + practice_table.BLACKJACK_PAYOUT_NOTE)
 
     summary = st.session_state.table_compare_summary
     if summary is not None and summary.most_favorable_key is not None:
         st.markdown("**Summary (local demo behaviour only):**")
         st.markdown(
-            f"- Most favorable by win %: **{summary.most_favorable_name}**")
+            f"- Most favorable by net units: **{summary.best_units_name}**")
+        st.markdown(
+            f"- Most difficult by net units: **{summary.worst_units_name}**")
+        st.markdown(f"- Best win %: **{summary.most_favorable_name}**")
         st.markdown(f"- Lowest loss %: **{summary.lowest_loss_name}**")
         st.markdown(f"- Highest push %: **{summary.highest_push_name}**")
-        st.markdown(f"- Most difficult profile: **{summary.most_difficult_name}**")
+        st.markdown(
+            f"- Most difficult by loss %: **{summary.most_difficult_name}**")
+        if summary.units_beats_winrate_note:
+            st.info(summary.units_beats_winrate_note)
+
+    # Coach sanity check (auto-play must follow the coach 100%).
+    worst_sanity = min(
+        (row.result for row in rows),
+        key=lambda res: res.followed_coach_pct, default=None)
+    if worst_sanity is not None:
+        sanity_note = practice_table.coach_sanity_note(worst_sanity)
+        if practice_table.coach_sanity_ok(worst_sanity):
+            st.success(sanity_note)
+        else:
+            st.warning(sanity_note)
+
+    st.markdown("**Why the dealer wins more hands than the player:**")
+    for note in practice_table.DEALER_EDGE_NOTES:
+        st.markdown(f"- {note}")
 
     st.markdown("**What rule differences usually mean:**")
     for note in profile_comparison.RULE_COMPARISON_NOTES:

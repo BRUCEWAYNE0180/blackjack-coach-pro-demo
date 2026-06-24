@@ -747,7 +747,7 @@ class TestProfileComparison:
         assert [r.profile_key for r in rows] == selection
         # A summary and educational notes are rendered after a comparison.
         markdowns = _markdowns(at)
-        assert any("Most favorable by win %" in m for m in markdowns)
+        assert any("Most favorable by net units" in m for m in markdowns)
 
     def test_empty_selection_warns_not_breaks(self):
         at = _fresh()
@@ -757,3 +757,51 @@ class TestProfileComparison:
         _assert_clean(at)
         warnings = [w.value for w in at.warning]
         assert any("at least one" in w.lower() for w in warnings)
+
+
+
+class TestProfileComparisonNetUnits:
+    """v2.5.0 follow-up: net units, loss audit and coach sanity in the UI."""
+
+    def test_comparison_shows_net_unit_summary(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        at.multiselect(key="compare_profiles_select").set_value(
+            ["MULTI_DECK_H17_DAS_LS", "EIGHT_DECK_H17_DAS_LS"]).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        markdowns = _markdowns(at)
+        assert any("Most favorable by net units" in m for m in markdowns)
+        assert any("Most difficult by net units" in m for m in markdowns)
+        # The dealer-edge explanation is shown.
+        assert any("dealer wins more hands" in m.lower() for m in markdowns)
+
+    def test_comparison_rows_have_unit_and_audit_data(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.select_slider(key="compare_rounds").set_value(100).run()
+        at.multiselect(key="compare_profiles_select").set_value(
+            ["MULTI_DECK_H17_DAS_LS"]).run()
+        at.button(key="compare_run").click().run()
+        _assert_clean(at)
+        rows = at.session_state["table_compare_rows"]
+        res = rows[0].result
+        assert res.correct_losses + res.mistake_losses == res.losses
+        mechanism = (
+            res.bust_losses + res.dealer_made_hand_losses
+            + res.double_losses + res.surrender_losses + res.split_losses)
+        assert mechanism == res.losses
+
+    def test_single_sim_panel_shows_net_units_and_audit(self):
+        at = _fresh()
+        _enter_practice_table(at)
+        at.button(key="sim_run_100").click().run()
+        _assert_clean(at)
+        markdowns = _markdowns(at)
+        assert any("Net demo units" in m for m in markdowns)
+        # Loss audit appears when there are losses (100 hands always has some).
+        assert any("Loss audit" in m for m in markdowns)
+        # Coach sanity is surfaced.
+        successes = [s.value for s in at.success]
+        assert any("coach sanity ok" in s.lower() for s in successes)

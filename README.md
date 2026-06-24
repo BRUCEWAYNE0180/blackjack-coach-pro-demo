@@ -210,7 +210,11 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   profile**. It shows a comparison table (wins/losses/pushes counts + %, busts,
   surrenders, doubles, followed-coach % = 100%, plausibility) plus a summary
   (most favorable by win %, lowest loss %, highest push %, most difficult) and
-  educational notes (S17 vs H17, DAS, late surrender). Local/demo study only: no
+  educational notes (S17 vs H17, DAS, late surrender). It also reports **net
+  demo units** (units / 100 hands, avg units / hand), a **loss audit** (correct
+  vs mistake losses; bust / dealer-made-hand / double / surrender losses), and a
+  **coach sanity check** so you can see whether you are really negative or just
+  losing more hands. Local/demo study only: no
   money, bankroll, EV-as-decision, casino, network, camera, or scraping, and
   more wins does not always mean better EV.
 
@@ -757,6 +761,28 @@ difficult** profile (highest simulated loss rate), followed by educational notes
 S17 (dealer stands on soft 17) is usually friendlier than H17; double-after-split
 (DAS) usually helps a little; late surrender can reduce losses on the worst
 hands; and **more wins does not always mean better EV**.
+
+### Net demo units, loss audit, and coach sanity (v2.5.0)
+
+Win % alone does not answer "am I really negative, or just losing more hands?",
+so the simulation also reports **net demo units** using a 1-unit base hand
+(WIN +1, LOSS -1, PUSH 0, SURRENDER -0.5, DOUBLE +/-2; a split sums +/-1 per
+sub-hand). Natural blackjack is **not** paid 3:2 in the demo (it scores as a
+normal +1 win). The comparison table adds **Net units**, **Units / 100 hands**
+and **Avg units / hand**, and the summary adds the **best / worst profile by net
+units** plus a note when the most-winning profile is not the best by units.
+
+A **loss audit** explains *why* hands were lost, two consistent ways: by quality
+(**correct losses** - the auto-player followed the coach but still lost, vs
+**mistake losses**) and by mechanism (**bust**, **dealer made a hand**,
+**double**, **surrender**, split) - each set sums to the total losses. Because
+auto-play always follows the coach, mistake losses are 0 and every loss is a
+correct loss (normal variance, not an error). A **coach sanity check** confirms
+the auto-play followed the coach on 100% of initial decisions and kept the frozen
+initial recommendation separate from the recalculated current one. An
+educational note explains that the dealer wins more hands because the player acts
+first (and can bust before the dealer draws), and that win % is not the same as
+profitability.
 
 Every comparison is **deterministic for a fixed seed**, the per-profile counts
 always sum to the total hands, and one or many profiles can be compared. The

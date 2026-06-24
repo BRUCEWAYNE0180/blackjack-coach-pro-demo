@@ -465,6 +465,15 @@ As of v0.9 the project enforces these gates on every change:
   Streamlit-free; it must involve no money, bankroll, real betting, casino
   connectivity, camera, screen reading, scraping, external API, database, or
   login, and the CLI must keep working unchanged.
+- **Net demo units and the loss audit are demo-only study aids, never profit.**
+  The v2.5.0 net-units accounting (1-unit base hand, DOUBLE +/-2, SURRENDER
+  -0.5), loss audit (correct vs mistake losses; bust / dealer-made-hand /
+  double / surrender losses) and coach sanity check are computed only from the
+  local auto-play simulation. They must **never be presented as real-world
+  profit, EV guidance, or a guarantee**, must not introduce money, bankroll, or
+  bets, and must keep decision quality separate from outcome (a correct decision
+  that loses is a correct loss, not a mistake). Natural blackjack is not paid
+  3:2 in the demo and this limitation must be stated, not hidden.
 
 ## 8. Release Rules
 

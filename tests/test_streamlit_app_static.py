@@ -273,15 +273,57 @@ class TestStreamlitAppV25ProfileComparison:
 
     def test_shows_summary_highlights(self):
         source = _source()
-        assert "Most favorable by win %" in source
+        assert "Best win %" in source
         assert "Lowest loss %" in source
         assert "Highest push %" in source
-        assert "Most difficult profile" in source
+        assert "Most difficult by loss %" in source
 
     def test_has_educational_message(self):
         source = _source()
         assert "does not predict profit" in source
         assert "more wins does not always mean better EV" in source
+
+
+class TestStreamlitAppV25NetUnitsAndLossAudit:
+    """v2.5.0 follow-up: net demo units, loss audit, coach sanity."""
+
+    def test_table_has_net_unit_columns(self):
+        source = _source()
+        assert "Net units" in source
+        assert "Units / 100 hands" in source
+        assert "Avg units / hand" in source
+
+    def test_table_has_loss_audit_columns(self):
+        source = _source()
+        for label in ("Correct losses", "Mistake losses", "Bust losses",
+                      "Dealer-made-hand losses", "Double losses",
+                      "Surrender losses"):
+            assert label in source
+
+    def test_summary_has_net_unit_highlights(self):
+        source = _source()
+        assert "Most favorable by net units" in source
+        assert "Most difficult by net units" in source
+
+    def test_uses_net_unit_and_audit_fields(self):
+        source = _source()
+        assert "net_units" in source
+        assert "units_per_100" in source
+        assert "avg_units_per_hand" in source
+        assert "correct_losses" in source
+        assert "dealer_made_hand_losses" in source
+
+    def test_has_dealer_edge_explanation(self):
+        source = _source()
+        assert "DEALER_EDGE_NOTES" in source
+
+    def test_has_blackjack_payout_note(self):
+        assert "BLACKJACK_PAYOUT_NOTE" in _source()
+
+    def test_has_coach_sanity_check(self):
+        source = _source()
+        assert "coach_sanity_note" in source
+        assert "coach_sanity_ok" in source
 
 
 class TestStreamlitAppNoExternalCapture:

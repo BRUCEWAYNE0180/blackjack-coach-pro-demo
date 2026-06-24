@@ -73,6 +73,22 @@ class TestCompareProfiles:
             assert isinstance(row.plausible, bool)
             assert row.interpretation
 
+    def test_rows_carry_net_units_and_loss_audit(self):
+        rows = profile_comparison.compare_profiles(TWO, rounds=300, seed=42)
+        for row in rows:
+            res = row.result
+            # Net-unit accessors are present and internally consistent.
+            assert isinstance(res.net_units, float)
+            assert res.units_per_100 == pytest.approx(
+                res.net_units / res.rounds * 100)
+            # Loss audit sums both ways.
+            assert res.correct_losses + res.mistake_losses == res.losses
+            mechanism = (
+                res.bust_losses + res.dealer_made_hand_losses
+                + res.double_losses + res.surrender_losses + res.split_losses)
+            assert mechanism == res.losses
+            assert res.followed_coach_pct == 100.0
+
 
 class TestSummarizeComparison:
     def test_empty_summary_is_safe(self):
@@ -107,6 +123,48 @@ class TestSummarizeComparison:
         summary = profile_comparison.summarize_comparison(rows)
         assert summary.most_favorable_key == "MULTI_DECK_H17_DAS_LS"
         assert summary.most_difficult_key == "MULTI_DECK_H17_DAS_LS"
+        # Net-unit highlights also resolve for a single profile.
+        assert summary.best_units_key == "MULTI_DECK_H17_DAS_LS"
+        assert summary.worst_units_key == "MULTI_DECK_H17_DAS_LS"
+
+    def test_picks_best_and_worst_by_net_units(self):
+        def row(key, wins, losses, pushes, net_units):
+            res = practice_table.SimulationResult(
+                rounds=wins + losses + pushes, wins=wins, losses=losses,
+                pushes=pushes, net_units=net_units)
+            return profile_comparison.ProfileComparisonRow(
+                profile_key=key, profile_name=key, result=res,
+                plausible=True, interpretation="ok")
+
+        rows = [
+            row("WINS_MORE", 50, 45, 5, -8.0),   # most wins, but worse units
+            row("BETTER_UNITS", 44, 48, 8, +3.0),  # fewer wins, better units
+        ]
+        summary = profile_comparison.summarize_comparison(rows)
+        assert summary.most_favorable_key == "WINS_MORE"   # by win %
+        assert summary.best_units_key == "BETTER_UNITS"    # by net units
+        assert summary.worst_units_key == "WINS_MORE"
+        # The note flags that more wins != fewer units lost.
+        assert summary.units_beats_winrate_note is not None
+        assert "does not always" in summary.units_beats_winrate_note
+
+    def test_no_units_note_when_winrate_matches_units(self):
+        def row(key, wins, losses, pushes, net_units):
+            res = practice_table.SimulationResult(
+                rounds=wins + losses + pushes, wins=wins, losses=losses,
+                pushes=pushes, net_units=net_units)
+            return profile_comparison.ProfileComparisonRow(
+                profile_key=key, profile_name=key, result=res,
+                plausible=True, interpretation="ok")
+
+        rows = [
+            row("BEST", 50, 45, 5, +5.0),
+            row("WORST", 40, 55, 5, -10.0),
+        ]
+        summary = profile_comparison.summarize_comparison(rows)
+        assert summary.most_favorable_key == "BEST"
+        assert summary.best_units_key == "BEST"
+        assert summary.units_beats_winrate_note is None
 
 
 class TestEducationalNotesAndSafety:

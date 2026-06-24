@@ -1293,3 +1293,29 @@ study aid only: it uses no money, bankroll, EV as the decision, real betting,
 casino connectivity, network, camera, screen reading, or scraping, never claims
 a real-world edge or guaranteed result, and never changes
 `strategy_engine.recommend`, the Hi-Lo math, the coach decisions, or the CLI.
+
+
+### Net demo units, loss audit & coach sanity (v2.5.0)
+
+Win % alone does not show whether you are really negative, so the simulation
+(both the single-profile sanity panel and the comparison table) also reports
+**net demo units**. Units use a 1-unit base hand: WIN +1, LOSS -1, PUSH 0,
+SURRENDER -0.5, DOUBLE +/-2, and a split sums +/-1 per sub-hand. Natural
+blackjack is not paid 3:2 in the demo (it scores as a normal +1 win). The table
+shows **Net units**, **Units / 100 hands** and **Avg units / hand**, and the
+summary adds the **best / worst profile by net units** with a note when the
+most-winning profile is not the best by units (more wins does not always mean
+fewer units lost).
+
+A **loss audit** explains why hands were lost, two consistent ways: by quality
+(**correct losses** - followed the coach but lost - vs **mistake losses**) and
+by mechanism (**bust**, **dealer made a hand**, **double**, **surrender**,
+split). Each set sums to the total losses. Because auto-play always follows the
+coach, mistake losses are 0 and every loss is a correct loss (normal variance,
+not an error). A **coach sanity check** confirms auto-play followed the coach on
+100% of initial decisions and kept the frozen initial recommendation separate
+from the recalculated current one. The helpers `round_units`, `loss_mechanism`,
+`coach_sanity_ok` and `coach_sanity_note` live in the Streamlit-free
+`app/practice_table.py`. Still local/demo only: no money, bankroll, EV as the
+decision, casino, network, camera, screen reading or scraping, and no profit
+prediction or guarantee.

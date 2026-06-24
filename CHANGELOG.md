@@ -43,6 +43,31 @@ all unchanged.
   educational notes (S17 vs H17, DAS, late surrender, more wins != better EV),
   and a reminder that the comparison does not predict profit or guarantee
   results.
+- **Net demo units, loss audit, and a coach sanity check** so the comparison
+  answers "am I really negative, or just losing more hands?":
+  - `SimulationResult` now also reports **net demo units** (1-unit base hand:
+    WIN +1, LOSS -1, PUSH 0, SURRENDER -0.5, DOUBLE +/-2, and a split sums
+    +/-1 per sub-hand), with `units_per_100` and `avg_units_per_hand`
+    properties. Natural blackjack is **not** paid 3:2 (`BLACKJACK_PAYOUT_NOTE`).
+  - A **loss audit** splits losses two consistent ways: by quality
+    (`correct_losses` = followed the coach but lost, vs `mistake_losses`) and by
+    mechanism (`bust_losses` + `dealer_made_hand_losses` + `double_losses` +
+    `surrender_losses` + `split_losses`); each dimension sums to the total
+    losses. New pure helpers `round_units(state)` and `loss_mechanism(state)`.
+  - A **coach sanity check** (`followed_coach_rounds`, `coach_deviations`,
+    `coach_sanity_ok`, `coach_sanity_note`) confirms auto-play follows the coach
+    100% of the time and keeps the frozen initial recommendation separate from
+    the recalculated current one.
+  - `ComparisonSummary` adds **best / worst profile by net units** and a note
+    when the most-winning profile is not the best by units (more wins != fewer
+    units lost). New `DEALER_EDGE_NOTES` explain why the dealer wins more hands
+    (the player acts first and can bust first) and that win % is not
+    profitability.
+  - The web comparison table adds **Net units, Units / 100 hands, Avg units /
+    hand, Correct losses, Mistake losses, Bust losses, Dealer-made-hand losses,
+    Double losses, Surrender losses** columns; the summary adds the net-unit
+    highlights; and the single-profile sanity panel now also shows net units, a
+    loss audit, the coach sanity note, and the dealer-edge explanation.
 
 ### Notes
 

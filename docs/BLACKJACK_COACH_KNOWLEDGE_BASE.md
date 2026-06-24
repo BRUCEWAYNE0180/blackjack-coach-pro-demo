@@ -1789,6 +1789,29 @@ Delivered:
   selection, educational notes, no-external-capture), plus extended streamlit
   static / interaction tests; `--version` assertions updated to 2.5.0.
 
+Net-units / loss-audit / coach-sanity follow-up (same version, so win % is not
+the only answer to "am I really negative?"):
+
+- **Net demo units** on `SimulationResult` (1-unit base hand: WIN +1, LOSS -1,
+  PUSH 0, SURRENDER -0.5, DOUBLE +/-2; a split sums +/-1 per sub-hand; natural
+  blackjack is not paid 3:2 - `BLACKJACK_PAYOUT_NOTE`), with `units_per_100` /
+  `avg_units_per_hand`, plus pure helpers `round_units(state)` and
+  `loss_mechanism(state)`.
+- **Loss audit** that sums two consistent ways: by quality (`correct_losses`
+  vs `mistake_losses`) and by mechanism (`bust_losses`,
+  `dealer_made_hand_losses`, `double_losses`, `surrender_losses`,
+  `split_losses`). Auto-play follows the coach, so mistake losses are 0.
+- **Coach sanity** (`followed_coach_rounds`, `coach_deviations`,
+  `coach_sanity_ok`, `coach_sanity_note`) verifying the auto-play follows the
+  coach 100% and keeps the frozen initial recommendation separate from the
+  recalculated current one. `DEALER_EDGE_NOTES` explain why the dealer wins more
+  hands and that win % is not profitability.
+- `ComparisonSummary` adds best/worst-by-net-units and a "more wins != fewer
+  units" note; the web comparison table and the single-profile sanity panel
+  render net units, the loss audit, and the coach-sanity note. Tests cover unit
+  accounting for WIN/LOSS/PUSH/SURRENDER/DOUBLE, both loss-audit sums, net-unit
+  determinism, and the UI columns.
+
 **Architecture:** `app/profile_comparison.py` is the testable, Streamlit-free
 comparison layer over `app.practice_table.simulate_following_coach`;
 `web/streamlit_app.py` only renders. `strategy_engine.recommend`, the Hi-Lo math,
