@@ -698,11 +698,20 @@ finished round now shows:
   advice** - e.g. *"Next time: stand on hard 17 vs 6."* or *"Next time: split 8s
   vs 10 if split is allowed."*
 
-A **learning dashboard** summarises the session: total rounds, **followed-coach
-%**, **mistakes**, **correct decisions that still lost** (tracked as variance,
-not errors), **most common missed spots**, most common losing-but-correct spots,
-and the most repeated situations. Repeated mistakes produce **drill suggestions**
-(e.g. *"Practice hard 16 vs 10"*, *"Practice double spots"*).
+A **learning dashboard** summarises the session: total rounds, **Wins / Losses /
+Pushes counts and percentages**, **followed-coach %**, **mistakes**, **correct
+wins**, **correct decisions that still lost** (tracked as variance, not errors),
+**most common missed spots**, most common losing-but-correct spots, and the most
+repeated situations. Repeated mistakes produce **drill suggestions** (e.g.
+*"Practice hard 16 vs 10"*, *"Practice double spots"*). The counters are derived
+from the same session list as the history table, so they always match.
+
+A local **sanity simulation** (`app.practice_table.simulate_following_coach`)
+can auto-play many demo rounds following the coach and report WIN / LOSS / PUSH,
+to confirm the demo table resolves correctly (a seeded 1500-round run sits at
+roughly 42% win / 48% loss / 9% push - a player simply wins fewer than half of
+blackjack hands, so a losing-heavy short session is normal variance, not a bug).
+It involves no money, EV, casino, network, or scraping.
 
 The single most important rule: **decision quality is separate from the round
 outcome.** A correct decision that loses is never counted as a mistake, and a

@@ -660,13 +660,19 @@ def _render_table_history() -> None:
     st.caption(
         "Decision quality is tracked separately from the round outcome - a "
         "correct decision that loses is never counted as a mistake.")
-    col_a, col_b, col_c = st.columns(3)
+    col_a, col_b, col_c, col_d = st.columns(4)
     col_a.metric("Rounds", dashboard.total_rounds)
-    col_b.metric("Followed coach", f"{dashboard.followed_coach_pct:.0f}%")
-    col_c.metric("Mistakes", dashboard.mistakes)
-    col_d, col_e = st.columns(2)
-    col_d.metric("Correct but lost", dashboard.correct_but_lost)
-    col_e.metric("Different but won", dashboard.different_but_won)
+    col_b.metric("Wins", f"{dashboard.wins} ({dashboard.win_pct:.0f}%)")
+    col_c.metric("Losses", f"{dashboard.losses} ({dashboard.loss_pct:.0f}%)")
+    col_d.metric("Pushes", f"{dashboard.pushes} ({dashboard.push_pct:.0f}%)")
+    col_e, col_f, col_g, col_h = st.columns(4)
+    col_e.metric("Followed coach", f"{dashboard.followed_coach_pct:.0f}%")
+    col_f.metric("Mistakes", dashboard.mistakes)
+    col_g.metric("Correct wins", dashboard.correct_wins)
+    col_h.metric("Correct losses", dashboard.correct_but_lost)
+    st.caption(
+        f"Different from coach but won: {dashboard.different_but_won} "
+        "(a win is not automatically a good habit).")
 
     if dashboard.most_common_missed_spots:
         st.markdown("**Most common missed spots (mistakes):**")

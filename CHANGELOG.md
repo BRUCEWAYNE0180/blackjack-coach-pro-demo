@@ -43,6 +43,18 @@ unchanged.
   different-but-won counts, the most common missed / losing-correct / repeated
   spots, and drill suggestions; the session history table shows per-round spot /
   coach / action / followed / outcome / conclusion.
+- **Result counters + sanity simulation.** The Learning dashboard now also shows
+  clear **Wins / Losses / Pushes counts and percentages** alongside followed
+  coach %, mistakes, **correct wins**, and correct losses (all derived from the
+  same session list, so they always match the history table). New
+  `app/practice_table.simulate_following_coach` (+ `SimulationResult`) auto-plays
+  many demo rounds following the *current* coach recommendation and reports
+  WIN / LOSS / PUSH - a local sanity check (no money, EV, casino, network, or
+  scraping) to catch a broken table (bad dealer play, mis-counted outcome,
+  mishandled HIT/DOUBLE/STAND, mis-used hole card). A 1500-round seeded run sits
+  at roughly 42% win / 48% loss / 9% push, confirming the demo resolves
+  correctly; a player simply wins fewer than half of blackjack hands, so a
+  losing-heavy short session is normal variance, not a bug.
 
 ### Changed
 

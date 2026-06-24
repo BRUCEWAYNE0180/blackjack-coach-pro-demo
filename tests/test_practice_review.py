@@ -176,6 +176,30 @@ class TestLearningDashboard:
         assert dash.correct_but_lost == 1
         assert dash.different_but_won == 0
 
+    def test_outcome_counters(self):
+        # _mixed(): 2 mistakes (LOSS), 1 correct loss (LOSS), 1 correct win (WIN).
+        dash = build_learning_dashboard(self._mixed())
+        assert dash.wins == 1
+        assert dash.losses == 3
+        assert dash.pushes == 0
+        assert dash.win_pct == 25.0
+        assert dash.loss_pct == 75.0
+        assert dash.push_pct == 0.0
+        assert dash.correct_wins == 1
+        # Outcome counts always sum to the total rounds (counter integrity).
+        assert dash.wins + dash.losses + dash.pushes == dash.total_rounds
+
+    def test_counters_match_history_rows(self):
+        learnings = self._mixed()
+        dash = build_learning_dashboard(learnings)
+        # The dashboard counts must match what the history table would show.
+        assert dash.total_rounds == len(learnings)
+        from app.practice_review import learning_row
+        rows = [learning_row(entry) for entry in learnings]
+        assert dash.wins == sum(1 for r in rows if r["Outcome"] == "WIN")
+        assert dash.losses == sum(1 for r in rows if r["Outcome"] == "LOSS")
+        assert dash.pushes == sum(1 for r in rows if r["Outcome"] == "PUSH")
+
     def test_weak_spots_and_drills(self):
         dash = build_learning_dashboard(self._mixed())
         assert dash.most_common_missed_spots[0][1] == 2  # the repeated mistake

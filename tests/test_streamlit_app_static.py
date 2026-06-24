@@ -170,6 +170,14 @@ class TestStreamlitAppV24LearningReview:
         assert "learning.explanation" in source
         assert "next_time_advice" in source
 
+    def test_dashboard_has_outcome_counters(self):
+        # v2.4.0 follow-up: clear win/loss/push counters in the dashboard.
+        source = _source()
+        for label in ("Wins", "Losses", "Pushes", "Correct wins",
+                      "Correct losses"):
+            assert label in source
+        assert "win_pct" in source
+
     def test_player_and_dealer_pickers(self):
         source = _source()
         assert "Your hand" in source

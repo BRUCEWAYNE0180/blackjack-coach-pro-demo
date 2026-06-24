@@ -259,9 +259,16 @@ class LearningDashboard:
     """Aggregate learning statistics across a session's rounds."""
 
     total_rounds: int
+    wins: int
+    losses: int
+    pushes: int
+    win_pct: float
+    loss_pct: float
+    push_pct: float
     followed_coach: int
     followed_coach_pct: float
     mistakes: int
+    correct_wins: int
     correct_but_lost: int
     different_but_won: int
     most_common_missed_spots: tuple[tuple[str, int], ...]
@@ -271,13 +278,23 @@ class LearningDashboard:
     note: str = DECISION_VS_OUTCOME_NOTE
 
 
+def _pct(part: int, total: int) -> float:
+    return round(100.0 * part / total, 1) if total else 0.0
+
+
 def build_learning_dashboard(
     learnings: list[RoundLearning], top: int = 5, drill_min_count: int = 2,
 ) -> LearningDashboard:
     """Build the learning dashboard, keeping decision quality vs outcome apart."""
     total = len(learnings)
+    wins = sum(1 for entry in learnings if entry.outcome == "WIN")
+    losses = sum(1 for entry in learnings if entry.outcome == "LOSS")
+    pushes = sum(1 for entry in learnings if entry.outcome == "PUSH")
     followed = sum(1 for entry in learnings if entry.followed_coach)
     mistakes = total - followed
+    correct_wins = sum(
+        1 for entry in learnings
+        if entry.followed_coach and entry.outcome == "WIN")
     correct_but_lost = sum(
         1 for entry in learnings
         if entry.followed_coach and entry.outcome == "LOSS")
@@ -294,9 +311,16 @@ def build_learning_dashboard(
 
     return LearningDashboard(
         total_rounds=total,
+        wins=wins,
+        losses=losses,
+        pushes=pushes,
+        win_pct=_pct(wins, total),
+        loss_pct=_pct(losses, total),
+        push_pct=_pct(pushes, total),
         followed_coach=followed,
-        followed_coach_pct=round(100.0 * followed / total, 1) if total else 0.0,
+        followed_coach_pct=_pct(followed, total),
         mistakes=mistakes,
+        correct_wins=correct_wins,
         correct_but_lost=correct_but_lost,
         different_but_won=different_but_won,
         most_common_missed_spots=tuple(missed.most_common(top)),

@@ -22,6 +22,7 @@ This module imports no Streamlit and is fully unit-testable. It never changes
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass, field
 
 from .hand_evaluator import evaluate_hand
@@ -442,3 +443,65 @@ def describe_total(cards: list[str] | tuple[str, ...]) -> str:
     if ev.is_soft:
         return f"{ev.total} (soft)"
     return str(ev.total)
+
+
+@dataclass(frozen=True)
+class SimulationResult:
+    """Win/loss/push counts from an auto-played sanity simulation (no money)."""
+
+    rounds: int
+    wins: int
+    losses: int
+    pushes: int
+
+    @property
+    def win_rate(self) -> float:
+        return self.wins / self.rounds if self.rounds else 0.0
+
+    @property
+    def loss_rate(self) -> float:
+        return self.losses / self.rounds if self.rounds else 0.0
+
+    @property
+    def push_rate(self) -> float:
+        return self.pushes / self.rounds if self.rounds else 0.0
+
+
+def simulate_following_coach(
+    profile_key: str = DEFAULT_PROFILE.key,
+    rounds: int = 1000,
+    seed: int | None = None,
+) -> SimulationResult:
+    """Auto-play ``rounds`` demo rounds always following the *current* coach
+    recommendation, and report WIN / LOSS / PUSH counts.
+
+    A local sanity check only: it deals from its own simulated shoe and uses the
+    same dealing, dealer-play and outcome code as the interactive table, so a
+    grossly skewed result would reveal a bug (bad dealer play, mis-counted
+    outcome, mishandled HIT/DOUBLE/STAND, mis-used hole card, etc.). It involves
+    no money, bankroll, EV, casino, network, or scraping. Deterministic for a
+    given ``seed``.
+    """
+    profile = get_profile(profile_key)
+    rng = random.Random(seed)
+    shoe: list[str] = []
+    wins = losses = pushes = 0
+    for _ in range(max(0, rounds)):
+        if cards_remaining(shoe) < _RESHUFFLE_AT:
+            shoe = shuffle_shoe(build_shoe(profile.decks), seed=rng.randrange(2 ** 31))
+        player = [draw_card(shoe), draw_card(shoe)]
+        dealer = [draw_card(shoe), draw_card(shoe)]
+        state = build_table_state(profile_key, player, dealer, shoe)
+        while state.phase == PHASE_PLAYER:
+            action = state.current_coach_action or state.coach_action
+            if action not in legal_actions(state):
+                action = "STAND"
+            apply_action(state, action)
+        if state.outcome == "WIN":
+            wins += 1
+        elif state.outcome == "LOSS":
+            losses += 1
+        else:
+            pushes += 1
+    return SimulationResult(
+        rounds=wins + losses + pushes, wins=wins, losses=losses, pushes=pushes)
