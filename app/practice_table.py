@@ -453,6 +453,9 @@ class SimulationResult:
     wins: int
     losses: int
     pushes: int
+    busts: int = 0
+    surrenders: int = 0
+    doubles: int = 0
 
     @property
     def win_rate(self) -> float:
@@ -465,6 +468,11 @@ class SimulationResult:
     @property
     def push_rate(self) -> float:
         return self.pushes / self.rounds if self.rounds else 0.0
+
+    @property
+    def followed_coach_pct(self) -> float:
+        # The simulation always follows the coach, by construction.
+        return 100.0 if self.rounds else 0.0
 
 
 def simulate_following_coach(
@@ -486,6 +494,7 @@ def simulate_following_coach(
     rng = random.Random(seed)
     shoe: list[str] = []
     wins = losses = pushes = 0
+    busts = surrenders = doubles = 0
     for _ in range(max(0, rounds)):
         if cards_remaining(shoe) < _RESHUFFLE_AT:
             shoe = shuffle_shoe(build_shoe(profile.decks), seed=rng.randrange(2 ** 31))
@@ -503,5 +512,34 @@ def simulate_following_coach(
             losses += 1
         else:
             pushes += 1
+        if state.doubled:
+            doubles += 1
+        if state.surrendered:
+            surrenders += 1
+        if not state.was_split and evaluate_hand(state.player_cards).is_bust:
+            busts += 1
     return SimulationResult(
-        rounds=wins + losses + pushes, wins=wins, losses=losses, pushes=pushes)
+        rounds=wins + losses + pushes, wins=wins, losses=losses, pushes=pushes,
+        busts=busts, surrenders=surrenders, doubles=doubles)
+
+
+def simulation_looks_plausible(result: SimulationResult) -> bool:
+    """Return whether a simulation's WIN/LOSS/PUSH split looks like basic strategy.
+
+    Wide bounds (the player wins fewer than half of blackjack hands); used only
+    to surface a friendly interpretation, never to assert an exact rate.
+    """
+    if result.rounds < 1:
+        return True
+    return (
+        0.30 <= result.win_rate <= 0.52
+        and 0.38 <= result.loss_rate <= 0.60
+        and result.push_rate <= 0.22
+    )
+
+
+def simulation_interpretation(result: SimulationResult) -> str:
+    """Return a friendly interpretation message for a simulation result."""
+    if simulation_looks_plausible(result):
+        return "Simulation looks plausible; short losing streaks can be normal."
+    return "Result looks unusual; review table logic."

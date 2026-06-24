@@ -55,6 +55,19 @@ unchanged.
   at roughly 42% win / 48% loss / 9% push, confirming the demo resolves
   correctly; a player simply wins fewer than half of blackjack hands, so a
   losing-heavy short session is normal variance, not a bug.
+- **Auto-play simulation panel in the Web UI.** The sanity check is now visible
+  in the **Practice table (demo)** page as an *Auto-play simulation / Sanity
+  check* section: **Run 100** / **Run 1,000** auto-play buttons, an optional
+  **Seed** field (default 42, deterministic), and a loading spinner while it
+  runs. It uses the selected rule profile and the same local/demo logic, then
+  shows total hands, wins/losses/pushes counts + %, busts, surrenders, doubles,
+  followed-coach % (always 100%), an educational disclaimer (a local demo check
+  that does not predict profit or guarantee winnings), and an interpretation
+  ("Simulation looks plausible..." vs "Result looks unusual; review table
+  logic."). `SimulationResult` gained `busts` / `surrenders` / `doubles` and a
+  `followed_coach_pct` property, plus `simulation_looks_plausible` and
+  `simulation_interpretation` helpers. No money, bankroll, EV, casino, network,
+  camera, or scraping is involved.
 
 ### Changed
 

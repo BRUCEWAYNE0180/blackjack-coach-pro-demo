@@ -194,7 +194,13 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   errors, and shows a **learning dashboard** (follow-coach %, mistakes,
   correct-but-lost spots, most repeated situations). Decision quality is always
   kept separate from the round outcome - a correct decision that loses is never
-  counted as a mistake.
+  counted as a mistake. The dashboard also shows **Wins / Losses / Pushes counts
+  and percentages**, and an **Auto-play simulation / Sanity check** panel lets
+  you run **100** or **1,000** auto-played hands (optional fixed **Seed**, with a
+  spinner) following the coach to confirm the local table resolves correctly -
+  it reports wins/losses/pushes (+%), busts, surrenders, doubles and a
+  plausibility interpretation. It is a local demo check only: no money,
+  bankroll, EV, casino, network, camera, or scraping.
 
 ## EV Snapshot History & Review (v1.17.0)
 

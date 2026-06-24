@@ -268,6 +268,31 @@ class TestSimulationSanity:
         assert result.rounds == 0
         assert result.win_rate == 0.0
 
+    def test_extra_counters_are_consistent(self):
+        # busts / surrenders / doubles are non-negative and bounded by rounds.
+        result = pt.simulate_following_coach(PROFILE, rounds=400, seed=42)
+        assert 0 <= result.busts <= result.rounds
+        assert 0 <= result.surrenders <= result.rounds
+        assert 0 <= result.doubles <= result.rounds
+        # The simulation always follows the coach, by construction.
+        assert result.followed_coach_pct == 100.0
+
+    def test_followed_coach_pct_zero_rounds(self):
+        result = pt.simulate_following_coach(PROFILE, rounds=0, seed=1)
+        assert result.followed_coach_pct == 0.0
+
+    def test_plausible_simulation_interpretation(self):
+        result = pt.simulate_following_coach(PROFILE, rounds=1000, seed=42)
+        assert pt.simulation_looks_plausible(result) is True
+        assert "plausible" in pt.simulation_interpretation(result).lower()
+
+    def test_broken_distribution_flagged_unusual(self):
+        # An all-loss table (a clearly broken result) is flagged as unusual.
+        broken = pt.SimulationResult(
+            rounds=100, wins=0, losses=100, pushes=0)
+        assert pt.simulation_looks_plausible(broken) is False
+        assert "unusual" in pt.simulation_interpretation(broken).lower()
+
 
 class TestHelpersAndSafety:
     def test_describe_total(self):

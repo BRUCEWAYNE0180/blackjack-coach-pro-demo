@@ -104,6 +104,9 @@ def _init_state() -> None:
     # v2.3.0 practice-table (demo game) state.
     st.session_state.setdefault("table_state", None)
     st.session_state.setdefault("table_history", [])
+    # v2.4.0 auto-play simulation / sanity-check state.
+    st.session_state.setdefault("table_sim_result", None)
+    st.session_state.setdefault("table_sim_rounds", 0)
 
 
 def _add_player_card(rank: str) -> None:
@@ -228,6 +231,18 @@ def _table_action(action: str) -> None:
 
 def _clear_table_history() -> None:
     st.session_state.table_history = []
+
+
+def _table_run_simulation(profile_key: str, rounds: int, seed: int) -> None:
+    """Auto-play ``rounds`` demo hands following the coach; store the result.
+
+    Local sanity check only - reuses the same dealing / dealer-play / outcome
+    code as the interactive table. No money, bankroll, EV, casino, network,
+    camera or scraping is involved.
+    """
+    st.session_state.table_sim_result = practice_table.simulate_following_coach(
+        profile_key, rounds=rounds, seed=seed)
+    st.session_state.table_sim_rounds = rounds
 
 
 # --- Rendering helpers -----------------------------------------------------
@@ -699,6 +714,63 @@ def _render_table_history() -> None:
         on_click=_clear_table_history, use_container_width=True)
 
 
+def _render_table_simulation(profile_key: str) -> None:
+    """Render the auto-play simulation / sanity-check panel.
+
+    Lets the user auto-play many demo rounds following the coach to confirm the
+    local table is not obviously broken. Educational / local only: no money,
+    bankroll, EV, casino, network, camera or scraping.
+    """
+    st.markdown("#### Auto-play simulation / Sanity check")
+    st.caption(
+        "Auto-play many demo rounds always following the coach to check the "
+        "local table resolves correctly. Local demo only - no money, no "
+        "bankroll, no casino, no network.")
+
+    seed = st.number_input(
+        "Seed", min_value=0, max_value=2_000_000_000, value=42, step=1,
+        key="table_sim_seed",
+        help="Fixed seed makes the simulation deterministic and repeatable.")
+    run_100_col, run_1000_col = st.columns(2)
+    run_100 = run_100_col.button(
+        "Run 100 auto-play hands", key="sim_run_100",
+        use_container_width=True)
+    run_1000 = run_1000_col.button(
+        "Run 1,000 auto-play hands", key="sim_run_1000",
+        use_container_width=True)
+
+    if run_100 or run_1000:
+        rounds = 100 if run_100 else 1000
+        with st.spinner(f"Auto-playing {rounds:,} demo hands..."):
+            _table_run_simulation(profile_key, rounds, int(seed))
+
+    result = st.session_state.table_sim_result
+    if result is None:
+        return
+
+    st.markdown(f"**Result of {result.rounds:,} auto-played hands:**")
+    sim_a, sim_b, sim_c, sim_d = st.columns(4)
+    sim_a.metric("Total hands", result.rounds)
+    sim_b.metric("Wins", f"{result.wins} ({result.win_rate * 100:.0f}%)")
+    sim_c.metric("Losses", f"{result.losses} ({result.loss_rate * 100:.0f}%)")
+    sim_d.metric("Pushes", f"{result.pushes} ({result.push_rate * 100:.0f}%)")
+    sim_e, sim_f, sim_g, sim_h = st.columns(4)
+    sim_e.metric("Busts", result.busts)
+    sim_f.metric("Surrenders", result.surrenders)
+    sim_g.metric("Doubles", result.doubles)
+    sim_h.metric("Followed coach", f"{result.followed_coach_pct:.0f}%")
+
+    interpretation = practice_table.simulation_interpretation(result)
+    if practice_table.simulation_looks_plausible(result):
+        st.success(interpretation)
+    else:
+        st.warning(interpretation)
+    st.info(
+        "This is a local demo sanity check. It does not predict profit or "
+        "guarantee winnings. Blackjack can lose many hands even when following "
+        "correct strategy.")
+
+
 def _render_table_round_result(state) -> None:
     """Render a finished demo round: outcome, decision review, conclusion."""
     record = practice_table.build_round_record(state)
@@ -753,6 +825,7 @@ def _render_practice_table(profile_key: str) -> None:
     if state is None:
         st.info("Press **Start demo round / Deal** to deal a local hand.")
         _render_table_history()
+        _render_table_simulation(profile_key)
         return
 
     # Player hand.
@@ -807,6 +880,7 @@ def _render_practice_table(profile_key: str) -> None:
             on_click=_table_deal, args=(profile_key,), use_container_width=True)
 
     _render_table_history()
+    _render_table_simulation(profile_key)
 
 
 def _render_sidebar() -> dict:

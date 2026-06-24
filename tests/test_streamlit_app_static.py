@@ -184,6 +184,79 @@ class TestStreamlitAppV24LearningReview:
         assert "dealer upcard" in source.lower()
 
 
+class TestStreamlitAppV24Simulation:
+    """v2.4.0 follow-up: visible auto-play simulation / sanity-check panel."""
+
+    def test_has_simulation_section(self):
+        source = _source()
+        assert "Auto-play simulation / Sanity check" in source
+
+    def test_has_run_buttons(self):
+        source = _source()
+        assert "Run 100 auto-play hands" in source
+        assert "Run 1,000 auto-play hands" in source
+        assert "sim_run_100" in source
+        assert "sim_run_1000" in source
+
+    def test_has_seed_input(self):
+        source = _source()
+        assert "table_sim_seed" in source
+        assert "value=42" in source
+
+    def test_uses_simulate_following_coach(self):
+        source = _source()
+        assert "simulate_following_coach" in source
+        assert "simulation_interpretation" in source
+        assert "simulation_looks_plausible" in source
+
+    def test_shows_loading_spinner(self):
+        assert "st.spinner(" in _source()
+
+    def test_shows_all_result_metrics(self):
+        source = _source()
+        for label in ("Total hands", "Wins", "Losses", "Pushes", "Busts",
+                      "Surrenders", "Doubles", "Followed coach"):
+            assert label in source
+
+    def test_has_educational_disclaimer(self):
+        source = _source()
+        assert "local demo sanity check" in source
+        assert "does not predict profit" in source
+
+    def test_has_interpretation_messages(self):
+        source = _source()
+        # Both interpretation strings live in the engine module; the UI shows
+        # whichever applies. Confirm the UI calls the interpretation helper.
+        assert "simulation_interpretation" in source
+
+
+class TestStreamlitAppNoExternalCapture:
+    """The whole app must never read cards from the outside world.
+
+    These check for actual library imports / usage (not disclaimer wording -
+    the module docstring legitimately *promises* it does none of these).
+    """
+
+    def test_no_camera_or_screen_reading(self):
+        source = _source().lower()
+        for forbidden in ("import cv2", "import opencv", "import pyautogui",
+                          "import mss", "import pyscreeze", ".screenshot(",
+                          "videocapture", "imagegrab"):
+            assert forbidden not in source
+
+    def test_no_scraping_or_automation(self):
+        source = _source().lower()
+        for forbidden in ("import selenium", "import playwright",
+                          "from bs4", "import bs4", "beautifulsoup",
+                          "webdriver", "import puppeteer"):
+            assert forbidden not in source
+
+    def test_no_payment_libraries(self):
+        source = _source().lower()
+        for forbidden in ("import stripe", "stripe.", "paypal", "braintree"):
+            assert forbidden not in source
+
+
 class TestStreamlitAppSafety:
     def test_no_subprocess(self):
         assert "subprocess" not in _source()
