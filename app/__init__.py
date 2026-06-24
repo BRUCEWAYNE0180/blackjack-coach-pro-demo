@@ -287,10 +287,22 @@ from .strategy_engine import (
     recommend,
     should_take_insurance,
 )
+from .web_adapter import (
+    WebCoachInput,
+    WebCoachOutput,
+    build_web_coach_output,
+    format_web_action,
+    validate_web_cards,
+)
 
-__version__ = "1.29.0"
+__version__ = "2.0.0"
 
 __all__ = [
+    "WebCoachInput",
+    "WebCoachOutput",
+    "build_web_coach_output",
+    "format_web_action",
+    "validate_web_cards",
     "ACTION_NOTES",
     "Action",
     "CoachHistoryContext",

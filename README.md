@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v1.29.0 feature summary
+## v2.0.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -163,6 +163,10 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   collection, and maintenance - each with a suggested existing command (never
   executed). Local and read-only; it never changes the correct answers or the
   recommendation.
+- **Local Web Coach UI** (v2.0.0): an optional Streamlit web page
+  (`web/streamlit_app.py`) that wraps the existing engine - enter cards, dealer
+  upcard, profile, optional true count and odds, and get the coach's
+  recommendation in the browser. Local only; the CLI and engine are unchanged.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -517,6 +521,33 @@ folder. Priority order: persistent misses, then improving, then new, then
 corrected. With no saved repeat completions it says so clearly. The plan only
 shows suggested commands - you run them yourself - and stores no sensitive data.
 
+## Local Web Coach UI (v2.0.0)
+
+v2.0.0 adds an optional **local web page** (Streamlit) so you can use the coach
+from your browser instead of the terminal. It is a thin wrapper around the same
+engine via `app/web_adapter.py` - it does **not** change the strategy
+recommendation, the correct answers, or the Hi-Lo math, and the CLI keeps
+working exactly as before.
+
+```bash
+python -m pip install -e ".[web]"
+python -m streamlit run web/streamlit_app.py
+blackjack-coach web   # prints these start instructions
+```
+
+`blackjack-coach web` just prints the launch instructions (it does not start any
+process). Streamlit opens a local page (default `http://localhost:8501`) with a
+sidebar for the rule profile, optional true count, odds / composition-aware
+toggles, seen cards, and available-action toggles; the main area takes your
+player cards and the dealer upcard and shows the recommended action,
+explanation, legal actions, optional count-aware and odds / EV blocks, and any
+warnings.
+
+The web UI is **local practice / training / learning only** - no real betting,
+no casino connectivity, no money handling, and no external commands. Streamlit
+is an optional dependency: a normal `pip install -e ".[dev]"` does not require
+it, and the full test suite runs without it.
+
 ## Terminal visual polish (v1.1.0)
 
 v1.1.0 makes the CLI clearer and more pleasant to practise with. Output now has
@@ -628,6 +659,7 @@ blackjack-coach correction-dashboard
 blackjack-coach correction-dashboard --markdown
 blackjack-coach correction-plan
 blackjack-coach correction-plan --focus urgent
+blackjack-coach web
 ```
 
 Without installing, run it as a module from the repository root:

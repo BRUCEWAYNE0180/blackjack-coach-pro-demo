@@ -7,6 +7,63 @@ casino, places real bets, uses a camera/video, or promises winnings.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/),
 and the project follows semantic-ish versioning for an educational tool.
 
+## [2.0.0] - 2026-06-23
+
+First local web mode. v2.0.0 adds an optional **Streamlit Web Coach UI** so the
+coach can be used from a local browser page, alongside (not replacing) the CLI.
+The web UI only wraps the existing engine through a new, testable adapter; it
+never changes `strategy_engine.recommend`, the Hi-Lo math, the recommendations,
+or the CLI, and it handles no money and runs no external commands.
+
+### Added
+
+- `app/web_adapter.py`: a Streamlit-free adapter between the UI and the engine -
+  dataclasses `WebCoachInput` and `WebCoachOutput`, plus `validate_web_cards`,
+  `build_web_coach_output` (reuses `guided_coach.build_coach_step` and the
+  probability / EV advisor; never duplicates strategy), and `format_web_action`.
+  The available-action toggles never silently override the recommendation - a
+  disabled-but-recommended action is flagged instead.
+- `web/` package with `web/streamlit_app.py`: a local Streamlit page (profile,
+  optional true count, odds / composition-aware toggles, seen cards,
+  available-action toggles, a "Get Coach Decision" button, and the recommended
+  action / explanation / legal actions / count-aware / odds / EV / warnings
+  output, plus terminal-command reminders).
+- CLI `web` command: prints the local web UI launch instructions
+  (`pip install -e ".[web]"` then `streamlit run web/streamlit_app.py`). It does
+  not launch any process.
+- Optional `web` dependency group in `pyproject.toml`
+  (`pip install -e ".[web]"`, `streamlit>=1.0`); the runtime engine, CLI, and
+  test suite never require it.
+
+### Changed
+
+- Bumped the package and `app.__version__` to **2.0.0** (first local web mode;
+  the CLI is unchanged and fully backward compatible).
+- `pyproject.toml` now packages the `web` package alongside `app`.
+
+### Quality
+
+- New `tests/test_web_adapter.py` (card validation incl. suited / invalid /
+  single-card; recommended action matches the engine; count-aware info with a
+  true count; odds / EV summaries with `show_odds`; a disabled action is flagged
+  not overridden; `recommend()` unchanged; and that the adapter never imports
+  Streamlit) and `tests/test_streamlit_app_static.py` (the app exists and
+  contains the title / "Local Web Coach UI" / "Get Coach Decision" / an
+  educational notice, uses the adapter, and contains no subprocess / os.system /
+  HTTP / tokens). Extended `tests/test_cli.py` with `TestCliWeb`. Full suite
+  passing (with and without Streamlit installed); ruff clean across
+  `app tests web`.
+
+### Safety
+
+- The Web Coach UI is a **local presentation layer only**. It never changes the
+  main strategy recommendation, the correct answers, or the engine math, never
+  overrides the recommendation with EV, and never runs external commands (no
+  shell, no subprocess, no network). It uses no FastAPI, no Telegram, no
+  database, and no cloud. It handles no money, bankroll, accounts, tokens, or
+  sensitive data, and the `.blackjack_coach/` tree stays git-ignored. The CLI
+  continues to work exactly as before.
+
 ## [1.29.0] - 2026-06-23
 
 Local correction action plan. The v1.28.0 correction dashboard now drives a

@@ -1084,6 +1084,34 @@ saved repeat completions it prints "No correction history yet. Use repeat-pack
 never changes the correct answers or the strategy recommendation, and is never
 committed.
 
+## Local Web Coach UI (v2.0.0)
+
+### web
+
+```bash
+blackjack-coach web
+```
+
+Prints the instructions for starting the optional local Streamlit Web Coach UI.
+It does **not** launch any process (no subprocess, no shell). To start the UI:
+
+```bash
+python -m pip install -e ".[web]"
+python -m streamlit run web/streamlit_app.py
+```
+
+Streamlit opens a local page (default `http://localhost:8501`) that wraps the
+existing engine via `app/web_adapter.py`: a sidebar for the rule profile,
+optional true count, odds / composition-aware toggles, seen cards, and
+available-action toggles; the main area takes the player cards and dealer upcard
+and shows the recommended action, explanation, legal actions, optional
+count-aware and odds / EV blocks, and warnings.
+
+The web UI is local practice / training / learning only - no real betting, no
+casino connectivity, no money handling, and no external commands. Streamlit is
+an optional dependency (`pip install -e ".[web]"`); the engine, CLI, and tests
+never require it, and the CLI keeps working exactly as before.
+
 
 
 

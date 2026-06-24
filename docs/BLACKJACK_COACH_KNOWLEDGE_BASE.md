@@ -167,6 +167,14 @@ tool relies on and the project's evolution.
   `render_correction_plan_markdown`, and `export_correction_plan`. Turns the
   correction dashboard into a prioritised plan with suggested existing commands;
   never executes commands or changes the correct answers / recommendation.
+- `app/web_adapter.py` — Streamlit-free adapter between the local web UI and the
+  engine: `WebCoachInput`, `WebCoachOutput`, plus `validate_web_cards`,
+  `build_web_coach_output` (reuses `guided_coach` and the probability/EV
+  advisor), and `format_web_action`. Testable without a browser; never imports
+  Streamlit and never changes the recommendation.
+- `web/streamlit_app.py` — the optional local Streamlit Web Coach UI (a thin
+  presentation layer over `app/web_adapter.py`). Streamlit is an optional `web`
+  extra; the engine, CLI, and tests never require it.
 - `app/split_rules.py` — Profile-aware split rules: `SplitRuleDecision`,
   `is_pair_hand`, `is_ace_pair`, `can_split_initial_hand`, `can_resplit`,
   `can_hit_split_aces`, `can_double_after_split`, and `explain_split_rules`.
@@ -197,8 +205,9 @@ tool relies on and the project's evolution.
   `report`, and `dashboard` subcommands, plus `drill` (with `--save` /
   `--review`) and `review-queue` and `practice-pack` (with `--complete` /
   `--progress`) and `repeat-pack` (with `--complete` / `--progress`) and
-  `correction-dashboard` and `correction-plan`; `odds`/`coach --show-odds` accept
-  `--explain-ev` and `ev-review` accepts `--explain` / `--large-gaps-only`).
+  `correction-dashboard` and `correction-plan` and `web`; `odds`/`coach
+  --show-odds` accept `--explain-ev` and `ev-review` accepts `--explain` /
+  `--large-gaps-only`).
 - `pyproject.toml` — Modern packaging: metadata, the `blackjack-coach` console
   script, the `dev` extra, and `pytest`/`ruff` configuration.
 - `.github/workflows/ci.yml` — CI: lint + tests on Python 3.9-3.12.
@@ -1541,7 +1550,7 @@ exported files under the git-ignored `.blackjack_coach/reports` tree (unless an
 `--output` path is given), and uses no external dependencies, network, cloud, or
 database.
 
-### v1.29.0 — Correction Action Plan (current)
+### v1.29.0 — Correction Action Plan (done)
 
 Builds on the v1.28.0 correction dashboard. The dashboard showed correction
 status; v1.29.0 turns it into a prioritised, command-by-command action plan so
@@ -1571,10 +1580,46 @@ data, keeps exported files under the git-ignored `.blackjack_coach/reports` tree
 (unless an `--output` path is given), and uses no external dependencies,
 network, cloud, or database.
 
-### v2.0 — Possible Web UI (if decided later)
+### v2.0.0 — Local Streamlit Web Coach UI (current)
 
-- A browser front end over the existing engine and simulator, only if and when
-  decided. Subject to the same educational, no-real-money constraints.
+The first local web mode. The full engine has lived behind the CLI; v2.0.0 adds
+an optional Streamlit web page so the coach can be used from a local browser,
+without replacing or changing the CLI. The web UI is a thin presentation layer
+over a new, testable adapter.
+
+Delivered:
+
+- **`app/web_adapter.py`** (Streamlit-free, unit-testable): `WebCoachInput`,
+  `WebCoachOutput`, plus `validate_web_cards`, `build_web_coach_output` (reuses
+  `guided_coach.build_coach_step` and the probability / EV advisor; the
+  available-action toggles flag, never override, the recommendation), and
+  `format_web_action`.
+- **`web/streamlit_app.py`**: the local Streamlit UI (profile, optional true
+  count, odds / composition-aware toggles, seen cards, available-action toggles,
+  a "Get Coach Decision" button, and the recommendation / explanation / legal
+  actions / count-aware / odds / EV / warnings output, plus terminal-command
+  reminders).
+- **CLI**: new `web` command that prints the launch instructions (it does not
+  start a process). Optional `web` dependency group (`streamlit>=1.0`).
+- **Tests**: `tests/test_web_adapter.py` and `tests/test_streamlit_app_static.py`
+  (the latter reads the app as text, so the suite runs without Streamlit), plus
+  `TestCliWeb` in `tests/test_cli.py`.
+
+**Architecture:** `app/web_adapter.py` is the testable boundary (no Streamlit
+import); `web/streamlit_app.py` is the UI and imports the adapter, never the
+reverse; `strategy_engine`, `guided_coach`, and `probability_advisor` are
+untouched. Per `PROJECT_RULES.md` the UI is a local presentation layer only - it
+never changes the strategy recommendation, the correct answers, or the engine
+math, never overrides the recommendation with EV, never runs external commands
+(no shell / subprocess / network), handles no money or sensitive data, and adds
+no FastAPI / Telegram / database / cloud. The CLI keeps working exactly as
+before.
+
+### v2.x — Possible further web modes (if decided later)
+
+- A richer web front end (or other interfaces) over the same engine and
+  adapter, only if and when decided. Subject to the same educational,
+  no-real-money constraints.
 
 ## Out-of-Scope (All Versions)
 

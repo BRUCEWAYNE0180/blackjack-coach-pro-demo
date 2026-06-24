@@ -389,6 +389,18 @@ As of v0.9 the project enforces these gates on every change:
   with no network, cloud, or database. Exported plans live under the
   git-ignored `.blackjack_coach/reports` tree (unless the user passes an
   explicit `--output` path) and are never committed.
+- **The Web Coach UI is a local presentation layer only.** The Streamlit Web
+  Coach UI (v2.0.0: `app/web_adapter.py` and `web/streamlit_app.py`, the `web`
+  command) is local-only and must never change the main strategy recommendation,
+  the correct answers, or the engine math, never override the recommendation
+  with EV, and never change `strategy_engine.recommend`, the Hi-Lo counting
+  math, or any engine module. It must never run external commands automatically
+  (no shell, no subprocess, no network), must add no FastAPI / Telegram /
+  database / cloud, and must handle no money, bankroll, accounts, tokens, or
+  sensitive/personal data. `app/web_adapter.py` must stay Streamlit-free and
+  testable; the Streamlit UI imports the adapter, never the reverse. Streamlit
+  is an optional `web` dependency and must not be required by the engine, the
+  CLI, or the test suite, and the CLI must keep working unchanged.
 
 ## 8. Release Rules
 
