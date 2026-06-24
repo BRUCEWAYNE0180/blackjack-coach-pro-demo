@@ -393,3 +393,60 @@ class TestRoundResultSection:
         at.button(key="round_clear_history").click().run()
         _assert_clean(at)
         assert at.session_state["round_history"] == []
+
+
+
+class TestFrozenInitialDecision:
+    """Regression: the round review must use the frozen initial coach decision,
+    never a recommendation recomputed from the final / grown cards."""
+
+    def _coach_line(self, at):
+        return next(
+            (m.value for m in at.markdown
+             if "Coach recommended action" in m.value), None)
+
+    def test_decision_frozen_when_main_hand_grows(self):
+        # A,7 vs 10 -> coach HIT. Growing the MAIN hand to A,7,K would make the
+        # live recommendation STAND, but the round review must stay HIT.
+        at = _build_hand(_fresh(), ["A", "7"], "10")
+        assert at.session_state["coach_decision"]["coach_action"] == "HIT"
+        at.button(key="player_K").click().run()  # grow main hand to A,7,K
+        # Frozen decision is unchanged even though the live banner now differs.
+        assert at.session_state["coach_decision"]["coach_action"] == "HIT"
+
+    def test_review_says_followed_coach_even_after_growing_hand(self):
+        at = _build_hand(_fresh(), ["A", "7"], "10")
+        at.button(key="player_K").click().run()  # main hand A,7,K (live STAND)
+        # Record final cards A,7,K vs 10,Q, action HIT, outcome LOSS.
+        at.button(key="round_player_A").click().run()
+        at.button(key="round_player_7").click().run()
+        at.button(key="round_player_K").click().run()
+        at.button(key="round_dealer_10").click().run()
+        at.button(key="round_dealer_Q").click().run()
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        _assert_clean(at)
+        markdowns = [m.value for m in at.markdown]
+        assert self._coach_line(at) == "- **Coach recommended action:** HIT"
+        assert any(
+            "Followed coach recommendation" in m and "correct" in m
+            for m in markdowns)
+        assert not any(
+            "Different from coach recommendation" in m for m in markdowns)
+        assert any("Outcome" in m and "Loss" in m for m in markdowns)
+
+    def test_history_separates_initial_and_final_hands(self):
+        at = _build_hand(_fresh(), ["A", "7"], "10")
+        at.button(key="round_copy_initial").click().run()
+        at.button(key="round_player_K").click().run()
+        at.button(key="round_dealer_Q").click().run()
+        at.radio(key="round_outcome").set_value("LOSS").run()
+        at.button(key="round_save").click().run()
+        _assert_clean(at)
+        row = at.session_state["round_history"][-1]
+        assert row["Initial"] == "A,7 vs 10"
+        assert row["Coach"] == "HIT"
+        assert row["Followed coach"] == "yes"
+        assert row["Outcome"] == "LOSS"
+        # The final hand is recorded separately, not used to infer the coach pick.
+        assert row["Player final"] == "A 7 K"
+        assert row["Dealer final"] == "10 Q"

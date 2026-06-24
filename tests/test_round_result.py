@@ -87,6 +87,21 @@ class TestDecisionReviewSeparatesQualityFromOutcome:
         # The decision is NOT marked bad just because the round was lost.
         assert "independent" in review.note.lower()
 
+    def test_review_uses_given_coach_action_not_recomputed_from_final_cards(self):
+        # Regression (PR #44 bug): the review must trust the frozen coach action
+        # passed in (HIT for the initial A,7 vs 10) and never re-derive it from
+        # the final cards A,7,K (which on their own would be a STAND hand).
+        review = build_round_review(
+            coach_recommended_action="HIT",
+            action_taken="HIT",
+            player_final_cards=["A", "7", "K"],
+            dealer_final_cards=["10", "Q"],
+            outcome="LOSS",
+        )
+        assert review.coach_recommended_action == "HIT"
+        assert review.followed_coach is True
+        assert review.decision_label != "Different from coach recommendation"
+
     def test_different_action_marked_as_different(self):
         review = build_round_review(
             coach_recommended_action="STAND",

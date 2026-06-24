@@ -52,6 +52,20 @@ used only in the new section and never change the recommendation.
   tracking only; the engine, the recommendations, the Hi-Lo math, EV (advisory),
   and the CLI are unchanged and fully backward compatible).
 
+### Fixed
+
+- The round review now **freezes the coach's recommendation at the initial
+  (two-card) decision point** and uses that frozen action, instead of reading
+  the live recommendation. Previously, if the player's main hand grew (e.g.
+  `A,7` -> `A,7,K`) the live recommendation changed (HIT -> STAND) and the
+  review wrongly showed `Coach recommended action: STAND` / "Different from coach
+  recommendation". The frozen decision is computed from the first two player
+  cards vs the dealer upcard and never recomputed from the final / grown cards
+  (`_capture_coach_decision` + the `coach_decision` session state). The decision
+  review and the round history now also show the **initial hand and the final
+  hand as separate fields**, so the final cards are never used to infer the
+  initial recommendation.
+
 ### Quality
 
 - New `tests/test_round_result.py` (outcome suggestion incl. busts / surrender /

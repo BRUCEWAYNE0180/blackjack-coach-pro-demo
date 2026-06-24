@@ -105,6 +105,14 @@ class TestStreamlitAppV22RoundResult:
         assert "Action taken" in source
         assert "Round outcome" in source
 
+    def test_freezes_initial_coach_decision(self):
+        # Regression (PR #44): the review uses a frozen initial decision, not a
+        # recommendation recomputed from the final / grown cards.
+        source = _source()
+        assert "coach_decision" in source
+        assert "_capture_coach_decision" in source
+        assert "Frozen initial decision" in source
+
     def test_player_and_dealer_pickers(self):
         source = _source()
         assert "Your hand" in source
