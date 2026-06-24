@@ -116,6 +116,8 @@ class WebCoachOutput:
     legal_actions: list[str]
     odds_summary: dict | None = None
     ev_summary: dict | None = None
+    recommended_available: bool = True
+    disabled_actions: list[str] = field(default_factory=list)
     raw_debug: dict = field(default_factory=dict)
 
 
@@ -233,6 +235,11 @@ def build_web_coach_output(web_input: WebCoachInput) -> WebCoachOutput:
                 f"You disabled {final_action}, but it is the recommended play; "
                 "re-enable it or pick the next best legal action.")
 
+    # Display-only flag: is the recommended action actually available to the
+    # player given their toggles? (The engine recommendation is unchanged; the
+    # UI uses this to avoid presenting a disabled action as the main play.)
+    recommended_available = final_action in legal_actions
+
     odds_summary = None
     ev_summary = None
     if web_input.show_odds:
@@ -271,5 +278,7 @@ def build_web_coach_output(web_input: WebCoachInput) -> WebCoachOutput:
         legal_actions=legal_actions,
         odds_summary=odds_summary,
         ev_summary=ev_summary,
+        recommended_available=recommended_available,
+        disabled_actions=disabled,
         raw_debug=raw_debug,
     )

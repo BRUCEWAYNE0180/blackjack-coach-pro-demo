@@ -184,3 +184,128 @@ class TestNoErrorBlockAfterReruns:
         _assert_clean(at)
         at.button(key="reset_all").click().run()
         _assert_clean(at)
+
+
+
+def _set_input_mode(at, mode):
+    for radio in at.radio:
+        if radio.label == "Input mode":
+            radio.set_value(mode).run()
+            return
+    raise AssertionError("Input mode radio not found")
+
+
+def _set_checkbox(at, label, value):
+    for box in at.checkbox:
+        if box.label == label:
+            box.set_value(value).run()
+            return
+    raise AssertionError(f"checkbox {label!r} not found")
+
+
+def _captions(at):
+    return [c.value for c in at.caption]
+
+
+def _markdowns(at):
+    return [m.value for m in at.markdown]
+
+
+class TestDisabledActionBanner:
+    """BUG 1: a disabled recommended action must not look like the main play."""
+
+    def test_disabled_surrender_shows_unavailable(self):
+        at = _fresh()
+        _set_checkbox(at, "Allow surrender", False)
+        _build_hand(at, ["10", "6"], "10")
+        _assert_clean(at)
+        # The banner clearly marks the action as unavailable, not a normal pick.
+        assert any("UNAVAILABLE" in c for c in _captions(at))
+        markdowns = _markdowns(at)
+        assert any("SURRENDER is disabled" in m for m in markdowns)
+        assert any(
+            "Base strategy recommends SURRENDER" in m and "disabled" in m
+            for m in markdowns
+        )
+        # Surrender is not offered as a legal action.
+        assert any(
+            m.startswith("**Legal actions:**") and "SURRENDER" not in m
+            for m in markdowns
+        )
+
+    def test_enabled_surrender_shows_normal_banner(self):
+        at = _fresh()
+        _build_hand(at, ["10", "6"], "10")
+        _assert_clean(at)
+        assert any("RECOMMENDED ACTION" in c for c in _captions(at))
+        assert all("UNAVAILABLE" not in c for c in _captions(at))
+        assert "SURRENDER" in (_action_heading(at) or "")
+
+
+class TestResetClearsManualText:
+    """BUG 2: Reset all must clear manual text, dealer, seen cards, true count."""
+
+    def test_reset_clears_all_manual_fields(self):
+        at = _fresh()
+        _set_input_mode(at, "Manual text")
+        at.text_input(key="manual_player").set_value("A,7").run()
+        at.text_input(key="manual_dealer").set_value("9").run()
+        at.text_input(key="seen_cards").set_value("2,3,4").run()
+        at.button(key="reset_all").click().run()
+        _assert_clean(at)
+        assert at.session_state["manual_player"] == ""
+        assert at.session_state["manual_dealer"] == ""
+        assert at.session_state["seen_cards"] == ""
+
+    def test_reset_clears_true_count(self):
+        at = _fresh()
+        _set_checkbox(at, "Use true count", True)
+        at.number_input(key="true_count_value").set_value(5.0).run()
+        at.button(key="reset_all").click().run()
+        _assert_clean(at)
+        assert at.session_state["use_true_count"] is False
+        assert at.session_state["true_count_value"] == 0.0
+
+    def test_reset_clears_button_cards_and_result(self):
+        at = _build_hand(_fresh(), ["8", "8"], "10")
+        at.button(key="reset_all").click().run()
+        _assert_clean(at)
+        assert at.session_state["player_cards"] == []
+        assert at.session_state["dealer_upcard"] is None
+        assert _action_heading(at) is None
+
+
+class TestManualWarningNotStale:
+    """BUG 3: warnings must refresh when the user fixes invalid input."""
+
+    def test_warning_clears_after_correcting_player(self):
+        at = _fresh()
+        _set_input_mode(at, "Manual text")
+        at.text_input(key="manual_player").set_value("A,Z").run()
+        at.button(key="get_decision").click().run()
+        assert len(at.warning) >= 1
+        assert len(at.error) == 0
+        # Correct the input (without re-clicking): warning must disappear.
+        at.text_input(key="manual_player").set_value("A,7").run()
+        _assert_clean(at)
+        assert len(at.warning) == 0
+        assert _action_heading(at) is not None
+
+    def test_warning_clears_after_correcting_dealer(self):
+        at = _fresh()
+        _set_input_mode(at, "Manual text")
+        at.text_input(key="manual_dealer").set_value("Z").run()
+        at.button(key="get_decision").click().run()
+        assert len(at.warning) >= 1
+        at.text_input(key="manual_dealer").set_value("9").run()
+        _assert_clean(at)
+        assert len(at.warning) == 0
+
+    def test_manual_mode_evaluates_live_when_complete(self):
+        at = _fresh()
+        _set_input_mode(at, "Manual text")
+        at.text_input(key="manual_player").set_value("8,8").run()
+        at.text_input(key="manual_dealer").set_value("10").run()
+        # No decision-button click needed: a complete manual hand evaluates.
+        _assert_clean(at)
+        assert "SPLIT" in (_action_heading(at) or "")

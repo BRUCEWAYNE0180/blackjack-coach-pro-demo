@@ -51,9 +51,19 @@ _BUTTONS_PER_ROW = 7
 # --- Session state helpers (button callbacks) -----------------------------
 
 def _init_state() -> None:
-    """Initialise the session state used by the card buttons."""
+    """Initialise the session state used by the card buttons and manual inputs.
+
+    Manual-text and sidebar inputs are given stable keys so that ``Reset all``
+    can clear them too (see :func:`_reset_all`). Initialising here (instead of
+    via widget ``value=``) avoids the "value set via Session State" warning.
+    """
     st.session_state.setdefault("player_cards", [])
     st.session_state.setdefault("dealer_upcard", None)
+    st.session_state.setdefault("manual_player", "A,7")
+    st.session_state.setdefault("manual_dealer", "9")
+    st.session_state.setdefault("seen_cards", "")
+    st.session_state.setdefault("use_true_count", False)
+    st.session_state.setdefault("true_count_value", 0.0)
 
 
 def _add_player_card(rank: str) -> None:
@@ -78,8 +88,20 @@ def _clear_dealer_upcard() -> None:
 
 
 def _reset_all() -> None:
+    """Clear *everything*: button cards, manual text, seen cards, true count.
+
+    Run as a button ``on_click`` callback, so writing to widget-keyed session
+    state here is allowed and takes effect before the widgets are rebuilt. This
+    also clears any stale result / warnings, since the result area recomputes
+    from the (now empty) inputs on the next run.
+    """
     st.session_state.player_cards = []
     st.session_state.dealer_upcard = None
+    st.session_state.manual_player = ""
+    st.session_state.manual_dealer = ""
+    st.session_state.seen_cards = ""
+    st.session_state.use_true_count = False
+    st.session_state.true_count_value = 0.0
 
 
 def _load_example(player: tuple[str, ...], dealer: str) -> None:
@@ -185,9 +207,27 @@ def _render_recommendation_banner(output) -> None:
     Built entirely from native Streamlit components (a bordered container plus
     colour-highlight markdown) - no ``unsafe_allow_html`` - so it renders
     without the dynamic-DOM ``removeChild`` error and stays display-only.
+
+    If the recommended action is disabled by the user's "Available actions"
+    toggles, it is shown clearly as *unavailable* (neutral, not as a normal
+    coloured recommendation) so the UI never presents a disabled action as the
+    main play. The engine recommendation itself is unchanged.
     """
     visual = action_visual(output.final_action)
     action = visual["action"]
+    legal = ", ".join(output.legal_actions) or "(none)"
+
+    if not output.recommended_available:
+        with st.container(border=True):
+            st.caption("RECOMMENDED ACTION UNAVAILABLE")
+            st.markdown(f"## :gray[{action}]")
+            st.markdown(f"**{action} is disabled**")
+            st.write(
+                f"Base strategy recommends {action}, but {action.lower()} is "
+                f"disabled. Legal actions are {legal}.")
+        st.caption(format_web_action(output.final_action))
+        return
+
     color = _ACTION_COLOR.get(action, "gray")
     with st.container(border=True):
         st.caption("RECOMMENDED ACTION")
@@ -238,15 +278,16 @@ def _render_sidebar() -> dict:
     profile_key = st.sidebar.selectbox(
         "Rule profile", sorted(PROFILES), index=sorted(PROFILES).index(
             DEFAULT_PROFILE.key) if DEFAULT_PROFILE.key in PROFILES else 0)
-    use_true_count = st.sidebar.checkbox("Use true count", value=False)
+    use_true_count = st.sidebar.checkbox("Use true count", key="use_true_count")
     true_count = None
     if use_true_count:
         true_count = st.sidebar.number_input(
-            "True count", min_value=-20.0, max_value=20.0, value=0.0, step=0.5)
+            "True count", min_value=-20.0, max_value=20.0, step=0.5,
+            key="true_count_value")
     show_odds = st.sidebar.checkbox("Show odds / EV", value=False)
     composition_aware = st.sidebar.checkbox("Composition-aware odds", value=False)
     seen_cards = st.sidebar.text_input(
-        "Seen cards (optional)", value="",
+        "Seen cards (optional)", key="seen_cards",
         help="Other exposed/removed cards, e.g. 2\u2663,5\u2666")
 
     st.sidebar.subheader("Available actions")
@@ -272,10 +313,10 @@ def _collect_inputs(input_mode: str) -> tuple[str, str]:
     """Return ``(player_cards_str, dealer_upcard_str)`` for the chosen mode."""
     if input_mode == "Manual text":
         player_cards = st.text_input(
-            "Player cards", value="A,7",
+            "Player cards", key="manual_player",
             help="Comma-separated, e.g. A,7 or A\u2660,7\u2665")
         dealer_upcard = st.text_input(
-            "Dealer upcard", value="9", help="e.g. 9 or 9\u2666")
+            "Dealer upcard", key="manual_dealer", help="e.g. 9 or 9\u2666")
         return player_cards, dealer_upcard
 
     _render_card_picker()
@@ -312,21 +353,26 @@ def main() -> None:
         "Reset all", key="reset_all", on_click=_reset_all,
         use_container_width=True)
 
-    # In button mode the result is shown live once the hand is complete, so it
-    # persists while you keep adding cards. In manual mode it waits for the
-    # button. Either way the warnings below are clear about what is missing.
-    auto_ready = (
-        input_mode == "Card buttons"
-        and len(st.session_state.player_cards) >= 2
-        and bool(st.session_state.dealer_upcard)
-    )
+    # When the inputs are "ready" the result is shown live and recomputed on
+    # every rerun, so it always reflects the *current* input - this is what
+    # keeps warnings from going stale when the user fixes an invalid entry or
+    # presses Reset all. Button mode waits for two cards before showing
+    # anything (to avoid premature warnings); manual mode is ready once both
+    # fields have text.
+    if input_mode == "Manual text":
+        ready = bool(player_cards.strip()) and bool(dealer_upcard.strip())
+    else:
+        ready = (
+            len(st.session_state.player_cards) >= 2
+            and bool(st.session_state.dealer_upcard)
+        )
 
     # Render the result inside a single stable container so the DOM node at this
     # position is consistent across reruns (this, plus dropping unsafe_allow_html
     # and giving every widget a unique key, avoids the React removeChild error).
     result_area = st.container()
     with result_area:
-        if evaluate_clicked or auto_ready:
+        if evaluate_clicked or ready:
             web_input = WebCoachInput(
                 player_cards=player_cards,
                 dealer_upcard=dealer_upcard,

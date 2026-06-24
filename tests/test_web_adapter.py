@@ -200,3 +200,53 @@ class TestNoStreamlitDependency:
         with open(wa.__file__, encoding="utf-8") as fh:
             source = fh.read()
         assert "import streamlit" not in source
+
+
+
+class TestRecommendedAvailability:
+    """v2.1.0 fix: flag when a recommended action is disabled by toggles.
+
+    The engine recommendation is never changed; the adapter only reports
+    whether that action is still available given the user's allow_* toggles.
+    """
+
+    def test_available_when_action_enabled(self):
+        out = build_web_coach_output(WebCoachInput(
+            player_cards="10,6", dealer_upcard="10", profile_key=PROFILE,
+            allow_surrender=True))
+        assert out.final_action == "SURRENDER"
+        assert out.recommended_available is True
+        assert out.disabled_actions == []
+        assert "SURRENDER" in out.legal_actions
+
+    def test_unavailable_when_recommended_action_disabled(self):
+        out = build_web_coach_output(WebCoachInput(
+            player_cards="10,6", dealer_upcard="10", profile_key=PROFILE,
+            allow_surrender=False))
+        # Engine still recommends SURRENDER (unchanged)...
+        assert out.final_action == "SURRENDER"
+        # ...but the UI is told it is not available and surrender is filtered
+        # out of the legal actions.
+        assert out.recommended_available is False
+        assert "SURRENDER" in out.disabled_actions
+        assert "SURRENDER" not in out.legal_actions
+        assert "HIT" in out.legal_actions
+
+    def test_engine_recommendation_is_not_changed_by_toggle(self):
+        enabled = build_web_coach_output(WebCoachInput(
+            player_cards="10,6", dealer_upcard="10", profile_key=PROFILE,
+            allow_surrender=True))
+        disabled = build_web_coach_output(WebCoachInput(
+            player_cards="10,6", dealer_upcard="10", profile_key=PROFILE,
+            allow_surrender=False))
+        assert enabled.final_action == disabled.final_action
+        assert enabled.recommended_action == disabled.recommended_action
+
+    def test_default_output_marks_available(self):
+        # A plain construction defaults to available with no disabled actions.
+        out = WebCoachOutput(
+            recommended_action="HIT", final_action="HIT", basic_action="HIT",
+            count_adjusted_action=None, explanation="", warnings=[],
+            hand_summary="", legal_actions=["HIT", "STAND"])
+        assert out.recommended_available is True
+        assert out.disabled_actions == []

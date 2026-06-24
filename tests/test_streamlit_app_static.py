@@ -64,6 +64,20 @@ class TestStreamlitAppV21Features:
     def test_uses_action_visual_for_polished_output(self):
         assert "action_visual" in _source()
 
+    def test_flags_disabled_recommended_action(self):
+        # BUG 1 fix: a disabled recommended action is shown as unavailable,
+        # not as a normal coloured recommendation.
+        source = _source()
+        assert "RECOMMENDED ACTION UNAVAILABLE" in source
+        assert "recommended_available" in source
+
+    def test_reset_clears_manual_inputs(self):
+        # BUG 2 fix: Reset all clears manual text, seen cards, and true count.
+        source = _source()
+        for key in ("manual_player", "manual_dealer", "seen_cards",
+                    "true_count_value"):
+            assert key in source
+
     def test_player_and_dealer_pickers(self):
         source = _source()
         assert "Your hand" in source
