@@ -32,13 +32,20 @@ SURRENDER; SPLIT is auto-played), plays the dealer out automatically per the
 profile, computes WIN / LOSS / PUSH, and auto-saves a decision review to a
 session history. Local / simulated / educational only - no real money, no
 bankroll.
+
+v2.4.0 adds a **learning review** to the practice table: every round gets an
+outcome-aware explanation and a conclusion category, weak spots are tracked, a
+learning dashboard summarises follow-rate / mistakes / correct-but-lost spots /
+repeated situations, mistakes get "next time" advice, and repeated mistakes
+suggest drills. Decision quality is always kept separate from the round outcome
+- a correct decision that loses is never counted as a mistake.
 """
 
 from __future__ import annotations
 
 import streamlit as st
 
-from app import __version__, practice_table
+from app import __version__, practice_review, practice_table
 from app.rules import DEFAULT_PROFILE, PROFILES
 from app.web_adapter import (
     DOUBLE_PLAY_NOTE,
@@ -97,6 +104,9 @@ def _init_state() -> None:
     # v2.3.0 practice-table (demo game) state.
     st.session_state.setdefault("table_state", None)
     st.session_state.setdefault("table_history", [])
+    # v2.4.0 auto-play simulation / sanity-check state.
+    st.session_state.setdefault("table_sim_result", None)
+    st.session_state.setdefault("table_sim_rounds", 0)
 
 
 def _add_player_card(rank: str) -> None:
@@ -215,12 +225,24 @@ def _table_action(action: str) -> None:
     if state.is_round_over and not state.recorded:
         record = practice_table.build_round_record(state)
         st.session_state.table_history.append(
-            practice_table.round_history_row(record))
+            practice_review.build_round_learning(record))
         state.recorded = True
 
 
 def _clear_table_history() -> None:
     st.session_state.table_history = []
+
+
+def _table_run_simulation(profile_key: str, rounds: int, seed: int) -> None:
+    """Auto-play ``rounds`` demo hands following the coach; store the result.
+
+    Local sanity check only - reuses the same dealing / dealer-play / outcome
+    code as the interactive table. No money, bankroll, EV, casino, network,
+    camera or scraping is involved.
+    """
+    st.session_state.table_sim_result = practice_table.simulate_following_coach(
+        profile_key, rounds=rounds, seed=seed)
+    st.session_state.table_sim_rounds = rounds
 
 
 # --- Rendering helpers -----------------------------------------------------
@@ -643,31 +665,116 @@ def _render_round_result(profile_key: str) -> None:
 # --- Practice-table rendering (v2.3.0) ------------------------------------
 
 def _render_table_history() -> None:
-    """Render this session's demo-round history with a small summary."""
-    history = st.session_state.table_history
-    if not history:
+    """Render this session's learning review: dashboard, drills, and history."""
+    learnings = st.session_state.table_history
+    if not learnings:
         return
-    st.markdown("#### Session history")
-    wins = sum(1 for r in history if r["Outcome"] == "WIN")
-    losses = sum(1 for r in history if r["Outcome"] == "LOSS")
-    pushes = sum(1 for r in history if r["Outcome"] == "PUSH")
-    followed = sum(1 for r in history if r["Followed coach"] == "yes")
-    followed_but_lost = sum(
-        1 for r in history
-        if r["Followed coach"] == "yes" and r["Outcome"] == "LOSS")
+    dashboard = practice_review.build_learning_dashboard(learnings)
+
+    st.markdown("#### Learning dashboard")
     st.caption(
-        f"{len(history)} round(s) - {wins}W / {losses}L / {pushes}P - "
-        f"followed coach {followed}/{len(history)} "
-        f"(incl. {followed_but_lost} correct decision(s) that still lost)")
-    st.table(list(reversed(history)))
+        "Decision quality is tracked separately from the round outcome - a "
+        "correct decision that loses is never counted as a mistake.")
+    col_a, col_b, col_c, col_d = st.columns(4)
+    col_a.metric("Rounds", dashboard.total_rounds)
+    col_b.metric("Wins", f"{dashboard.wins} ({dashboard.win_pct:.0f}%)")
+    col_c.metric("Losses", f"{dashboard.losses} ({dashboard.loss_pct:.0f}%)")
+    col_d.metric("Pushes", f"{dashboard.pushes} ({dashboard.push_pct:.0f}%)")
+    col_e, col_f, col_g, col_h = st.columns(4)
+    col_e.metric("Followed coach", f"{dashboard.followed_coach_pct:.0f}%")
+    col_f.metric("Mistakes", dashboard.mistakes)
+    col_g.metric("Correct wins", dashboard.correct_wins)
+    col_h.metric("Correct losses", dashboard.correct_but_lost)
+    st.caption(
+        f"Different from coach but won: {dashboard.different_but_won} "
+        "(a win is not automatically a good habit).")
+
+    if dashboard.most_common_missed_spots:
+        st.markdown("**Most common missed spots (mistakes):**")
+        for spot, count in dashboard.most_common_missed_spots:
+            st.markdown(f"- {spot} - {count}x")
+    if dashboard.most_common_losing_correct_spots:
+        st.markdown("**Correct decisions that still lost (variance, not errors):**")
+        for spot, count in dashboard.most_common_losing_correct_spots:
+            st.markdown(f"- {spot} - {count}x")
+    if dashboard.most_repeated_situations:
+        st.markdown("**Most repeated situations:**")
+        for spot, count in dashboard.most_repeated_situations:
+            st.markdown(f"- {spot} - {count}x")
+    if dashboard.drill_suggestions:
+        st.markdown("**Suggested drills (repeated mistakes):**")
+        for drill in dashboard.drill_suggestions:
+            st.markdown(f"- {drill}")
+
+    st.markdown("#### Session history")
+    rows = [practice_review.learning_row(entry) for entry in reversed(learnings)]
+    st.table(rows)
     st.button(
         "Clear session history", key="table_clear_history",
         on_click=_clear_table_history, use_container_width=True)
 
 
+def _render_table_simulation(profile_key: str) -> None:
+    """Render the auto-play simulation / sanity-check panel.
+
+    Lets the user auto-play many demo rounds following the coach to confirm the
+    local table is not obviously broken. Educational / local only: no money,
+    bankroll, EV, casino, network, camera or scraping.
+    """
+    st.markdown("#### Auto-play simulation / Sanity check")
+    st.caption(
+        "Auto-play many demo rounds always following the coach to check the "
+        "local table resolves correctly. Local demo only - no money, no "
+        "bankroll, no casino, no network.")
+
+    seed = st.number_input(
+        "Seed", min_value=0, max_value=2_000_000_000, value=42, step=1,
+        key="table_sim_seed",
+        help="Fixed seed makes the simulation deterministic and repeatable.")
+    run_100_col, run_1000_col = st.columns(2)
+    run_100 = run_100_col.button(
+        "Run 100 auto-play hands", key="sim_run_100",
+        use_container_width=True)
+    run_1000 = run_1000_col.button(
+        "Run 1,000 auto-play hands", key="sim_run_1000",
+        use_container_width=True)
+
+    if run_100 or run_1000:
+        rounds = 100 if run_100 else 1000
+        with st.spinner(f"Auto-playing {rounds:,} demo hands..."):
+            _table_run_simulation(profile_key, rounds, int(seed))
+
+    result = st.session_state.table_sim_result
+    if result is None:
+        return
+
+    st.markdown(f"**Result of {result.rounds:,} auto-played hands:**")
+    sim_a, sim_b, sim_c, sim_d = st.columns(4)
+    sim_a.metric("Total hands", result.rounds)
+    sim_b.metric("Wins", f"{result.wins} ({result.win_rate * 100:.0f}%)")
+    sim_c.metric("Losses", f"{result.losses} ({result.loss_rate * 100:.0f}%)")
+    sim_d.metric("Pushes", f"{result.pushes} ({result.push_rate * 100:.0f}%)")
+    sim_e, sim_f, sim_g, sim_h = st.columns(4)
+    sim_e.metric("Busts", result.busts)
+    sim_f.metric("Surrenders", result.surrenders)
+    sim_g.metric("Doubles", result.doubles)
+    sim_h.metric("Followed coach", f"{result.followed_coach_pct:.0f}%")
+
+    interpretation = practice_table.simulation_interpretation(result)
+    if practice_table.simulation_looks_plausible(result):
+        st.success(interpretation)
+    else:
+        st.warning(interpretation)
+    st.info(
+        "This is a local demo sanity check. It does not predict profit or "
+        "guarantee winnings. Blackjack can lose many hands even when following "
+        "correct strategy.")
+
+
 def _render_table_round_result(state) -> None:
     """Render a finished demo round: outcome, decision review, conclusion."""
     record = practice_table.build_round_record(state)
+    learning = practice_review.build_round_learning(record)
     outcome_color = _OUTCOME_COLOR.get(record.outcome, "gray")
     with st.container(border=True):
         st.caption("ROUND RESULT")
@@ -677,7 +784,7 @@ def _render_table_round_result(state) -> None:
     st.markdown("#### Decision review")
     st.markdown(
         f"- **Initial hand:** {record.initial_hand} vs dealer "
-        f"{record.dealer_upcard}")
+        f"{record.dealer_upcard} ({learning.hand_type})")
     st.markdown(f"- **Coach recommended action:** {record.coach_action}")
     st.markdown(f"- **Player action taken:** {record.action_taken}")
     st.markdown(f"- **Player final cards:** {record.player_final}")
@@ -687,6 +794,11 @@ def _render_table_round_result(state) -> None:
     st.markdown(
         f"- **Decision review:** :{decision_color}[{record.decision_label}] "
         f"({review_word})")
+    st.markdown(
+        f"- **Conclusion:** {learning.conclusion_category.replace('_', ' ')}")
+    st.info(learning.explanation)
+    if learning.next_time_advice:
+        st.warning(learning.next_time_advice)
     if record.decision_steps:
         st.markdown("**Action sequence:**")
         for index, step in enumerate(record.decision_steps, start=1):
@@ -713,6 +825,7 @@ def _render_practice_table(profile_key: str) -> None:
     if state is None:
         st.info("Press **Start demo round / Deal** to deal a local hand.")
         _render_table_history()
+        _render_table_simulation(profile_key)
         return
 
     # Player hand.
@@ -767,6 +880,7 @@ def _render_practice_table(profile_key: str) -> None:
             on_click=_table_deal, args=(profile_key,), use_container_width=True)
 
     _render_table_history()
+    _render_table_simulation(profile_key)
 
 
 def _render_sidebar() -> dict:

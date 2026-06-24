@@ -232,6 +232,68 @@ class TestRoundRecordSeparatesQualityFromOutcome:
         assert len(record.decision_steps) == 2
 
 
+class TestSimulationSanity:
+    """Auto-play many rounds following the coach to detect a broken table.
+
+    These do not assert an exact rate (variance / rules vary) - they catch
+    *obviously broken* results: a non-functional dealer, mis-counted outcomes,
+    mishandled actions, or a mis-used hole card would push the rates far outside
+    these wide, basic-strategy-plausible bounds.
+    """
+
+    def test_distribution_is_plausible(self):
+        result = pt.simulate_following_coach(PROFILE, rounds=1500, seed=42)
+        assert result.rounds == 1500
+        # Counts always sum to rounds (no lost / double-counted rounds).
+        assert result.wins + result.losses + result.pushes == result.rounds
+        # Wide, basic-strategy-plausible bounds (player wins < half of hands).
+        assert 0.34 < result.win_rate < 0.50
+        assert 0.42 < result.loss_rate < 0.56
+        assert 0.03 < result.push_rate < 0.16
+
+    def test_not_all_one_outcome(self):
+        # A broken table often collapses to ~all losses or ~all wins.
+        result = pt.simulate_following_coach(PROFILE, rounds=600, seed=7)
+        assert result.wins > 0
+        assert result.losses > 0
+        assert result.pushes > 0
+
+    def test_deterministic_for_seed(self):
+        a = pt.simulate_following_coach(PROFILE, rounds=300, seed=123)
+        b = pt.simulate_following_coach(PROFILE, rounds=300, seed=123)
+        assert (a.wins, a.losses, a.pushes) == (b.wins, b.losses, b.pushes)
+
+    def test_zero_rounds(self):
+        result = pt.simulate_following_coach(PROFILE, rounds=0, seed=1)
+        assert result.rounds == 0
+        assert result.win_rate == 0.0
+
+    def test_extra_counters_are_consistent(self):
+        # busts / surrenders / doubles are non-negative and bounded by rounds.
+        result = pt.simulate_following_coach(PROFILE, rounds=400, seed=42)
+        assert 0 <= result.busts <= result.rounds
+        assert 0 <= result.surrenders <= result.rounds
+        assert 0 <= result.doubles <= result.rounds
+        # The simulation always follows the coach, by construction.
+        assert result.followed_coach_pct == 100.0
+
+    def test_followed_coach_pct_zero_rounds(self):
+        result = pt.simulate_following_coach(PROFILE, rounds=0, seed=1)
+        assert result.followed_coach_pct == 0.0
+
+    def test_plausible_simulation_interpretation(self):
+        result = pt.simulate_following_coach(PROFILE, rounds=1000, seed=42)
+        assert pt.simulation_looks_plausible(result) is True
+        assert "plausible" in pt.simulation_interpretation(result).lower()
+
+    def test_broken_distribution_flagged_unusual(self):
+        # An all-loss table (a clearly broken result) is flagged as unusual.
+        broken = pt.SimulationResult(
+            rounds=100, wins=0, losses=100, pushes=0)
+        assert pt.simulation_looks_plausible(broken) is False
+        assert "unusual" in pt.simulation_interpretation(broken).lower()
+
+
 class TestHelpersAndSafety:
     def test_describe_total(self):
         assert pt.describe_total(["10", "9"]) == "19"

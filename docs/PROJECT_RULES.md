@@ -438,6 +438,20 @@ As of v0.9 the project enforces these gates on every change:
   screenshots, or personal data; the in-web session history is session-only. No
   FastAPI, no Telegram, no external API, no database, no login/auth, and the CLI
   must keep working unchanged.
+- **The learning review is local, educational, and outcome-separated.** The
+  v2.4.0 practice-table learning review (`app/practice_review.py`, surfaced in
+  the web Practice table mode) explains rounds, categorises conclusions, tracks
+  weak spots, gives next-time advice, suggests drills, and builds a dashboard.
+  It must **never use the round outcome to call a correct decision a mistake**:
+  a "mistake" means only that the action differed from the coach, and a correct
+  decision that loses must be tracked as variance, never as an error. A win
+  after a non-recommended action must never be presented as automatically good.
+  It must not change `strategy_engine.recommend`, the Hi-Lo math, the coach
+  decisions, or the correct answers, and must not use EV as the main decision.
+  `app/practice_review.py` must stay Streamlit-free; it must store no money,
+  bankroll, bets, accounts, tokens, screenshots, or personal data (the session
+  history is in-memory only), and add no camera / screen reading / scraping /
+  external API / database / login. The CLI must keep working unchanged.
 
 ## 8. Release Rules
 

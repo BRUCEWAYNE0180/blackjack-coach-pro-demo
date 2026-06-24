@@ -1690,7 +1690,7 @@ persistence boundary; `app/web_adapter.py` wraps it for the UI;
 from the final cards. Per `PROJECT_RULES.md` it stays local, educational, and
 outcome-separated, with no money or sensitive data.
 
-### v2.3.0 — Local blackjack practice table (current)
+### v2.3.0 — Local blackjack practice table
 
 Lets the user practise a full round without typing every card. A **Practice
 table (demo)** mode deals the app's own local, simulated cards, freezes the
@@ -1727,6 +1727,38 @@ the Hi-Lo math, and the coach decisions are untouched, and decision quality is
 kept separate from the round outcome. Per `PROJECT_RULES.md` it stays a local,
 simulated, educational demo with no camera / screen reading / scraping / real
 money / bankroll / sensitive data.
+
+### v2.4.0 — Practice table learning review (current)
+
+Makes the practice-table history smarter. Beyond WIN / LOSS / PUSH, each round
+gets an outcome-aware explanation and a conclusion category, weak spots are
+tracked, mistakes get "next time" advice, repeated mistakes suggest drills, and
+a learning dashboard summarises the session. The golden rule: decision quality
+is kept separate from the round outcome - a correct decision that loses is never
+a mistake, and a win after a non-recommended action is never automatically good.
+
+Delivered:
+
+- **`app/practice_review.py`** (Streamlit-free, unit-testable): `RoundLearning`,
+  `LearningDashboard`, `classify_conclusion`, `hand_type_of`, `spot_label`,
+  `build_explanation`, `next_time_advice` (mistakes only), `build_round_learning`,
+  `learning_row`, `build_drill_suggestions` (repeated mistakes), and
+  `build_learning_dashboard` (follow %, mistakes, correct-but-lost,
+  different-but-won, most common missed / losing-correct / repeated spots,
+  drills).
+- **`app/practice_table.py`**: `TableRoundRecord` exposes `player_busted` /
+  `dealer_busted` / `doubled` / `surrendered` for accurate explanations.
+- **`web/streamlit_app.py`**: per-round explanation + conclusion + next-time
+  advice in the round result, and a Learning dashboard + enriched session
+  history table in the Practice table mode.
+- **Tests**: `tests/test_practice_review.py`, extended streamlit
+  interaction / static tests; `--version` assertions updated to 2.4.0.
+
+**Architecture:** `app/practice_review.py` is the testable, Streamlit-free
+learning layer over `app/practice_table.TableRoundRecord`; `web/streamlit_app.py`
+only renders. `strategy_engine`, the Hi-Lo math, and the coach decisions are
+untouched, the outcome never re-grades a decision, and per `PROJECT_RULES.md` it
+stays local, educational, and outcome-separated with no money or sensitive data.
 
 ### v2.x — Possible further web modes (if decided later)
 

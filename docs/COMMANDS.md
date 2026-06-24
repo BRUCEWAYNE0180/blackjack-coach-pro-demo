@@ -1227,6 +1227,28 @@ money or bankroll. The game logic lives in the Streamlit-free
 code) and never changes `strategy_engine.recommend`, the Hi-Lo math, the coach
 decisions, or the CLI. Decision quality is kept separate from the outcome.
 
+## Practice Table Learning Review (v2.4.0)
+
+v2.4.0 adds a **learning review** to the Practice table (demo) mode (no new
+command - it is part of the same local web page). For every finished round it
+shows a **conclusion category** (correct win / correct loss / different win /
+different loss / push / surrender), an **outcome-aware explanation**, and - for
+mistakes (an action different from the coach) - **next-time advice**. A
+**learning dashboard** summarises the session: total rounds, followed-coach %,
+mistakes, correct-but-lost spots (tracked as variance, not errors),
+different-but-won, the most common missed / losing-correct / repeated spots, and
+**drill suggestions** for repeated mistakes (e.g. "Practice hard 16 vs 10",
+"Practice double spots").
+
+The logic lives in the Streamlit-free `app/practice_review.py`
+(`build_round_learning`, `classify_conclusion`, `next_time_advice`,
+`build_drill_suggestions`, `build_learning_dashboard`). The headline rule:
+**decision quality is separate from the round outcome** - a correct decision
+that loses is never counted as a mistake, and a win after a non-recommended play
+is never automatically a good habit. It never changes `strategy_engine.recommend`,
+the Hi-Lo math, the coach decisions, or the CLI, uses no EV as the main
+decision, and stores no money, bankroll, or sensitive data.
+
 
 
 
