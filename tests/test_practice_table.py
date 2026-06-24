@@ -109,6 +109,45 @@ class TestPlayerActions:
         assert state.phase == pt.PHASE_PLAYER
         assert len(state.player_cards) == 3
 
+    def test_hit_recalculates_current_recommendation(self):
+        # A,A,4 (soft 16) vs Q -> coach HIT; after drawing a 5 -> A,A,4,5 (21),
+        # the current recommendation recalculates to STAND while the frozen
+        # initial recommendation stays HIT.
+        state = _state(["A", "A", "4"], ["Q", "7"], tail=["5"])
+        assert state.coach_action == "HIT"
+        assert state.current_coach_action == "HIT"
+        pt.apply_action(state, "HIT")
+        assert state.phase == pt.PHASE_PLAYER
+        assert state.player_cards == ["A", "A", "4", "5"]
+        assert state.coach_action == "HIT"          # frozen, unchanged
+        assert state.current_coach_action == "STAND"  # recalculated live
+
+    def test_action_buttons_remain_after_hit(self):
+        # After a non-busting HIT, HIT/STAND remain legal (no DOUBLE on 3 cards).
+        state = _state(["5", "2"], ["7", "9"], tail=["3"])
+        assert "DOUBLE" in pt.legal_actions(state)
+        pt.apply_action(state, "HIT")
+        assert pt.legal_actions(state) == ["HIT", "STAND"]
+
+    def test_stand_after_hit_resolves_dealer(self):
+        # Tail: HIT draws "3" (-> 13), then the dealer draws "6" (16+6 = 22 bust).
+        state = _state(["5", "2"], ["7", "9"], tail=["6", "3"])
+        pt.apply_action(state, "HIT")
+        assert state.phase == pt.PHASE_PLAYER
+        pt.apply_action(state, "STAND")
+        assert state.phase == pt.PHASE_DONE
+        assert state.dealer_revealed is True
+        assert state.outcome in pt.OUTCOMES
+
+    def test_decision_steps_recorded(self):
+        state = _state(["A", "A", "4"], ["Q", "7"], tail=["5"])
+        pt.apply_action(state, "HIT")
+        pt.apply_action(state, "STAND")
+        steps = state.steps
+        assert len(steps) == 2
+        assert steps[0]["coach"] == "HIT" and steps[0]["action"] == "HIT"
+        assert steps[1]["coach"] == "STAND" and steps[1]["action"] == "STAND"
+
     def test_split_is_autoplayed(self):
         deck = shuffle_shoe(build_shoe(6), seed=7)
         state = pt.build_table_state(PROFILE, ["8", "8"], ["6", deck.pop()], deck)
@@ -179,6 +218,18 @@ class TestRoundRecordSeparatesQualityFromOutcome:
             "Initial", "Coach", "Action", "Followed coach",
             "Player final", "Dealer final", "Outcome",
         }
+
+    def test_frozen_coach_separate_from_current_after_hits(self):
+        # The record's coach_action is the FROZEN initial recommendation, even
+        # after the live recommendation changed during the hand.
+        state = _state(["A", "A", "4"], ["Q", "7"], tail=["5"])
+        pt.apply_action(state, "HIT")    # current -> STAND
+        pt.apply_action(state, "STAND")
+        record = pt.build_round_record(state)
+        assert record.coach_action == "HIT"      # frozen initial
+        assert record.action_taken == "HIT"      # the first action taken
+        assert record.followed_coach is True
+        assert len(record.decision_steps) == 2
 
 
 class TestHelpersAndSafety:

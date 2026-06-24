@@ -651,10 +651,12 @@ selector, then:
    dealer's upcard and a hidden hole card from its own local shoe.
 2. The dealer shows only the upcard; the coach freezes its recommendation
    (HIT / STAND / DOUBLE / SPLIT / SURRENDER) for the initial hand.
-3. Choose your action with the buttons. HIT draws a card (and you can keep
-   playing); DOUBLE takes exactly one card and ends your turn; STAND ends your
-   turn; SURRENDER forfeits; SPLIT is played out automatically by basic
-   strategy (re-splitting is out of scope for the demo).
+3. Choose your action with the buttons. HIT draws a card and you **keep
+   playing** - the coach recommendation is **recalculated for the new hand**
+   after each HIT (using only the dealer upcard); DOUBLE takes exactly one card
+   and ends your turn; STAND ends your turn; SURRENDER forfeits; SPLIT is played
+   out automatically by basic strategy (re-splitting is out of scope for the
+   demo).
 4. The dealer then plays automatically per the rule profile (H17 / S17), the
    app computes **WIN / LOSS / PUSH**, and shows a colour-coded result with a
    **decision review**: the initial hand, the coach's recommended action, the

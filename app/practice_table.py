@@ -83,8 +83,11 @@ class TableState:
     initial_player_cards: tuple[str, ...]
     coach_action: str                    # frozen recommendation (initial hand)
     coach_reason: str
+    current_coach_action: str = ""        # live recommendation for current hand
+    current_coach_reason: str = ""
     phase: str = PHASE_PLAYER
     actions_taken: list[str] = field(default_factory=list)
+    steps: list[dict] = field(default_factory=list)
     doubled: bool = False
     surrendered: bool = False
     was_split: bool = False
@@ -135,8 +138,23 @@ def build_table_state(
         initial_player_cards=tuple(player_cards),
         coach_action=rec.action.value,
         coach_reason=rec.reason,
+        current_coach_action=rec.action.value,
+        current_coach_reason=rec.reason,
         warnings=[EDUCATIONAL_NOTE],
     )
+
+
+def _recompute_current(state: TableState) -> None:
+    """Recalculate the *current* coach recommendation for the live player hand.
+
+    Uses only the player's current cards and the dealer *upcard* (never the
+    hidden hole card). The initial recommendation frozen on ``coach_action`` is
+    left untouched for the history / decision review.
+    """
+    profile = get_profile(state.profile_key)
+    rec = recommend(state.player_cards, state.dealer_upcard, profile)
+    state.current_coach_action = rec.action.value
+    state.current_coach_reason = rec.reason
 
 
 def start_round(
@@ -212,7 +230,6 @@ def _settle_split(state: TableState) -> None:
     """
     profile = get_profile(state.profile_key)
     state.was_split = True
-    state.actions_taken.append("SPLIT")
 
     is_aces = evaluate_hand(state.player_cards).pair_value == 11
     allow_hit = profile.hit_split_aces if is_aces else True
@@ -246,6 +263,10 @@ def _settle_split(state: TableState) -> None:
 def apply_action(state: TableState, action: str) -> TableState:
     """Apply a player action and advance the round (mutates and returns state).
 
+    HIT never ends the turn: if the player does not bust, the round stays in the
+    player phase and the *current* coach recommendation is recalculated for the
+    new hand. The frozen initial recommendation is preserved for the review.
+
     Raises:
         ValueError: If the round is over or the action is not currently legal.
     """
@@ -255,22 +276,31 @@ def apply_action(state: TableState, action: str) -> TableState:
     if action not in legal_actions(state):
         raise ValueError(f"{action or '(none)'} is not a legal action right now.")
 
+    # Record the decision the player faced: the current recommendation for the
+    # hand as it stands, plus the action they took.
+    state.steps.append({
+        "hand": " ".join(state.player_cards),
+        "total": describe_total(state.player_cards),
+        "coach": state.current_coach_action or state.coach_action,
+        "action": action,
+    })
+    state.actions_taken.append(action)
+
     if action == "HIT":
         state.player_cards.append(draw_card(state.shoe))
-        state.actions_taken.append("HIT")
         if evaluate_hand(state.player_cards).is_bust:
             _settle_single(state)
+        else:
+            # HIT does not end the turn - guide the next decision.
+            _recompute_current(state)
     elif action == "STAND":
-        state.actions_taken.append("STAND")
         _settle_single(state)
     elif action == "DOUBLE":
         state.player_cards.append(draw_card(state.shoe))
         state.doubled = True
-        state.actions_taken.append("DOUBLE")
         _settle_single(state)
     elif action == "SURRENDER":
         state.surrendered = True
-        state.actions_taken.append("SURRENDER")
         _settle_single(state)
     elif action == "SPLIT":
         _settle_split(state)
@@ -298,6 +328,7 @@ class TableRoundRecord:
     outcome: str
     was_split: bool
     conclusion: str
+    decision_steps: tuple[dict, ...] = ()
     note: str = DECISION_VS_OUTCOME_NOTE
 
 
@@ -374,6 +405,7 @@ def build_round_record(state: TableState) -> TableRoundRecord:
         outcome=state.outcome,
         was_split=state.was_split,
         conclusion=conclusion,
+        decision_steps=tuple(state.steps),
     )
 
 

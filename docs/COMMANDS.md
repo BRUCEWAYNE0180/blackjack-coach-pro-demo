@@ -1208,6 +1208,10 @@ It lets you play a whole demo round without typing every card:
 - Action buttons: **HIT** (draw and keep playing), **STAND** (end turn), **DOUBLE**
   (exactly one card, then end turn), **SURRENDER** (forfeit), and **SPLIT**
   (auto-played by basic strategy; re-splitting is out of scope for the demo).
+  HIT never ends the turn - after each non-busting HIT the **current** coach
+  recommendation is recalculated for the new hand (the frozen initial
+  recommendation is kept for the review), and the round records the full action
+  sequence.
 - The dealer then plays automatically per the profile (H17 / S17), the app
   computes **WIN / LOSS / PUSH**, and shows a colour-coded result with a
   **decision review** (initial hand, coach recommended action, action taken,

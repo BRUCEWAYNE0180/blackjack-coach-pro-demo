@@ -687,6 +687,12 @@ def _render_table_round_result(state) -> None:
     st.markdown(
         f"- **Decision review:** :{decision_color}[{record.decision_label}] "
         f"({review_word})")
+    if record.decision_steps:
+        st.markdown("**Action sequence:**")
+        for index, step in enumerate(record.decision_steps, start=1):
+            st.markdown(
+                f"{index}. Hand {step['hand']} ({step['total']}) - "
+                f"coach {step['coach']}, you {step['action']}")
     st.caption(record.note)
 
 
@@ -725,13 +731,19 @@ def _render_practice_table(profile_key: str) -> None:
             f"+ hidden card")
 
     # Frozen coach recommendation for the initial hand.
-    coach_color = _ACTION_COLOR.get(state.coach_action, "gray")
-    st.markdown(
-        f"**Coach recommends:** :{coach_color}[{state.coach_action}]")
-    if state.coach_reason:
-        st.caption(state.coach_reason)
+    st.caption(
+        f"Initial recommendation (frozen for review): "
+        f"the coach said {state.coach_action} on "
+        f"{','.join(state.initial_player_cards)} vs {state.dealer_upcard}.")
 
     if state.phase == practice_table.PHASE_PLAYER:
+        # Live recommendation for the *current* hand (recalculated after each
+        # HIT). HIT never ends the turn.
+        current = state.current_coach_action or state.coach_action
+        current_color = _ACTION_COLOR.get(current, "gray")
+        st.markdown(f"**Current coach recommendation:** :{current_color}[{current}]")
+        if state.current_coach_reason:
+            st.caption(state.current_coach_reason)
         actions = practice_table.legal_actions(state)
         if "DOUBLE" in actions:
             st.caption(DOUBLE_PLAY_NOTE)
@@ -744,7 +756,10 @@ def _render_practice_table(profile_key: str) -> None:
             column.button(
                 act, key=f"table_act_{act}", on_click=_table_action,
                 args=(act,), use_container_width=True)
-        st.caption("Choose your action. The dealer then plays automatically.")
+        st.caption(
+            "HIT draws one card and you keep playing; the recommendation "
+            "updates. STAND / DOUBLE / SURRENDER end your turn and the dealer "
+            "plays automatically.")
     else:
         _render_table_round_result(state)
         st.button(

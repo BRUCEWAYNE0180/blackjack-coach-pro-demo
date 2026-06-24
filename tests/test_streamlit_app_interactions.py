@@ -544,9 +544,30 @@ class TestPracticeTable:
         at.button(key="table_deal").click().run()
         coach = at.session_state["table_state"].coach_action
         assert any(
-            "Coach recommends" in m.value for m in at.markdown)
-        # Acting does not change the frozen coach recommendation.
+            "Current coach recommendation" in m.value for m in at.markdown)
+        # Acting does not change the frozen initial coach recommendation.
         first_action = next(
             b.key for b in at.button if b.key.startswith("table_act_"))
         at.button(key=first_action).click().run()
         assert at.session_state["table_state"].coach_action == coach
+
+    def test_hit_keeps_round_active_and_recalculates(self):
+        # Inject a deterministic non-busting state so HIT keeps the player's
+        # turn and the current recommendation recalculates.
+        from app import practice_table as pt
+        at = _fresh()
+        _enter_practice_table(at)
+        at.session_state["table_state"] = pt.build_table_state(
+            "MULTI_DECK_H17_DAS_LS", ["A", "A", "4"], ["Q", "7"], ["5"])
+        at.run()
+        at.button(key="table_act_HIT").click().run()
+        _assert_clean(at)
+        state = at.session_state["table_state"]
+        assert state.phase == pt.PHASE_PLAYER          # HIT did not end the turn
+        assert state.player_cards == ["A", "A", "4", "5"]
+        assert state.current_coach_action == "STAND"   # recalculated
+        assert state.coach_action == "HIT"             # frozen initial kept
+        # Action buttons are shown again after the HIT.
+        assert any(b.key.startswith("table_act_") for b in at.button)
+        assert any(
+            "Current coach recommendation" in m.value for m in at.markdown)

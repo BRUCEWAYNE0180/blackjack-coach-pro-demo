@@ -52,6 +52,19 @@ round-result features are unchanged.
 - The CLI `web` command output mentions the new Practice table (demo) mode
   (still instructions only - it launches no process).
 
+### Fixed
+
+- **HIT now guides the next decision.** HIT never ends the turn: after each
+  non-busting HIT the practice table recalculates a **current** coach
+  recommendation for the new player hand (using only the dealer upcard, never
+  the hole card) and shows it with the legal-action buttons again, so the user
+  is never left unsure whether to hit again or stand. The frozen **initial**
+  recommendation is kept separately for the history / decision review, and the
+  round also records the full **action sequence** (each step's hand, the coach
+  recommendation at that point, and the action taken). A bust after HIT still
+  resolves the round automatically; STAND / DOUBLE / SURRENDER still end the
+  turn (`TableState.current_coach_action` / `steps`).
+
 ### Quality
 
 - New `tests/test_practice_table.py` (deal; legal actions incl. pair-split and

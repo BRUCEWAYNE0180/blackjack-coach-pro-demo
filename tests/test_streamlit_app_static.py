@@ -145,6 +145,12 @@ class TestStreamlitAppV23PracticeTable:
         assert "table_history" in source
         assert "Session history" in source
 
+    def test_shows_current_recommendation_after_hit(self):
+        # Bug fix: HIT recalculates and shows a current recommendation.
+        source = _source()
+        assert "Current coach recommendation" in source
+        assert "current_coach_action" in source
+
     def test_player_and_dealer_pickers(self):
         source = _source()
         assert "Your hand" in source
