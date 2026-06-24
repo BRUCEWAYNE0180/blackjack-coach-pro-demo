@@ -1112,6 +1112,40 @@ casino connectivity, no money handling, and no external commands. Streamlit is
 an optional dependency (`pip install -e ".[web]"`); the engine, CLI, and tests
 never require it, and the CLI keeps working exactly as before.
 
+## Web Card Buttons & UI Polish (v2.1.0)
+
+v2.1.0 upgrades the local web page so you no longer have to type cards by hand.
+Start it the same way:
+
+```bash
+python -m pip install -e ".[web]"
+python -m streamlit run web/streamlit_app.py
+```
+
+In the default **Card buttons** mode (chosen via the sidebar "Input mode"):
+
+- **Your hand:** tap the card buttons (A, 2, 3, 4, 5, 6, 7, 8, 9, 10, J, Q, K)
+  to add cards; **Undo last card** removes the last one and **Clear hand**
+  empties the hand. The selected cards show as live chips.
+- **Dealer upcard:** tap one card button for the dealer's upcard; **Clear
+  dealer** removes it.
+- **Quick examples:** one-click sample hands (*Soft 18 vs 9*, *Hard 16 vs 10*,
+  *Pair of 8s vs 10*, *Pair of Aces vs 6*, *11 vs 5*).
+- **Reset all:** clears the hand and dealer upcard together.
+
+The recommended action is shown as a **colour-coded banner** (HIT / STAND /
+DOUBLE / SPLIT / SURRENDER) with a short description, followed by the
+explanation, hand summary, legal actions, and the optional count-aware / odds /
+EV blocks. If cards are missing or invalid, a clear warning explains what to add
+(e.g. *"Enter at least two player cards"*). The layout is mobile-friendly.
+
+The **Manual text** input mode (sidebar) keeps the original typed-card entry.
+All of this is presentation only - it never changes the recommendation, the
+correct answers, the Hi-Lo math, or the CLI, runs no external commands, and
+handles no money or sensitive data. The display-only helpers live in
+`app/web_adapter.py` (`WEB_CARD_RANKS`, `WEB_QUICK_EXAMPLES`, `action_visual`),
+which stays Streamlit-free.
+
 
 
 

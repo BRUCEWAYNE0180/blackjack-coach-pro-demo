@@ -1580,7 +1580,7 @@ data, keeps exported files under the git-ignored `.blackjack_coach/reports` tree
 (unless an `--output` path is given), and uses no external dependencies,
 network, cloud, or database.
 
-### v2.0.0 — Local Streamlit Web Coach UI (current)
+### v2.0.0 — Local Streamlit Web Coach UI
 
 The first local web mode. The full engine has lived behind the CLI; v2.0.0 adds
 an optional Streamlit web page so the coach can be used from a local browser,
@@ -1614,6 +1614,40 @@ math, never overrides the recommendation with EV, never runs external commands
 (no shell / subprocess / network), handles no money or sensitive data, and adds
 no FastAPI / Telegram / database / cloud. The CLI keeps working exactly as
 before.
+
+### v2.1.0 — Web card buttons & UI polish (current)
+
+A usability pass over the v2.0.0 web page. Instead of typing cards, the user
+taps **card buttons** to build the hand and pick the dealer upcard, loads sample
+hands from **quick examples**, and uses **clear / reset** controls; the
+recommendation is shown as a **colour-coded banner** and the layout is
+mobile-friendly. The manual text-entry mode is kept. This is presentation only -
+the engine, the recommendations, the Hi-Lo math, and the CLI are unchanged.
+
+Delivered:
+
+- **`app/web_adapter.py`** display-only helpers (no strategy logic):
+  `WEB_CARD_RANKS` (the A, 2-10, J, Q, K button ranks), `WEB_QUICK_EXAMPLES`
+  (one-click sample hands), and `action_visual` (a CSS colour + short
+  description per action used by the colour-coded banner). The adapter stays
+  Streamlit-free.
+- **`web/streamlit_app.py`**: tappable player-hand buttons (undo / clear-hand),
+  tappable dealer-upcard buttons (clear), a live selected-cards display,
+  one-click quick examples, a Reset-all control, a polished colour-coded
+  recommended-action banner, clearer missing-card warnings, a centred
+  mobile-friendly layout, and a retained "Manual text" input mode.
+- **CLI**: the `web` command output now mentions the card buttons / quick
+  examples / clear-reset / colour-coded result (still instructions only).
+- **Tests**: extended `tests/test_web_adapter.py` (button ranks, quick examples,
+  `action_visual`, and that none of it changes `recommend()`) and
+  `tests/test_streamlit_app_static.py` (card buttons, quick examples, clear /
+  reset, manual mode, `action_visual`); `--version` assertions updated to 2.1.0.
+
+**Architecture:** unchanged from v2.0.0 - `app/web_adapter.py` stays the
+testable, Streamlit-free boundary and the new helpers are display/input only;
+`web/streamlit_app.py` is the UI and imports the adapter, never the reverse;
+`strategy_engine`, `guided_coach`, and `probability_advisor` are untouched. Per
+`PROJECT_RULES.md` the UI remains a local presentation layer only.
 
 ### v2.x — Possible further web modes (if decided later)
 

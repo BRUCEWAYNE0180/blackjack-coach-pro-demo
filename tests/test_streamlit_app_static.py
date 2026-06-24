@@ -1,4 +1,4 @@
-"""Static checks for the local Streamlit Web Coach UI (v2.0.0).
+"""Static checks for the local Streamlit Web Coach UI (v2.1.0).
 
 These read the source as text and never import Streamlit, so they run without
 the optional web extra installed.
@@ -34,6 +34,40 @@ class TestStreamlitAppContent:
 
     def test_uses_web_adapter(self):
         assert "web_adapter" in _source()
+
+
+class TestStreamlitAppV21Features:
+    """v2.1.0 card buttons, quick examples, clear/reset, polished output."""
+
+    def test_uses_card_rank_buttons(self):
+        source = _source()
+        assert "WEB_CARD_RANKS" in source
+        assert "_render_rank_buttons" in source
+
+    def test_has_quick_examples(self):
+        source = _source()
+        assert "WEB_QUICK_EXAMPLES" in source
+        assert "Quick examples" in source
+
+    def test_has_clear_and_reset_controls(self):
+        source = _source()
+        assert "Clear hand" in source
+        assert "Clear dealer" in source
+        assert "Reset all" in source
+
+    def test_keeps_manual_text_mode(self):
+        source = _source()
+        assert "Manual text" in source
+        assert "Player cards" in source
+        assert "Dealer upcard" in source
+
+    def test_uses_action_visual_for_polished_output(self):
+        assert "action_visual" in _source()
+
+    def test_player_and_dealer_pickers(self):
+        source = _source()
+        assert "Your hand" in source
+        assert "dealer upcard" in source.lower()
 
 
 class TestStreamlitAppSafety:

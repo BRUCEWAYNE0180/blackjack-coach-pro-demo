@@ -1,12 +1,15 @@
-"""Tests for the web adapter (v2.0.0)."""
+"""Tests for the web adapter (v2.1.0)."""
 
 import sys
 
 from app.rules import get_profile
 from app.strategy_engine import recommend
 from app.web_adapter import (
+    WEB_CARD_RANKS,
+    WEB_QUICK_EXAMPLES,
     WebCoachInput,
     WebCoachOutput,
+    action_visual,
     build_web_coach_output,
     format_web_action,
     validate_web_cards,
@@ -110,6 +113,72 @@ class TestFormatAction:
 
     def test_none(self):
         assert format_web_action(None) == "(none)"
+
+
+class TestWebCardRanks:
+    """v2.1.0 display/input button ranks."""
+
+    def test_has_all_expected_ranks(self):
+        assert WEB_CARD_RANKS == (
+            "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K")
+
+    def test_every_rank_is_parseable_by_the_engine(self):
+        # Each button rank must validate as a real engine card (paired so the
+        # adapter accepts the two-card minimum).
+        for rank in WEB_CARD_RANKS:
+            ranks, dealer = validate_web_cards(f"{rank},{rank}", rank)
+            assert len(ranks) == 2
+            assert dealer
+
+
+class TestWebQuickExamples:
+    """v2.1.0 one-click quick-example hands."""
+
+    def test_examples_are_well_formed(self):
+        assert WEB_QUICK_EXAMPLES
+        for example in WEB_QUICK_EXAMPLES:
+            assert example["label"]
+            assert len(example["player"]) >= 2
+            assert example["dealer"]
+
+    def test_examples_validate_and_recommend(self):
+        # Every quick example must be a valid, coachable hand.
+        for example in WEB_QUICK_EXAMPLES:
+            out = build_web_coach_output(WebCoachInput(
+                player_cards=",".join(example["player"]),
+                dealer_upcard=example["dealer"], profile_key=PROFILE))
+            assert out.recommended_action
+
+
+class TestActionVisual:
+    """v2.1.0 display-only action styling (never changes strategy)."""
+
+    def test_known_actions_have_distinct_colors(self):
+        colors = {
+            action_visual(a)["color"]
+            for a in ("HIT", "STAND", "DOUBLE", "SPLIT", "SURRENDER")
+        }
+        assert len(colors) == 5
+
+    def test_returns_color_and_description(self):
+        visual = action_visual("HIT")
+        assert visual["action"] == "HIT"
+        assert visual["color"].startswith("#")
+        assert visual["description"]
+
+    def test_is_case_insensitive(self):
+        assert action_visual("stand")["action"] == "STAND"
+
+    def test_none_and_unknown_get_fallback(self):
+        assert action_visual(None)["action"] == "(none)"
+        assert action_visual("WAVE")["color"].startswith("#")
+
+    def test_does_not_change_recommendation(self):
+        profile = get_profile(PROFILE)
+        before = recommend(["10", "6"], "10", profile).action
+        action_visual("SURRENDER")
+        after = recommend(["10", "6"], "10", profile).action
+        assert before == after
 
 
 class TestNoStreamlitDependency:

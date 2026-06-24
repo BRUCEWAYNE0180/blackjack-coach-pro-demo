@@ -23,7 +23,7 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
 [Commands](docs/COMMANDS.md) · [Changelog](CHANGELOG.md) ·
 [Project rules](docs/PROJECT_RULES.md) · [License](LICENSE)
 
-## v2.0.0 feature summary
+## v2.1.0 feature summary
 
 - Recommends the basic-strategy action (`HIT`, `STAND`, `DOUBLE`, `SPLIT`,
   `SURRENDER`) for multi-deck **H17** and **S17** profiles.
@@ -167,6 +167,13 @@ Docs: [Release notes](docs/RELEASE_NOTES_v1.0.0.md) ·
   (`web/streamlit_app.py`) that wraps the existing engine - enter cards, dealer
   upcard, profile, optional true count and odds, and get the coach's
   recommendation in the browser. Local only; the CLI and engine are unchanged.
+- **Web card buttons & UI polish** (v2.1.0): the local web page gains tappable
+  **card buttons** (A, 2-10, J, Q, K) for the player hand and dealer upcard,
+  one-click **quick examples**, **clear / reset** controls, a **colour-coded**
+  recommended-action banner (HIT / STAND / DOUBLE / SPLIT / SURRENDER), clearer
+  missing-card warnings, and a mobile-friendly layout - with the manual
+  text-entry mode kept. Presentation only; the engine, recommendations, Hi-Lo
+  math, and CLI are unchanged.
 
 ## EV Snapshot History & Review (v1.17.0)
 
@@ -547,6 +554,37 @@ The web UI is **local practice / training / learning only** - no real betting,
 no casino connectivity, no money handling, and no external commands. Streamlit
 is an optional dependency: a normal `pip install -e ".[dev]"` does not require
 it, and the full test suite runs without it.
+
+## Web Card Buttons & UI Polish (v2.1.0)
+
+v2.1.0 makes the local web page much friendlier - no more typing `A,7` by hand.
+
+```bash
+python -m pip install -e ".[web]"
+python -m streamlit run web/streamlit_app.py
+```
+
+In the default **Card buttons** mode you build the hand by tapping card buttons
+(**A, 2, 3, 4, 5, 6, 7, 8, 9, 10, J, Q, K**):
+
+- **Your hand:** tap ranks to add cards, with **Undo last card** and **Clear
+  hand**; the selected cards show as live chips.
+- **Dealer upcard:** tap one rank for the dealer's card, with **Clear dealer**.
+- **Quick examples:** load a sample hand (e.g. *Soft 18 vs 9*, *Hard 16 vs 10*,
+  *Pair of 8s vs 10*, *Pair of Aces vs 6*, *11 vs 5*) with one tap.
+- **Reset all:** clear the hand and the dealer upcard together.
+
+The recommendation appears as a **polished, colour-coded banner** - HIT, STAND,
+DOUBLE, SPLIT, or SURRENDER - with a short description, followed by the
+explanation, hand summary, legal actions, and any optional count-aware / odds /
+EV blocks. Warnings are clearer when cards are missing or invalid (e.g. *"Enter
+at least two player cards"*), and the centred layout works well on a phone.
+
+A **Manual text** input mode (sidebar) keeps the original typed-card entry for
+power users. All of this is **presentation only**: the engine, the
+recommendation, the correct answers, the Hi-Lo math, and the CLI are unchanged,
+and the UI still runs no external commands and handles no money or sensitive
+data.
 
 ## Terminal visual polish (v1.1.0)
 

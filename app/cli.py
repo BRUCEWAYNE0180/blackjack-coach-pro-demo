@@ -3297,6 +3297,11 @@ def build_web_output() -> str:
         "Streamlit opens a local page in your browser (default "
         "http://localhost:8501).",
         "",
+        format_kv("Tip", "v2.1.0 adds card buttons (A, 2-10, J, Q, K) for "
+                         "player cards and the dealer upcard, quick examples, "
+                         "clear / reset, and a polished colour-coded result. A "
+                         "manual text-entry mode is still available."),
+        "",
         format_kv("Note", "Local practice / training only - no real bets, no "
                           "casino connectivity, no money handling. The CLI "
                           "keeps working exactly as before."),
